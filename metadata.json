@@ -1,0 +1,6 @@
+{
+  "name": "LoanFlow AI - Loan Follow-Up & Recovery Dashboard",
+  "description": "AI-powered loan follow-up, recovery management, and RAG policy retrieval dashboard for collection executives.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
