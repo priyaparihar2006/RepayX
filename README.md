@@ -10,9 +10,6 @@ View your app in AI Studio: https://ai.studio/apps/c5c62c1c-25a6-4bd2-b053-2e348
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
-
-1. I
+**Prerequisites:**  No
    
 
