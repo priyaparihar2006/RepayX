@@ -6,4 +6,4 @@ fhfgc<div align="center">
 
 This contains everything you need to run your app locally.
 
-View your app in AI Studio: 
+View your app in 
