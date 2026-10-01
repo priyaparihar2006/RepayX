@@ -6,7 +6,6 @@ RepayX is an intelligent loan follow-up and recovery management platform designe
 The platform combines structured loan data, analytics, automated follow-up workflows, and natural-language querying into a centralized dashboard for collection and recovery teams.
 
 🚀 Overview
-🚀 Overview
 
 Managing large volumes of loan accounts manually can make it difficult for collection teams to identify:
 
