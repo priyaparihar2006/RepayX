@@ -54,4 +54,19 @@ Payment status distribution
 
 The dashboard provides a quick understanding of the overall loan portfolio.
 
-2. 📅 Due Date & Payment Tracking
+2. 📅 Due Date & Payment TrackingRepayX tracks important payment information including:
+
+Loan ID
+Borrower information
+Loan amount
+Due date
+Payment date
+Payment status
+Outstanding amount
+Days Past Due (DPD)
+
+This helps users identify accounts that may require attention.
+
+3. ⚠️ Overdue Loan Monitoring
+
+The system identifies loans where payments have passed their expected due date.
