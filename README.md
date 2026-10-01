@@ -1,25 +1,30 @@
-RepayX
-AI-Powered Loan Follow-Up & Recovery Dashboard
+# RepayX
 
-RepayX is an intelligent loan follow-up and recovery management platform designed to help lending and financial organizations efficiently monitor loan accounts, identify upcoming and overdue payments, prioritize follow-ups, and interact with loan records using an AI-powered Retrieval-Augmented Generation (RAG) system.
+### AI-Powered Loan Follow-Up & Recovery Dashboard
 
-The platform combines structured loan data, analytics, automated follow-up workflows, and natural-language querying into a centralized dashboard for collection and recovery teams.
+RepayX is an intelligent **loan follow-up and recovery management platform** designed to help lending and financial organizations efficiently monitor loan accounts, identify upcoming and overdue payments, prioritize follow-ups, and interact with loan records using an AI-powered Retrieval-Augmented Generation (RAG) system.
 
-🚀 Overview
+The platform combines **structured loan data, analytics, automated follow-up workflows, and natural-language querying** into a centralized dashboard for collection and recovery teams.
+
+---
+
+## 🚀 Overview
 
 Managing large volumes of loan accounts manually can make it difficult for collection teams to identify:
 
-Which loans are due soon
-Which accounts are overdue
-How many days a payment is past due
-Which accounts require follow-up
-Historical payment and repayment information
-Portfolio-level payment statistics
-Relevant information from large loan datasets
+* Which loans are due soon
+* Which accounts are overdue
+* How many days a payment is past due
+* Which accounts require follow-up
+* Historical payment and repayment information
+* Portfolio-level payment statistics
+* Relevant information from large loan datasets
 
 RepayX addresses these challenges through a unified dashboard that allows users to monitor loan portfolios and retrieve relevant information using natural language.
 
-Core Concept
+### Core Concept
+
+```text
 Loan / Payment Data
         ↓
 Data Processing & Validation
@@ -33,78 +38,97 @@ RAG Knowledge Layer
 AI Query Interface
         ↓
 RepayX Dashboard
+```
 
-✨ Key Features
-1. 📊 Loan Portfolio Dashboard
+---
+
+# ✨ Key Features
+
+## 1. 📊 Loan Portfolio Dashboard
 
 RepayX provides a centralized overview of the loan portfolio.
 
 Users can monitor important metrics such as:
 
-Total Loans
-Active Loans
-Paid Loans
-Overdue Loans
-Due Soon Accounts
-Total Loan Amount
-Total Amount Paid
-Outstanding Amount
-Recovery-related metrics
-Payment status distribution
+* Total Loans
+* Active Loans
+* Paid Loans
+* Overdue Loans
+* Due Soon Accounts
+* Total Loan Amount
+* Total Amount Paid
+* Outstanding Amount
+* Recovery-related metrics
+* Payment status distribution
 
 The dashboard provides a quick understanding of the overall loan portfolio.
 
-2. 📅 Due Date & Payment TrackingRepayX tracks important payment information including:
+---
 
-Loan ID
-Borrower information
-Loan amount
-Due date
-Payment date
-Payment status
-Outstanding amount
-Days Past Due (DPD)
+## 2. 📅 Due Date & Payment Tracking
+
+RepayX tracks important payment information including:
+
+* Loan ID
+* Borrower information
+* Loan amount
+* Due date
+* Payment date
+* Payment status
+* Outstanding amount
+* Days Past Due (DPD)
 
 This helps users identify accounts that may require attention.
 
-3. ⚠️ Overdue Loan Monitoring
+---
+
+## 3. ⚠️ Overdue Loan Monitoring
 
 The system identifies loans where payments have passed their expected due date.
+
 Accounts can be categorized based on their payment status, such as:
 
+```text
 Upcoming
 Due Today
 Overdue
 Paid
 Partially Paid
+```
 
-The system can also use Days Past Due (DPD) to provide a clearer understanding of payment timelines.
+The system can also use **Days Past Due (DPD)** to provide a clearer understanding of payment timelines.
 
-4. 🔎 Loan Search & Filtering
+---
+
+## 4. 🔎 Loan Search & Filtering
 
 Users can search and filter loan records based on relevant attributes.
 
 Examples include:
 
-Loan ID
-Customer name
-Loan status
-Payment status
-Due date
-Date range
-Outstanding amount
-DPD
-Loan amount
+* Loan ID
+* Customer name
+* Loan status
+* Payment status
+* Due date
+* Date range
+* Outstanding amount
+* DPD
+* Loan amount
 
 This makes it easier for collection teams to locate specific accounts.
 
-🤖 AI-Powered RAG Assistant
+---
 
-One of the primary features of RepayX is its Retrieval-Augmented Generation (RAG) based AI assistant.
+# 🤖 AI-Powered RAG Assistant
+
+One of the primary features of RepayX is its **Retrieval-Augmented Generation (RAG)** based AI assistant.
 
 The assistant allows users to ask questions about available loan records using natural language.
 
-Example Questions
+### Example Questions
+
+```text
 How many loans are currently overdue?
 
 What is the total outstanding amount?
@@ -116,13 +140,17 @@ How many payments were completed last month?
 What is the average loan amount?
 
 Show the payment records for loan ID LN10234.
+```
 
 Instead of requiring users to manually search through large datasets, the AI assistant retrieves relevant information and generates an understandable response.
 
-🧠 RAG Architecture
+---
+
+# 🧠 RAG Architecture
 
 RepayX uses a RAG-based architecture to connect the AI assistant with the application's loan data.
 
+```text
                     User Query
                         │
                         ▼
@@ -152,50 +180,64 @@ RepayX uses a RAG-based architecture to connect the AI assistant with the applic
                        │
                        ▼
                  AI Response
-Important Design Principle
+```
 
-RepayX separates structured numerical analysis from semantic retrieval.
+### Important Design Principle
+
+RepayX separates **structured numerical analysis** from **semantic retrieval**.
 
 For example:
 
-Query Type	Processing
-Number of overdue loans	SQL / Pandas
-Average loan amount	SQL / Pandas
-Total outstanding amount	SQL / Pandas
-Specific loan record	Database retrieval
-Information from documents	Vector search
-Natural-language contextual questions	RAG
+| Query Type                            | Processing         |
+| ------------------------------------- | ------------------ |
+| Number of overdue loans               | SQL / Pandas       |
+| Average loan amount                   | SQL / Pandas       |
+| Total outstanding amount              | SQL / Pandas       |
+| Specific loan record                  | Database retrieval |
+| Information from documents            | Vector search      |
+| Natural-language contextual questions | RAG                |
 
 This prevents the system from relying on vector search for calculations that should be performed directly on structured data.
 
-📈 Analytics
+---
+
+# 📈 Analytics
 
 RepayX can calculate portfolio-level statistics directly from structured loan data.
 
 Examples include:
 
-Loan Statistics
-Total number of loans
-Average loan amount
-Minimum loan amount
-Maximum loan amount
-Total disbursed amount
-Payment Statistics
-Total payments
-Paid payments
-Pending payments
-Overdue payments
-Average payment amount
-Date-Based Analytics
-Loans due today
-Loans due this week
-Loans overdue this month
-Monthly payment trends
-Historical payment summaries
-🗂️ Loan Data Structure
+### Loan Statistics
+
+* Total number of loans
+* Average loan amount
+* Minimum loan amount
+* Maximum loan amount
+* Total disbursed amount
+
+### Payment Statistics
+
+* Total payments
+* Paid payments
+* Pending payments
+* Overdue payments
+* Average payment amount
+
+### Date-Based Analytics
+
+* Loans due today
+* Loans due this week
+* Loans overdue this month
+* Monthly payment trends
+* Historical payment summaries
+
+---
+
+# 🗂️ Loan Data Structure
 
 A typical loan record may contain fields such as:
 
+```text
 Loan ID
 Customer ID
 Customer Name
@@ -210,42 +252,51 @@ Days Past Due
 Loan Type
 Interest Rate
 Loan Tenure
+```
 
 The exact schema can be extended according to the organization's requirements.
 
-🔐 Data & Security
+---
+
+# 🔐 Data & Security
 
 Because RepayX deals with financial information, the application should follow secure data-handling practices.
 
 Recommended controls include:
 
-Authentication
-Role-based access control
-Secure API endpoints
-Input validation
-Environment variables for secrets
-Database access controls
-API rate limiting
-Secure session/token management
-Sensitive information protection
-Audit logging
-Environment Variables
+* Authentication
+* Role-based access control
+* Secure API endpoints
+* Input validation
+* Environment variables for secrets
+* Database access controls
+* API rate limiting
+* Secure session/token management
+* Sensitive information protection
+* Audit logging
+
+### Environment Variables
 
 Sensitive configuration should never be committed directly to Git.
 
 Example:
 
+```env
 DATABASE_URL=
 OPENAI_API_KEY=
 VECTOR_DB_URL=
 JWT_SECRET=
+```
 
-A .env.example file should be maintained for development.
+A `.env.example` file should be maintained for development.
 
-🏗️ Project Architecture
+---
+
+# 🏗️ Project Architecture
 
 A high-level architecture of RepayX:
 
+```text
                     ┌─────────────────┐
                     │   RepayX UI     │
                     │    Dashboard    │
@@ -267,18 +318,27 @@ A high-level architecture of RepayX:
                                     ┌────────┴────────┐
                                     ▼                 ▼
                               Vector Store           LLM
-🔄 Data Flow
-Step 1 — Data Ingestion
+```
+
+---
+
+# 🔄 Data Flow
+
+### Step 1 — Data Ingestion
 
 Loan and payment records are imported into the system.
 
+```text
 CSV / Database / API
         ↓
 Data Ingestion
-Step 2 — Data Processing
+```
+
+### Step 2 — Data Processing
 
 The system validates and processes the incoming records.
 
+```text
 Raw Data
    ↓
 Validation
@@ -286,14 +346,17 @@ Validation
 Cleaning
    ↓
 Transformation
-Step 3 — Structured Storage
+```
+
+### Step 3 — Structured Storage
 
 Processed records are stored in the application's database.
 
-Step 4 — RAG Indexing
+### Step 4 — RAG Indexing
 
 Relevant textual information can be transformed into embeddings and stored in a vector database.
 
+```text
 Documents
    ↓
 Chunking
@@ -301,117 +364,152 @@ Chunking
 Embeddings
    ↓
 Vector Database
-Step 5 — User Query
+```
+
+### Step 5 — User Query
 
 The user asks a question through the RepayX AI assistant.
 
-Step 6 — Retrieval & Processing
+### Step 6 — Retrieval & Processing
 
 The system determines whether the question requires:
 
-Database querying
-Aggregation
-Retrieval
-Semantic search
-RAG
-Step 7 — Response
+* Database querying
+* Aggregation
+* Retrieval
+* Semantic search
+* RAG
+
+### Step 7 — Response
 
 The system returns a natural-language response to the user.
 
-🖥️ Dashboard Modules
+---
+
+# 🖥️ Dashboard Modules
 
 RepayX can be organized into the following modules:
 
-Dashboard
+### Dashboard
 
 Provides the overall portfolio summary.
 
-Loans
+### Loans
 
 Displays detailed loan records.
 
-Payments
+### Payments
 
 Displays payment history and payment statuses.
 
-Overdue
+### Overdue
 
 Displays overdue accounts and DPD information.
 
-Analytics
+### Analytics
 
 Provides charts, trends, and portfolio-level statistics.
 
-AI Assistant
+### AI Assistant
 
 Allows users to ask natural-language questions about the loan data.
 
-Follow-Ups
+### Follow-Ups
 
 Provides a workspace for managing accounts requiring follow-up.
 
-🎯 Target Users
+---
+
+# 🎯 Target Users
 
 RepayX is designed for organizations and teams involved in loan servicing and recovery operations.
 
 Potential users include:
 
-Collection teams
-Loan servicing teams
-Recovery teams
-Operations teams
-Financial analysts
-Loan administrators
-Managers
-Supervisors
-💡 Example Use Cases
-Use Case 1 — Overdue Loans
+* Collection teams
+* Loan servicing teams
+* Recovery teams
+* Operations teams
+* Financial analysts
+* Loan administrators
+* Managers
+* Supervisors
+
+---
+
+# 💡 Example Use Cases
+
+## Use Case 1 — Overdue Loans
 
 A collection manager wants to identify overdue accounts.
 
+```text
 User:
 "Show me all overdue loans."
 
 RepayX:
 Retrieves the relevant records and displays
 overdue accounts with their DPD and outstanding amounts.
-Use Case 2 — Portfolio Summary
+```
+
+---
+
+## Use Case 2 — Portfolio Summary
+
+```text
 User:
 "What is the total outstanding amount?"
 
 RepayX:
 Calculates the value directly from structured loan data
 and returns the aggregated result.
-Use Case 3 — Historical Analysis
+```
+
+---
+
+## Use Case 3 — Historical Analysis
+
+```text
 User:
 "How many payments were completed last month?"
 
 RepayX:
 Filters payment records based on the requested date range
 and calculates the total.
-Use Case 4 — Specific Loan
+```
+
+---
+
+## Use Case 4 — Specific Loan
+
+```text
 User:
 "Show me the details of loan LN10234."
 
 RepayX:
 Retrieves the corresponding loan record and presents
 its relevant details.
-🧪 Data Validation
+```
+
+---
+
+# 🧪 Data Validation
 
 The application should validate incoming loan and payment records before storing them.
 
 Examples:
 
-Required fields must be present
-Loan IDs should be unique
-Dates should follow valid formats
-Amounts should be numeric
-Payment amounts should not contain invalid values
-DPD should be a valid numeric value
-Status values should follow predefined categories
+* Required fields must be present
+* Loan IDs should be unique
+* Dates should follow valid formats
+* Amounts should be numeric
+* Payment amounts should not contain invalid values
+* DPD should be a valid numeric value
+* Status values should follow predefined categories
 
 Example:
 
+```text
 Loan Amount
       ↓
 Numeric Validation
@@ -419,47 +517,65 @@ Numeric Validation
 Positive Value
       ↓
 Accepted
-📊 Reporting
+```
+
+---
+
+# 📊 Reporting
 
 RepayX can provide reporting for:
 
-Loan portfolio
-Payment history
-Outstanding amounts
-Overdue accounts
-DPD distribution
-Monthly payment trends
-Loan status distribution
-Recovery operations
+* Loan portfolio
+* Payment history
+* Outstanding amounts
+* Overdue accounts
+* DPD distribution
+* Monthly payment trends
+* Loan status distribution
+* Recovery operations
 
 Charts and tables can be used to make the information easier to understand.
 
-🛠️ Technology Stack
+---
+
+# 🛠️ Technology Stack
 
 The exact technologies may evolve with the project, but the platform can be structured around:
 
-Frontend
-React
-Vite
-JavaScript
-Tailwind CSS / CSS
-Reusable UI components
-Charts & data visualization
-Backend
-Python / Node.js
-REST APIs
-Authentication
-Data processing services
-Data
-PostgreSQL / SQL database
-Pandas for analytical operations
-CSV/structured datasets
-AI
-Large Language Model (LLM)
-Retrieval-Augmented Generation (RAG)
-Embeddings
-Vector database
-📁 Suggested Project Structure
+### Frontend
+
+* React
+* Vite
+* JavaScript
+* Tailwind CSS / CSS
+* Reusable UI components
+* Charts & data visualization
+
+### Backend
+
+* Python / Node.js
+* REST APIs
+* Authentication
+* Data processing services
+
+### Data
+
+* PostgreSQL / SQL database
+* Pandas for analytical operations
+* CSV/structured datasets
+
+### AI
+
+* Large Language Model (LLM)
+* Retrieval-Augmented Generation (RAG)
+* Embeddings
+* Vector database
+
+---
+
+# 📁 Suggested Project Structure
+
+```text
 RepayX/
 │
 ├── frontend/
@@ -494,171 +610,232 @@ RepayX/
 ├── .env.example
 ├── .gitignore
 └── README.md
-⚙️ Installation
-Prerequisites
+```
+
+---
+
+# ⚙️ Installation
+
+## Prerequisites
 
 Make sure the following are installed:
 
-Node.js
-npm
-Python 3.x
-Git
-PostgreSQL (if required by the configured backend)
-Clone the Repository
+* Node.js
+* npm
+* Python 3.x
+* Git
+* PostgreSQL (if required by the configured backend)
+
+---
+
+## Clone the Repository
+
+```bash
 git clone <repository-url>
 
 cd RepayX
-Frontend Setup
+```
+
+---
+
+## Frontend Setup
+
+```bash
 cd frontend
 
 npm install
 
 npm run dev
+```
 
 The frontend will then be available through the local development server.
 
-Backend Setup
+---
+
+## Backend Setup
 
 Open another terminal:
 
+```bash
 cd backend
 
 python -m venv venv
-Windows
+```
+
+### Windows
+
+```bash
 venv\Scripts\activate
-macOS / Linux
+```
+
+### macOS / Linux
+
+```bash
 source venv/bin/activate
+```
 
 Install dependencies:
 
+```bash
 pip install -r requirements.txt
+```
 
 Start the backend:
 
+```bash
 python app.py
+```
 
-The exact backend startup command may vary depending on the configured application entry point.
+> The exact backend startup command may vary depending on the configured application entry point.
 
-🔑 Environment Configuration
+---
 
-Create a .env file based on .env.example.
+# 🔑 Environment Configuration
+
+Create a `.env` file based on `.env.example`.
 
 Example:
 
+```env
 DATABASE_URL=your_database_url
 OPENAI_API_KEY=your_api_key
 VECTOR_DB_URL=your_vector_database_url
 JWT_SECRET=your_secret
+```
 
-Never commit the .env file to Git.
+Never commit the `.env` file to Git.
 
-🧪 Testing
+---
+
+# 🧪 Testing
 
 Testing should cover the major application layers.
 
-Frontend
+### Frontend
+
+```bash
 npm run build
-Backend
+```
+
+### Backend
 
 Run the configured backend test suite.
 
 Testing should cover:
 
-API endpoints
-Authentication
-Loan retrieval
-Payment retrieval
-Data validation
-Analytics
-RAG retrieval
-AI responses
-Error handling
-🔍 RAG Evaluation
+* API endpoints
+* Authentication
+* Loan retrieval
+* Payment retrieval
+* Data validation
+* Analytics
+* RAG retrieval
+* AI responses
+* Error handling
+
+---
+
+# 🔍 RAG Evaluation
 
 The AI layer should be evaluated for:
 
-Retrieval Accuracy
+### Retrieval Accuracy
 
 Does the system retrieve the correct records or context?
 
-Response Accuracy
+### Response Accuracy
 
 Does the generated response accurately represent the retrieved information?
 
-Grounding
+### Grounding
 
 Does the response remain grounded in the available data?
 
-Numerical Accuracy
+### Numerical Accuracy
 
 Are calculations performed from structured data rather than hallucinated by the LLM?
 
-Relevance
+### Relevance
 
 Does the response directly answer the user's question?
 
-🚀 Future Enhancements
+---
+
+# 🚀 Future Enhancements
 
 Potential future versions of RepayX can include:
 
-Automated follow-up scheduling
-SMS integration
-WhatsApp integration
-Email notifications
-Call-management integration
-AI-generated follow-up summaries
-Customer communication history
-Advanced recovery analytics
-Role-based dashboards
-Exportable reports
-PDF report generation
-Advanced portfolio segmentation
-Predictive analytics
-AI-assisted collection workflows
-Multi-language AI assistant
-Real-time notifications
-📌 Project Goals
+* Automated follow-up scheduling
+* SMS integration
+* WhatsApp integration
+* Email notifications
+* Call-management integration
+* AI-generated follow-up summaries
+* Customer communication history
+* Advanced recovery analytics
+* Role-based dashboards
+* Exportable reports
+* PDF report generation
+* Advanced portfolio segmentation
+* Predictive analytics
+* AI-assisted collection workflows
+* Multi-language AI assistant
+* Real-time notifications
+
+---
+
+# 📌 Project Goals
 
 The primary goals of RepayX are to:
 
-Centralize loan and payment information.
-Reduce manual data searching.
-Improve visibility into overdue accounts.
-Provide accurate portfolio analytics.
-Enable natural-language interaction with loan data.
-Use RAG to retrieve relevant contextual information.
-Keep numerical calculations grounded in structured data.
-Provide collection teams with a modern operational dashboard.
-Create a scalable foundation for AI-assisted loan recovery workflows.
-🔒 Responsible AI
+1. Centralize loan and payment information.
+2. Reduce manual data searching.
+3. Improve visibility into overdue accounts.
+4. Provide accurate portfolio analytics.
+5. Enable natural-language interaction with loan data.
+6. Use RAG to retrieve relevant contextual information.
+7. Keep numerical calculations grounded in structured data.
+8. Provide collection teams with a modern operational dashboard.
+9. Create a scalable foundation for AI-assisted loan recovery workflows.
 
-RepayX should treat AI-generated responses as data-assisted outputs, not independent financial decisions.
+---
+
+# 🔒 Responsible AI
+
+RepayX should treat AI-generated responses as **data-assisted outputs**, not independent financial decisions.
 
 The AI system should:
 
-Use available source data
-Avoid fabricating loan information
-Clearly distinguish retrieved facts from generated explanations
-Use structured calculations for numerical questions
-Provide appropriate uncertainty when information is unavailable
-Respect access permissions
-Avoid exposing unauthorized borrower information
-📖 Documentation
+* Use available source data
+* Avoid fabricating loan information
+* Clearly distinguish retrieved facts from generated explanations
+* Use structured calculations for numerical questions
+* Provide appropriate uncertainty when information is unavailable
+* Respect access permissions
+* Avoid exposing unauthorized borrower information
+
+---
+
+# 📖 Documentation
 
 Additional project documentation can include:
 
-Product Requirements Document (PRD)
-System Architecture
-API Documentation
-Database Schema
-RAG Architecture
-Deployment Guide
-Testing Documentation
-User Guide
-🤝 Contribution
+* Product Requirements Document (PRD)
+* System Architecture
+* API Documentation
+* Database Schema
+* RAG Architecture
+* Deployment Guide
+* Testing Documentation
+* User Guide
+
+---
+
+# 🤝 Contribution
 
 Contributions should follow the project's development workflow.
 
+```text
 Create Branch
      ↓
 Implement Changes
@@ -674,22 +851,31 @@ Pull Request
 Code Review
      ↓
 Merge
+```
 
 Use meaningful commit messages, for example:
 
+```bash
 git commit -m "feat: add overdue loan analytics"
 git commit -m "fix: validate payment date"
 git commit -m "feat: integrate RAG assistant"
-📄 License
+```
+
+---
+
+# 📄 License
 
 This project is intended for internal/company use.
 
 Add the organization's official license and usage terms here if applicable.
 
-👩‍💻 Project
+---
 
-RepayX — AI-Powered Loan Follow-Up & Recovery Dashboard
+# 👩‍💻 Project
 
-Built to bring loan monitoring, payment analytics, recovery workflows, and AI-powered data interaction into one intelligent platform.
+**RepayX — AI-Powered Loan Follow-Up & Recovery Dashboard**
 
-RepayX — From Loan Data to Actionable Recovery Intelligence.
+Built to bring **loan monitoring, payment analytics, recovery workflows, and AI-powered data interaction** into one intelligent platform.
+
+> **RepayX — From Loan Data to Actionable Recovery Intelligence.**
+
