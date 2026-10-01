@@ -35,3 +35,23 @@ AI Query Interface
 RepayX Dashboard
 
 ✨ Key Features
+1. 📊 Loan Portfolio Dashboard
+
+RepayX provides a centralized overview of the loan portfolio.
+
+Users can monitor important metrics such as:
+
+Total Loans
+Active Loans
+Paid Loans
+Overdue Loans
+Due Soon Accounts
+Total Loan Amount
+Total Amount Paid
+Outstanding Amount
+Recovery-related metrics
+Payment status distribution
+
+The dashboard provides a quick understanding of the overall loan portfolio.
+
+2. 📅 Due Date & Payment Tracking
