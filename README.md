@@ -18,3 +18,20 @@ Portfolio-level payment statistics
 Relevant information from large loan datasets
 
 RepayX addresses these challenges through a unified dashboard that allows users to monitor loan portfolios and retrieve relevant information using natural language.
+
+Core Concept
+Loan / Payment Data
+        ↓
+Data Processing & Validation
+        ↓
+Database / Structured Storage
+        ↓
+Analytics & Aggregation
+        ↓
+RAG Knowledge Layer
+        ↓
+AI Query Interface
+        ↓
+RepayX Dashboard
+
+✨ Key Features
