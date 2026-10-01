@@ -8,4 +8,4 @@ This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/c5c62c1c-25a6-4bd2-b053-2e3482508e4d
 
-## Run Locally
+## Ru
