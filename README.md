@@ -1,912 +1,454 @@
 # RepayX
 
-### AI-Powered Loan Follow-Up & Recovery Dashboard
+**AI-powered loan risk and recovery intelligence platform**
 
-> Project status (Phase 11): the dashboard, Risk Analytics, Repayment Analytics, Customers, customer details, and AI Insights (`POST /api/query`) run on real data from the FastAPI backend, with automated backend, ML, and frontend tests and CI. The recovery-workflow pages are grouped under *Demo workflow* and use sample data. Architecture and feature descriptions below include planned capabilities.
+RepayX estimates each borrower's risk of default with a machine-learning model, analyses their historical repayment behaviour, and lets analysts explore the portfolio through a dashboard and natural-language questions. Every number in the interface is computed from the scored dataset by the backend; nothing is hard-coded.
 
-RepayX is an intelligent **loan follow-up and recovery management platform** designed to help lending and financial organizations efficiently monitor loan accounts, identify upcoming and overdue payments, prioritize follow-ups, and interact with loan records using an AI-powered Retrieval-Augmented Generation (RAG) system.
-
-The platform combines **structured loan data, analytics, automated follow-up workflows, and natural-language querying** into a centralized dashboard for collection and recovery teams.
+> RepayX provides model-based risk estimates for analytical and demonstration purposes. Risk scores are not guaranteed outcomes and should not be treated as a final lending decision.
 
 ---
 
-## 🚀 Overview
+## Contents
 
-Managing large volumes of loan accounts manually can make it difficult for collection teams to identify:
+1. [Project overview](#1-project-overview)
+2. [Problem statement](#2-problem-statement)
+3. [Features](#3-features)
+4. [Architecture](#4-architecture)
+5. [Tech stack](#5-tech-stack)
+6. [ML pipeline](#6-ml-pipeline)
+7. [Feature engineering](#7-feature-engineering)
+8. [Hybrid RAG architecture](#8-hybrid-rag-architecture)
+9. [API endpoints](#9-api-endpoints)
+10. [Frontend architecture](#10-frontend-architecture)
+11. [Project structure](#11-project-structure)
+12. [Installation](#12-installation)
+13. [Running the frontend](#13-running-the-frontend)
+14. [Running the backend](#14-running-the-backend)
+15. [Dataset information](#15-dataset-information)
+16. [Model evaluation](#16-model-evaluation)
+17. [Example queries](#17-example-queries)
+18. [Limitations](#18-limitations)
+19. [Future improvements](#19-future-improvements)
 
-* Which loans are due soon
-* Which accounts are overdue
-* How many days a payment is past due
-* Which accounts require follow-up
-* Historical payment and repayment information
-* Portfolio-level payment statistics
-* Relevant information from large loan datasets
+Also: [Testing](#testing) · [Security and data privacy](#security-and-data-privacy) · [Product requirements (PRD.md)](PRD.md) · [Backend notes](backend/README.md)
 
-RepayX addresses these challenges through a unified dashboard that allows users to monitor loan portfolios and retrieve relevant information using natural language.
+---
 
-### Core Concept
+## 1. Project overview
 
-```text
-Loan / Payment Data
-        ↓
-Data Processing & Validation
-        ↓
-Database / Structured Storage
-        ↓
-Analytics & Aggregation
-        ↓
-RAG Knowledge Layer
-        ↓
-AI Query Interface
-        ↓
-RepayX Dashboard
+RepayX combines four things in one application:
+
+- **Default-risk prediction.** A logistic-regression model trained on the Home Credit Default Risk data estimates each customer's probability of default. The probability becomes a 0–100 risk score and a Low / Medium / High risk category.
+- **Repayment analytics.** Historical installment records are aggregated into per-customer behaviour: lateness, underpayment, unpaid amounts, and payment ratio.
+- **Portfolio dashboard.** Risk and repayment distributions, segment breakdowns, and ranked customer tables, all served by a FastAPI backend.
+- **Natural-language questions.** A hybrid query router answers questions such as *"How many high-risk customers are there?"* or *"Which customers frequently pay late?"*. Numeric questions are calculated with pandas; only descriptive questions use TF-IDF text retrieval. No language model writes the answers.
+
+The scored portfolio is the 20% held-out split of the training data: **61,503 customers** that the model never saw while training.
+
+## 2. Problem statement
+
+Lenders and collections teams need to know which borrowers are most likely to default and why, early enough to act. In practice:
+
+- Application data and repayment history live in separate tables, so risk is judged without behavioural context.
+- Dashboards are often static, show figures nobody can trace back to data, or mix model output with outcomes in ways that leak information.
+- Analysts who are not data specialists cannot easily ask questions of the portfolio, and generic AI chatbots answer numeric questions unreliably.
+
+RepayX addresses this with one pipeline from raw data to scored customers, an API that computes every figure on request from that data, and a question interface that routes each question to a method that can answer it correctly.
+
+## 3. Features
+
+| Area | What it does |
+|---|---|
+| Risk scoring | Estimated default probability, risk score (probability × 100), risk category, and a predicted-default flag at the 0.65 classification threshold |
+| Dashboard | Customer totals by risk category, risk-score histogram, default-probability overview, repayment metrics, late-payment-rate distribution, highest-risk customers |
+| Risk analytics | Risk by income type, education, and occupation; highest default probabilities; model evaluation |
+| Repayment analytics | Late payment rates by segment; highest late-payment rates; largest unpaid amounts |
+| Customers | Searchable, filterable (All / Low / Medium / High), sortable, paginated table; filters live in the URL |
+| Customer details | Financial profile, customer profile, repayment history, risk position meter, repayment comparison with portfolio averages, and a rule-based AI Insight with risk indicators |
+| AI Insights | Natural-language questions answered by the hybrid query router, with the query type, the answer, and results as metric cards, customer cards, or a customer table |
+| Error handling | Clear states for loading, empty results, invalid or unknown customer IDs, unavailable backend, missing data/model/index, and invalid responses; no stack traces reach the user |
+| Demo workflow | The original recovery-workflow screens (loans, conversations, follow-ups, payments, escalations, reports) are kept under *Demo workflow*. They use sample data and are labelled as such. |
+
+## 4. Architecture
+
+```mermaid
+flowchart TD
+    User([Analyst]) --> UI[React + TypeScript frontend]
+    UI -->|REST / JSON| API[FastAPI backend]
+
+    API --> CS[Customer service]
+    API --> AS[Analytics service]
+    API --> QR[Query router]
+    API --> IS[Insight service]
+
+    QR --> CQ[Customer lookup]
+    QR --> AQ[Aggregate calculations - pandas]
+    QR --> SR[Structured repayment retrieval]
+    QR --> TR[TF-IDF cosine retrieval]
+
+    CS --> DATA[(Scored customer data - Parquet)]
+    AS --> DATA
+    IS --> DATA
+    CQ --> DATA
+    AQ --> DATA
+    SR --> DATA
+    TR --> IDX[(TF-IDF vectorizer + matrix)]
+    API -. validates at startup .-> MODEL[(Logistic regression model - joblib)]
+
+    subgraph ML [Offline ML pipeline]
+        RAW[(Home Credit CSVs)] --> FE[Cleaning + installment features]
+        FE --> TRAIN[Training + threshold selection]
+        TRAIN --> MODEL
+        MODEL --> SCORE[Batch scoring]
+        FE --> SCORE
+        SCORE --> DATA
+        DATA --> BUILD[Index builder]
+        BUILD --> IDX
+    end
 ```
 
----
+Design principles:
 
-# ✨ Key Features
+- **Numbers are calculated, never retrieved.** Counts, averages, and totals come from pandas over the customer data. TF-IDF is used only for descriptive questions.
+- **Load once, serve from memory.** The model, the customer data, and the TF-IDF index are loaded and validated once when the backend starts.
+- **Thin routes, logic in services.** API routes validate input and delegate to services under `backend/services/`.
+- **Consistency is enforced.** The backend refuses customer data scored by a different model version, and a TF-IDF index built from different customer data. The model's checksum, scikit-learn version, and input columns must match its metadata.
+- **No outcomes in the serving path.** The actual default label (`TARGET`) is used only for training and evaluation. The scoring step and the index builder refuse data that contains it, and the backend rejects any customer file with an outcome column.
 
-## 1. 📊 Loan Portfolio Dashboard
+## 5. Tech stack
 
-RepayX provides a centralized overview of the loan portfolio.
+| Layer | Technologies |
+|---|---|
+| Frontend | React 19, TypeScript, Vite 8, React Router 7, Tailwind CSS 4, Recharts 3, Lucide icons |
+| Backend | Python 3.12+ (tested on 3.14), FastAPI, Uvicorn, Pydantic |
+| ML and data | pandas, NumPy, scikit-learn 1.9.1, SciPy, joblib, PyArrow |
+| Retrieval | scikit-learn `TfidfVectorizer`, cosine similarity on a sparse matrix (NPZ) |
+| Storage | Parquet (customer data), joblib (model, vectorizer), NPZ (TF-IDF matrix) |
+| Testing and CI | pytest, Vitest, Testing Library, GitHub Actions |
 
-Users can monitor important metrics such as:
+There is no database: the prototype serves a fixed, pre-scored dataset from memory.
 
-* Total Loans
-* Active Loans
-* Paid Loans
-* Overdue Loans
-* Due Soon Accounts
-* Total Loan Amount
-* Total Amount Paid
-* Outstanding Amount
-* Recovery-related metrics
-* Payment status distribution
+## 6. ML pipeline
 
-The dashboard provides a quick understanding of the overall loan portfolio.
-
----
-
-## 2. 📅 Due Date & Payment Tracking
-
-RepayX tracks important payment information including:
-
-* Loan ID
-* Borrower information
-* Loan amount
-* Due date
-* Payment date
-* Payment status
-* Outstanding amount
-* Days Past Due (DPD)
-
-This helps users identify accounts that may require attention.
-
----
-
-## 3. ⚠️ Overdue Loan Monitoring
-
-The system identifies loans where payments have passed their expected due date.
-
-Accounts can be categorized based on their payment status, such as:
-
-```text
-Upcoming
-Due Today
-Overdue
-Paid
-Partially Paid
+```mermaid
+flowchart LR
+    A[application_train.csv] --> C[Clean applications]
+    B[installments_payments.csv] --> D[Installment features]
+    C --> E[Join on SK_ID_CURR]
+    D --> E
+    E --> F[Stratified 80/20 split]
+    F -->|80% train| G[5-fold out-of-fold predictions]
+    G --> H[F1 threshold sweep -> 0.65]
+    F -->|80% train| I[Fit pipeline]
+    I --> J[(repayx_model.joblib + metadata)]
+    F -->|20% holdout| K[Evaluate]
+    J --> K
+    J --> L[Score holdout customers]
+    L --> M[(customer_data.parquet)]
 ```
 
-The system can also use **Days Past Due (DPD)** to provide a clearer understanding of payment timelines.
+1. **Cleaning** (`ml/preprocessing/preprocessing.py`). The `DAYS_EMPLOYED` placeholder value 365243 becomes missing and gets a flag. `XNA` categories become missing. Ratio features are derived: credit ÷ income, annuity ÷ income, annuity ÷ credit, goods price ÷ credit, and employment ÷ age.
+2. **Installment features** (`ml/features/installment_features.py`). See [section 7](#7-feature-engineering).
+3. **Preprocessing pipeline.** Numeric features: median imputation, then `StandardScaler`, with money amounts log-transformed first. Categorical features: a constant "MISSING" fill, then `OneHotEncoder` (rare levels grouped). The pipeline uses only built-in scikit-learn components, so loading the model never depends on project code.
+4. **Model.** `LogisticRegression(class_weight="balanced")` on 54 input features: 46 numeric and 8 categorical.
+5. **Threshold selection.** A 5-fold out-of-fold F1 sweep on the training split only selected **0.65**, matching the value in the specification. The holdout is never used for tuning.
+6. **Outputs.** `risk_score = default_probability × 100`. Risk categories are prototype presentation bands: **Low < 30, Medium 30–60, High ≥ 60**. `predicted_default` is 1 when the probability is ≥ 0.65. The threshold and the bands are separate concepts.
+7. **Excluded inputs.** `CODE_GENDER` and `NAME_FAMILY_STATUS` are protected attributes in many lending regimes and are not model inputs. Family status is still shown on customer profiles.
 
----
+Commands (run from the repository root): `python -m ml.training.train_model`, `python -m ml.evaluation.evaluate_model`, `python -m ml.scoring.score_customers`, and `python -m ml.retrieval.build_tfidf_index`.
 
-## 4. 🔎 Loan Search & Filtering
+## 7. Feature engineering
 
-Users can search and filter loan records based on relevant attributes.
+About 5% of installments in `installments_payments.csv` are paid in several rows, and each row repeats the full `AMT_INSTALMENT`. Computing features row by row would count the small top-up payment as "underpaid" by almost the whole amount and double-count totals. RepayX therefore first collapses rows to **one record per installment** (`SK_ID_PREV`, `NUM_INSTALMENT_VERSION`, `NUM_INSTALMENT_NUMBER`): the scheduled amount, the sum of payments, the due day, and the day of the last payment.
 
-Examples include:
+Per installment:
 
-* Loan ID
-* Customer name
-* Loan status
-* Payment status
-* Due date
-* Date range
-* Outstanding amount
-* DPD
-* Loan amount
+| Feature | Definition |
+|---|---|
+| `DAYS_LATE` | `DAYS_ENTRY_PAYMENT − DAYS_INSTALMENT` |
+| `DAYS_LATE_POSITIVE` | `max(DAYS_LATE, 0)` |
+| `IS_LATE` | `DAYS_LATE > 0` (unknown when no payment was recorded) |
+| `IS_UNDERPAID` | shortfall > 0.01 (absorbs floating-point noise) |
+| `UNPAID_AMOUNT` | the shortfall when underpaid, else 0 |
 
-This makes it easier for collection teams to locate specific accounts.
+Per customer (`SK_ID_CURR`):
 
----
+`INSTALLMENT_COUNT`, `TOTAL_INSTALLMENT_AMOUNT`, `TOTAL_PAYMENT_AMOUNT`, `AVG_INSTALLMENT_AMOUNT`, `AVG_PAYMENT_AMOUNT`, `LATE_PAYMENT_COUNT`, `AVG_DAYS_LATE`, `MAX_DAYS_LATE`, `UNDERPAID_COUNT`, `TOTAL_UNPAID_AMOUNT`, `LATE_PAYMENT_RATE` (late ÷ installments with a known payment date), `UNDERPAID_RATE`, and `PAYMENT_RATIO` (paid ÷ due).
 
-# 🤖 AI-Powered RAG Assistant
+Missing history is not treated as good history. Customers without installment records (5.2% of the scored portfolio) keep missing repayment values plus a `HAS_INSTALLMENT_HISTORY = 0` flag. The API returns `null` for them, the UI shows "—", and portfolio averages exclude them.
 
-One of the primary features of RepayX is its **Retrieval-Augmented Generation (RAG)** based AI assistant.
+## 8. Hybrid RAG architecture
 
-The assistant allows users to ask questions about available loan records using natural language.
+`route_repayx_query(query)` (`backend/services/query_router.py`) classifies each question with deterministic rules, in this priority order:
 
-### Example Questions
-
-```text
-How many loans are currently overdue?
-
-What is the total outstanding amount?
-
-Show me loans that were due in September 2026.
-
-How many payments were completed last month?
-
-What is the average loan amount?
-
-Show the payment records for loan ID LN10234.
+```mermaid
+flowchart TD
+    Q[Question] --> C1{Customer ID present?}
+    C1 -->|yes| CQ[customer_query - direct lookup]
+    C1 -->|no| C2{Count / share / average / median / total / distribution<br/>with a recognised metric?}
+    C2 -->|yes| AQ[aggregate_query - pandas calculation]
+    C2 -->|no| C3{Late, on-time, unpaid, predicted-default,<br/>or risk-ranking criteria?}
+    C3 -->|yes| SR[retrieval_query - structured filter + sort]
+    C3 -->|no| GR[general_retrieval - TF-IDF cosine similarity]
 ```
 
-Instead of requiring users to manually search through large datasets, the AI assistant retrieves relevant information and generates an understandable response.
+- **Customer IDs always win.** *"How many late payments does customer 385772 have?"* is a customer query, not an aggregate. Numbers that read as amounts or thresholds (*"over 100000"*, *"₹250000"*) are not mistaken for IDs.
+- **Filters combine with every route:** a risk category (*high risk*), profile values (*pensioners*, *laborers*, *married*), numeric thresholds (*unpaid amounts over 100000*, *late rate above 50%*), and limits (*top 5*, at most 50).
+- **Structured retrieval sorting:** late payers by `LATE_PAYMENT_RATE`, then `AVG_DAYS_LATE`; unpaid amounts by `TOTAL_UNPAID_AMOUNT`; risk by `risk_score`.
+- **General retrieval.** Each customer is described by a short text document built from the served customer data: risk category, predicted default, profile fields, and descriptive repayment wording such as *frequent late payments*. The vectorizer uses word unigrams and bigrams with sublinear TF; there are 61,503 documents and 268 terms. Results below 0.05 cosine similarity are dropped. The documents never contain outcomes, and TF-IDF is never used for numeric questions.
+- **Answers are generated from computed values** and always state the population they cover, for example *"across 58,318 customers (3,185 without a known value excluded)"*.
 
----
+## 9. API endpoints
 
-# 🧠 RAG Architecture
+Base URL: `http://localhost:8000`. Interactive documentation is at `/docs`.
 
-RepayX uses a RAG-based architecture to connect the AI assistant with the application's loan data.
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/health` | `ok` / `degraded`, plus the status of each artifact (`available` / `missing` / `invalid`) and the model version |
+| GET | `/api/customer/{customer_id}` | Full profile, rule-based `insight` (summary and indicators), portfolio `benchmarks`, and the classification threshold. Returns `404` for unknown customers. |
+| GET | `/api/customers` | Paginated summaries. Parameters: `page`, `page_size` (≤ 100), `risk_category`, `search` (customer ID or prefix, digits only), `sort_by`, `sort_order` |
+| GET | `/api/analytics` | Portfolio metrics, repayment statistics, risk-score histogram, late-rate buckets, segment breakdowns, model evaluation, and the disclaimer |
+| POST | `/api/query` | Body `{"query": "..."}` (1–500 characters). Returns `query_type`, `result`, and `customer` / `customers` / `metrics` as relevant |
 
-```text
-                    User Query
-                        │
-                        ▼
-              ┌──────────────────┐
-              │   AI Assistant   │
-              └────────┬─────────┘
-                       │
-                       ▼
-              Query Understanding
-                       │
-                       ▼
-             ┌────────────────────┐
-             │ Retrieval / Search │
-             └─────────┬──────────┘
-                       │
-              ┌────────┴─────────┐
-              ▼                  ▼
-       Structured Data      Knowledge Data
-        SQL / Pandas        Vector Store
-              │                  │
-              └────────┬─────────┘
-                       ▼
-                Relevant Context
-                       │
-                       ▼
-                LLM Generation
-                       │
-                       ▼
-                 AI Response
-```
+Units: `default_probability`, `late_payment_rate`, and `underpaid_rate` are percentages (0–100). `risk_score` is 0–100. `payment_ratio` is paid ÷ due (1.0 = paid in full).
 
-### Important Design Principle
-
-RepayX separates **structured numerical analysis** from **semantic retrieval**.
-
-For example:
-
-| Query Type                            | Processing         |
-| ------------------------------------- | ------------------ |
-| Number of overdue loans               | SQL / Pandas       |
-| Average loan amount                   | SQL / Pandas       |
-| Total outstanding amount              | SQL / Pandas       |
-| Specific loan record                  | Database retrieval |
-| Information from documents            | Vector search      |
-| Natural-language contextual questions | RAG                |
-
-This prevents the system from relying on vector search for calculations that should be performed directly on structured data.
-
----
-
-# 📈 Analytics
-
-RepayX can calculate portfolio-level statistics directly from structured loan data.
-
-Examples include:
-
-### Loan Statistics
-
-* Total number of loans
-* Average loan amount
-* Minimum loan amount
-* Maximum loan amount
-* Total disbursed amount
-
-### Payment Statistics
-
-* Total payments
-* Paid payments
-* Pending payments
-* Overdue payments
-* Average payment amount
-
-### Date-Based Analytics
-
-* Loans due today
-* Loans due this week
-* Loans overdue this month
-* Monthly payment trends
-* Historical payment summaries
-
----
-
-# 🗂️ Loan Data Structure
-
-A typical loan record may contain fields such as:
-
-```text
-Loan ID
-Customer ID
-Customer Name
-Loan Amount
-Outstanding Amount
-Due Date
-Payment Date
-Payment Amount
-Payment Status
-Loan Status
-Days Past Due
-Loan Type
-Interest Rate
-Loan Tenure
-```
-
-The exact schema can be extended according to the organization's requirements.
-
----
-
-# 🔐 Data & Security
-
-Because RepayX deals with financial information, the application should follow secure data-handling practices.
-
-Recommended controls include:
-
-* Authentication
-* Role-based access control
-* Secure API endpoints
-* Input validation
-* Environment variables for secrets
-* Database access controls
-* API rate limiting
-* Secure session/token management
-* Sensitive information protection
-* Audit logging
-
-### Environment Variables
-
-Sensitive configuration should never be committed directly to Git.
+Errors use one envelope: `{"success": false, "error": {"code": "...", "message": "...", "details": [...]}}`. Status codes: `422` for invalid input (the input is never echoed back), `404` for unknown customers or routes, `503` when data, model, or index is unavailable, and `500` with a generic message.
 
 Example:
 
-```env
-DATABASE_URL=
-OPENAI_API_KEY=
-VECTOR_DB_URL=
-JWT_SECRET=
+```bash
+curl http://localhost:8000/api/customer/385772
+curl "http://localhost:8000/api/customers?risk_category=High%20Risk&sort_by=late_payment_rate&page_size=5"
+curl -X POST http://localhost:8000/api/query -H "Content-Type: application/json" \
+     -d '{"query": "How many high-risk customers are there?"}'
 ```
 
-A `.env.example` file should be maintained for development.
-
----
-
-# 🏗️ Project Architecture
-
-A high-level architecture of RepayX:
-
-```text
-                    ┌─────────────────┐
-                    │   RepayX UI     │
-                    │    Dashboard    │
-                    └────────┬────────┘
-                             │
-                             ▼
-                    ┌─────────────────┐
-                    │   Backend API   │
-                    └────────┬────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              │              │              │
-              ▼              ▼              ▼
-         Loan Service    Analytics      AI Service
-              │              │              │
-              ▼              ▼              ▼
-          Database       SQL/Pandas     RAG Pipeline
-                                             │
-                                    ┌────────┴────────┐
-                                    ▼                 ▼
-                              Vector Store           LLM
+```json
+{
+  "success": true,
+  "query": "How many high-risk customers are there?",
+  "query_type": "aggregate_query",
+  "result": "There are 12,646 High Risk customers, 20.56% of the 61,503 scored customers.",
+  "model_version": "repayx-logreg-20261005064635",
+  "metrics": [
+    {"name": "customer_count", "label": "Number of High Risk customers", "value": 12646, "unit": "count", "population": 61503},
+    {"name": "share_of_portfolio", "label": "Share of portfolio", "value": 20.56, "unit": "percent", "population": 61503}
+  ]
+}
 ```
 
----
+## 10. Frontend architecture
 
-# 🔄 Data Flow
+| Route | Page | Data |
+|---|---|---|
+| `/` | Dashboard | `/api/analytics`, `/api/customers` |
+| `/analytics/risk` | Risk Analytics | `/api/analytics`, `/api/customers` |
+| `/analytics/repayment` | Repayment Analytics | `/api/analytics`, `/api/customers` |
+| `/customers` | Customer table (filters stored in the URL) | `/api/customers` |
+| `/customers/:customerId` | Customer details | `/api/customer/{id}` |
+| `/insights` | AI Insights (question in `?q=`) | `POST /api/query` |
+| `/demo/*`, `/loans`, `/conversations`, … | Demo workflow pages | sample data only |
 
-### Step 1 — Data Ingestion
+- **`src/services/api.ts`** is a typed client. It reads `VITE_API_BASE_URL` (never a hard-coded host) and adds timeouts, cancellation, response-shape checks, and typed error kinds (`config`, `network`, `timeout`, `not_found`, `validation`, `unavailable`, `server`, `invalid_response`).
+- **`src/hooks/`** contains `useCustomers`, `useCustomer`, `useAnalytics`, and `useRepayxQuery`. They handle loading, error, and retry, keep the previous data while refetching, and cancel requests that are no longer needed.
+- **`src/pages/`** holds the route pages, which are lazy-loaded. Components live in `components/analytics`, `components/customers`, `components/rag`, and `components/common`.
+- **Charts** follow a validated palette. The risk colours (Low `#2a78d6`, Medium `#c98500`, High `#b8322f`) pass colour-blind separation and contrast checks. Every chart has a legend, hover tooltips, and a table view, and severity labels always pair an icon with a word.
 
-Loan and payment records are imported into the system.
+## 11. Project structure
 
-```text
-CSV / Database / API
-        ↓
-Data Ingestion
 ```
-
-### Step 2 — Data Processing
-
-The system validates and processes the incoming records.
-
-```text
-Raw Data
-   ↓
-Validation
-   ↓
-Cleaning
-   ↓
-Transformation
-```
-
-### Step 3 — Structured Storage
-
-Processed records are stored in the application's database.
-
-### Step 4 — RAG Indexing
-
-Relevant textual information can be transformed into embeddings and stored in a vector database.
-
-```text
-Documents
-   ↓
-Chunking
-   ↓
-Embeddings
-   ↓
-Vector Database
-```
-
-### Step 5 — User Query
-
-The user asks a question through the RepayX AI assistant.
-
-### Step 6 — Retrieval & Processing
-
-The system determines whether the question requires:
-
-* Database querying
-* Aggregation
-* Retrieval
-* Semantic search
-* RAG
-
-### Step 7 — Response
-
-The system returns a natural-language response to the user.
-
----
-
-# 🖥️ Dashboard Modules
-
-RepayX can be organized into the following modules:
-
-### Dashboard
-
-Provides the overall portfolio summary.
-
-### Loans
-
-Displays detailed loan records.
-
-### Payments
-
-Displays payment history and payment statuses.
-
-### Overdue
-
-Displays overdue accounts and DPD information.
-
-### Analytics
-
-Provides charts, trends, and portfolio-level statistics.
-
-### AI Assistant
-
-Allows users to ask natural-language questions about the loan data.
-
-### Follow-Ups
-
-Provides a workspace for managing accounts requiring follow-up.
-
----
-
-# 🎯 Target Users
-
-RepayX is designed for organizations and teams involved in loan servicing and recovery operations.
-
-Potential users include:
-
-* Collection teams
-* Loan servicing teams
-* Recovery teams
-* Operations teams
-* Financial analysts
-* Loan administrators
-* Managers
-* Supervisors
-
----
-
-# 💡 Example Use Cases
-
-## Use Case 1 — Overdue Loans
-
-A collection manager wants to identify overdue accounts.
-
-```text
-User:
-"Show me all overdue loans."
-
-RepayX:
-Retrieves the relevant records and displays
-overdue accounts with their DPD and outstanding amounts.
-```
-
----
-
-## Use Case 2 — Portfolio Summary
-
-```text
-User:
-"What is the total outstanding amount?"
-
-RepayX:
-Calculates the value directly from structured loan data
-and returns the aggregated result.
-```
-
----
-
-## Use Case 3 — Historical Analysis
-
-```text
-User:
-"How many payments were completed last month?"
-
-RepayX:
-Filters payment records based on the requested date range
-and calculates the total.
-```
-
----
-
-## Use Case 4 — Specific Loan
-
-```text
-User:
-"Show me the details of loan LN10234."
-
-RepayX:
-Retrieves the corresponding loan record and presents
-its relevant details.
-```
-
----
-
-# 🧪 Data Validation
-
-The application should validate incoming loan and payment records before storing them.
-
-Examples:
-
-* Required fields must be present
-* Loan IDs should be unique
-* Dates should follow valid formats
-* Amounts should be numeric
-* Payment amounts should not contain invalid values
-* DPD should be a valid numeric value
-* Status values should follow predefined categories
-
-Example:
-
-```text
-Loan Amount
-      ↓
-Numeric Validation
-      ↓
-Positive Value
-      ↓
-Accepted
-```
-
----
-
-# 📊 Reporting
-
-RepayX can provide reporting for:
-
-* Loan portfolio
-* Payment history
-* Outstanding amounts
-* Overdue accounts
-* DPD distribution
-* Monthly payment trends
-* Loan status distribution
-* Recovery operations
-
-Charts and tables can be used to make the information easier to understand.
-
----
-
-# 🛠️ Technology Stack
-
-The exact technologies may evolve with the project, but the platform can be structured around:
-
-### Frontend
-
-* React
-* Vite
-* JavaScript
-* Tailwind CSS / CSS
-* Reusable UI components
-* Charts & data visualization
-
-### Backend
-
-* Python / Node.js
-* REST APIs
-* Authentication
-* Data processing services
-
-### Data
-
-* PostgreSQL / SQL database
-* Pandas for analytical operations
-* CSV/structured datasets
-
-### AI
-
-* Large Language Model (LLM)
-* Retrieval-Augmented Generation (RAG)
-* Embeddings
-* Vector database
-
----
-
-# 📁 Suggested Project Structure
-
-```text
 RepayX/
-│
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── layouts/
-│   │   ├── services/
-│   │   ├── hooks/
-│   │   └── utils/
-│   │
-│   ├── public/
-│   └── package.json
-│
 ├── backend/
-│   ├── api/
-│   ├── services/
-│   ├── models/
-│   ├── routes/
-│   ├── rag/
-│   ├── database/
-│   └── requirements.txt
-│
-├── data/
-│   ├── loans.csv
-│   └── payments.csv
-│
-├── docs/
-│   ├── PRD.md
-│   └── architecture.md
-│
-├── .env.example
-├── .gitignore
-└── README.md
+│   ├── api/                 # FastAPI app, routes, error handling
+│   ├── services/            # customer, analytics, insight, query router/service, TF-IDF retrieval, model engine
+│   ├── models/schemas.py    # Pydantic request/response schemas
+│   ├── tests/               # pytest (fixtures; real-data tests skip without artifacts)
+│   ├── data/                # customer_data.parquet (generated, git-ignored)
+│   ├── rag/                 # TF-IDF artifacts (generated, git-ignored)
+│   ├── config.py · run.py · requirements*.txt · README.md
+├── ml/
+│   ├── preprocessing/       # application cleaning, feature lists, sklearn preprocessor
+│   ├── features/            # installment feature engineering
+│   ├── training/            # train_model.py
+│   ├── evaluation/          # metrics, evaluate_model.py
+│   ├── scoring/             # risk outputs, score_customers.py
+│   ├── retrieval/           # customer documents, build_tfidf_index.py
+│   ├── tests/               # pytest
+│   └── config.py · data.py · model_io.py · requirements*.txt
+├── models/                  # repayx_model.joblib + metadata + evaluation report (committed)
+├── datasets/                # Home Credit CSVs (download; git-ignored)
+├── frontend/
+│   ├── src/pages · components · hooks · services · types · lib · test
+│   └── package.json · vite.config.ts · tsconfig.json · index.html
+├── notebooks/ · rag/        # reserved placeholders (empty); the TF-IDF index lives in backend/rag/
+├── .github/workflows/ci.yml
+├── Loan payments data.csv · loan_data_set.csv   # original datasets, not used by the pipeline (see section 15)
+├── PRD.md · README.md · .env.example · .gitignore
 ```
 
----
+## 12. Installation
 
-# ⚙️ Installation
-
-## Prerequisites
-
-Make sure the following are installed:
-
-* Node.js 22.12+
-* npm
-* Git
-
-* Python 3.12+ (tested with 3.14) for the backend
-
----
-
-## Clone the Repository
+Prerequisites: Git, **Node.js 22.12+** with npm, and **Python 3.12+**.
 
 ```bash
 git clone https://github.com/priyaparihar2006/RepayX.git
-
 cd RepayX
+cp .env.example .env              # read by Vite (VITE_API_BASE_URL); backend defaults work without it
 ```
 
----
-
-## Frontend Setup
-
-```bash
-cd frontend
-
-npm install
-
-npm run dev
-```
-
-Before starting, copy `.env.example` to `.env` in the repository root (Vite reads it from there) so `VITE_API_BASE_URL` points at the backend, and start the backend (see below). The frontend will be available at http://localhost:3000. From `frontend/`, run `npm run lint` for TypeScript checking and `npm run build` for a production build.
-
-The two original CSV datasets remain unchanged at the repository root. They are separate datasets and are not joined or consumed by the current UI.
-
----
-
-## Backend Setup
-
-Open another terminal:
+Backend and ML environment (one virtual environment serves both, so their scikit-learn versions always match):
 
 ```bash
 cd backend
-
 python -m venv .venv
-```
-
-Activate it — Windows: `.venv\Scripts\activate`, macOS/Linux: `source .venv/bin/activate`. Then:
-
-```bash
+# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
 pip install -r requirements-dev.txt
-
-python run.py          # serves http://127.0.0.1:8000 (API_HOST / API_PORT override)
-pytest                 # backend test suite
+cd ..
 ```
 
-Interactive API docs are at http://127.0.0.1:8000/docs.
+Data and artifacts. The trained model is committed; the customer data and the index must be generated:
 
-Currently implemented (requires `backend/data/customer_data.parquet` from the ML pipeline below):
-
-| Endpoint | Description |
-|---|---|
-| `GET /api/health` | Artifact status (`available` / `missing` / `invalid`) and model version |
-| `GET /api/customer/{id}` | Full risk profile plus `insight` (rule-based summary and risk indicators built from the customer's data), `benchmarks` (portfolio averages), and the classification threshold; `404` if the customer is not in the scored dataset |
-| `GET /api/customers` | Paginated summaries. Query params: `page`, `page_size` (≤100), `risk_category` (`Low Risk` / `Medium Risk` / `High Risk`), `search` (customer ID or ID prefix, digits only), `sort_by` (`risk_score`, `default_probability`, `late_payment_rate`, `total_unpaid_amount`, `payment_ratio`, `customer_id`), `sort_order` (`asc` / `desc`) |
-| `GET /api/analytics` | Portfolio metrics computed from the scored data: risk-category counts and shares, average/median risk score, predicted defaults; repayment statistics (average late payment rate, customers with late payments, always-late customers, unpaid amounts, payment ratio); a 10-bin risk-score histogram; late-payment-rate buckets; segment breakdowns by income type, education, and occupation; the model's threshold, risk bands, and recorded holdout evaluation; and the RepayX disclaimer. Computed once at startup. |
-
-Units: `default_probability`, `late_payment_rate`, and `underpaid_rate` are percentages (0–100); `risk_score` is 0–100; `payment_ratio` is paid ÷ due (1.0 = paid in full). Repayment fields are `null` for customers without installment history, and missing values sort last. Customer data scored by a different model version than the one loaded is rejected as `invalid`.
-
-### `POST /api/query`
-
-Body: `{"query": "..."}` (1–500 characters). `route_repayx_query()` classifies each question in priority order, without a language model:
-
-| Priority | `query_type` | Triggered by | Answered with |
-|---|---|---|---|
-| 1 | `customer_query` | a customer ID (`customer 385772`, `#385772`, or a bare 6-digit ID) | direct lookup |
-| 2 | `aggregate_query` | how many / percentage / average / median / total / distribution | pandas calculation over all scored customers |
-| 3 | `retrieval_query` | late or overdue payers, on-time payers, unpaid amounts, predicted defaults, highest/lowest risk | structured filter + sort |
-| 4 | `general_retrieval` | anything else (e.g. profile descriptions) | TF-IDF cosine similarity |
-
-Numeric questions are never answered by TF-IDF. Questions can add a risk category (`high risk`), profile values (`pensioners`, `laborers`, `married`), a numeric threshold (`over 100000`, `above 50%`), and a limit (`top 5`, max 50). Answers are generated from the computed values and state the population used; averages of repayment metrics exclude customers without installment history. Only general retrieval needs the TF-IDF index; without it those questions return `503` while the others still work.
-
-Example: `{"query": "How many high-risk customers are there?"}` → `{"query_type": "aggregate_query", "result": "There are 12,646 High Risk customers, 20.56% of the 61,503 scored customers.", "metrics": [...]}`
-
-
----
-
-## ML Pipeline Setup
-
-The backend virtual environment already includes the ML requirements (`backend/requirements.txt` includes `ml/requirements.txt`). Run these from the repository root with that environment active.
-
-1. Download the [Home Credit Default Risk](https://www.kaggle.com/competitions/home-credit-default-risk/data) data and copy `application_train.csv`, `application_test.csv`, and `installments_payments.csv` into `datasets/`. Raw and derived data are git-ignored and must not be committed.
-2. Train, evaluate, and score:
+1. Download [Home Credit Default Risk](https://www.kaggle.com/competitions/home-credit-default-risk/data) (a Kaggle account is required). Copy `application_train.csv`, `application_test.csv`, and `installments_payments.csv` into `datasets/`.
+2. From the repository root, with the virtual environment active:
 
 ```bash
-python -m ml.training.train_model          # ~5 min: writes models/repayx_model.joblib + metadata
-python -m ml.evaluation.evaluate_model     # re-checks the holdout, writes models/evaluation_report.json
-python -m ml.scoring.score_customers       # writes backend/data/customer_data.parquet (no TARGET)
-python -m ml.retrieval.build_tfidf_index   # writes the TF-IDF index to backend/rag/
-cd ml && pytest                            # ML unit tests
+python -m ml.scoring.score_customers       # backend/data/customer_data.parquet (61,503 holdout customers)
+python -m ml.retrieval.build_tfidf_index   # backend/rag/ index files
 ```
 
-Key modelling decisions:
+Optional: to retrain, run `python -m ml.training.train_model` (about 5 minutes; it writes a new model version) and `python -m ml.evaluation.evaluate_model`, then re-run the two commands above. The backend rejects customer data or an index produced by a different model version.
 
-* Installment rows are collapsed to one record per installment (`SK_ID_PREV`, version, number) before features are computed; about 5% of installments are paid in several rows that each repeat the full amount.
-* Customers without installment history keep missing repayment features plus a `HAS_INSTALLMENT_HISTORY` flag; missing history is not treated as on-time repayment.
-* `CODE_GENDER` and `NAME_FAMILY_STATUS` are not model inputs (family status is still shown on profiles).
-* Stratified 80/20 split (seed 42). The 0.65 classification threshold is the best F1 threshold from a 5-fold out-of-fold sweep on the training split only. Risk bands (Low < 30, Medium 30–60, High ≥ 60 on the 0–100 score) are prototype presentation bands, separate from that threshold.
-* The backend refuses to load a model whose checksum, scikit-learn version, or input columns do not match its metadata.
+Frontend:
 
-Holdout results (61,503 customers, 8.07% default rate): ROC-AUC 0.753. At threshold 0.65: accuracy 83.5%, precision 22.6%, recall 43.4%, F1 29.8%. At 0.5: accuracy 69.7%, precision 16.4%, recall 67.4%, F1 26.4%. These are prototype evaluation results; the model is not production-ready and its outputs are estimated probabilities, not guaranteed outcomes.
----
-
-# 🔑 Environment Configuration
-
-The root `.env.example` lists all variables. Copy it to `.env` in the repository root: Vite is configured (`envDir`) to read it from there and only exposes `VITE_`-prefixed values to the browser. Without `VITE_API_BASE_URL` the API-connected pages show a configuration error. Backend variables (`API_HOST`, `API_PORT`, `CORS_ALLOWED_ORIGINS`) are read from the environment of the shell running `backend/run.py`, and default to local development values.
-
-Example:
-
-```env
-VITE_API_BASE_URL=http://localhost:8000
-
-API_HOST=127.0.0.1
-API_PORT=8000
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+```bash
+cd frontend
+npm install
 ```
 
-Never commit the `.env` file to Git.
+## 13. Running the frontend
 
----
+```bash
+cd frontend
+npm run dev        # http://localhost:3000
+npm run lint       # TypeScript check
+npm test           # Vitest suite
+npm run build      # production build in dist/
+```
 
-# 🧪 Testing
+Vite reads `VITE_API_BASE_URL` from the repository-root `.env` (`envDir`). Without it, API pages show a configuration message.
 
-No running backend or dataset is needed for the automated suites; they use fixtures and a fake API.
+## 14. Running the backend
 
-| Suite | Command | Covers |
+```bash
+cd backend
+python run.py      # http://127.0.0.1:8000, docs at /docs
+pytest             # backend tests
+```
+
+Settings come from environment variables (listed in `.env.example`; the backend does not read the `.env` file itself): `API_HOST`, `API_PORT`, and `CORS_ALLOWED_ORIGINS` (defaults: `http://localhost:3000` and `http://127.0.0.1:3000`). Optional artifact path overrides are listed there too. Check `GET /api/health`: `status: ok` means the model, customer data, and index all loaded and validated. Missing pieces show as `missing` or `invalid`, and only the features that need them return `503`.
+
+## 15. Dataset information
+
+**Home Credit Default Risk** (Kaggle competition data; not redistributed in this repository):
+
+| File | Rows | Use |
 |---|---|---|
-| Backend (190 + 8 real-data) | `cd backend && pytest` | health, CORS, input validation, error handling (no stack traces or paths), model/data/index loading and tamper detection, customer lookup and listing, analytics, insights, query routing and all four query types, empty/invalid queries, no outcome fields in responses |
-| ML (29) | `cd ml && pytest` | installment features (partial payments, missing payments, tolerances), preprocessing, risk bands vs classification threshold, TF-IDF index building |
-| Frontend (39) | `cd frontend && npm test` | API client error handling, dashboard rendering, customer search, risk filtering, sorting/pagination, customer details (including invalid, unknown, and no-history customers), AI query submission and error states |
+| `application_train.csv` | 307,511 applications, 8.07% default rate (`TARGET` = 1) | training, evaluation, and the scored holdout |
+| `installments_payments.csv` | 13,605,401 payment rows (12,951,918 installments; 339,587 customers) | repayment features |
+| `application_test.csv` | 48,744 applications, no labels | optional scoring population (`--population application_test`) |
 
-`backend/tests/test_real_data.py` checks the five reference questions and cross-endpoint consistency against the real artifacts. It runs automatically once the ML pipeline has produced them and is skipped otherwise.
+The scored portfolio is the stratified 20% holdout of `application_train.csv` (61,503 customers; 58,321 with installment history). Raw data, the scored Parquet file, holdout IDs, and the TF-IDF index are git-ignored. Recreate them with the pipeline in [section 12](#12-installation). The Kaggle competition rules govern use of the data.
 
-GitHub Actions (`.github/workflows/ci.yml`) runs the backend, ML, and frontend checks (lint, tests, build) on every push to `main` or `repayx-fullstack` and on pull requests.
+The two CSVs that shipped with the original prototype (`Loan payments data.csv`, 500 loans; `loan_data_set.csv`, 614 applications) are kept unchanged. They have no loan IDs in common, describe different borrowers, and lack the installment fields RepayX needs, so the pipeline does not use them.
 
----
+## 16. Model evaluation
 
-# 🔍 RAG Evaluation
+Holdout of 61,503 customers (8.07% defaults), evaluated once and then independently reproduced by `ml.evaluation.evaluate_model`:
 
-The AI layer should be evaluated for:
+| Metric | Threshold 0.65 (used) | Threshold 0.50 |
+|---|---|---|
+| Accuracy | 83.5% | 69.7% |
+| Precision | 22.6% | 16.4% |
+| Recall | 43.4% | 67.4% |
+| F1 | 29.8% | 26.4% |
+| ROC-AUC | 75.3% | 75.3% |
+| PR-AUC (average precision) | 23.4% | 23.4% |
 
-### Retrieval Accuracy
+At 0.65 the confusion matrix is 2,155 true positives, 7,368 false positives, 2,810 false negatives, and 49,170 true negatives. The original prototype's reported figures (accuracy 69.4%, precision 16.4%, recall 68.3%, F1 26.5%, ROC-AUC 75.3%) correspond to the 0.50 threshold and are reproduced closely.
 
-Does the system retrieve the correct records or context?
+Risk bands separate observed default rates as intended:
 
-### Response Accuracy
+| Risk category | Customers | Observed default rate |
+|---|---|---|
+| Low Risk (< 30) | 20,465 | 2.1% |
+| Medium Risk (30–60) | 28,392 | 6.9% |
+| High Risk (≥ 60) | 12,646 | 20.5% |
 
-Does the generated response accurately represent the retrieved information?
+ROC-AUC is 0.752 for customers with installment history and 0.765 for those without. These are prototype results on public competition data, not a production validation.
 
-### Grounding
+## 17. Example queries
 
-Does the response remain grounded in the available data?
+All answers below come from the real scored data:
 
-### Numerical Accuracy
+| Question | Type | Answer (abridged) |
+|---|---|---|
+| What is the risk status of customer 385772? | customer | High Risk, risk score 80.13/100, predicted default: yes; 3 installments, all late (100%), 4.33 days late on average, 0.22 unpaid |
+| How many high-risk customers are there? | aggregate | 12,646 High Risk customers, 20.56% of 61,503 |
+| What is the average late payment rate? | aggregate | 8.52% across 58,318 customers (3,185 without a known value excluded) |
+| Which customers frequently pay late? | retrieval | 30,946 customers with a late payment, sorted by late rate, then days late |
+| Show customers with unpaid amounts. | retrieval | 621 customers, sorted by unpaid amount (largest 1,040,230.57) |
+| What is the average risk score of pensioners? | aggregate | 34.34 across 11,228 pensioners |
+| How many customers have a 100% late payment rate? | aggregate | 52 customers |
+| What percentage of customers are predicted to default? | aggregate | 9,523 of 61,503 (15.48%) |
+| Show customers with unpaid amounts over 100000 | retrieval | 22 customers |
+| married drivers with higher education | general (TF-IDF) | Customers whose profiles match, with similarity scores |
 
-Are calculations performed from structured data rather than hallucinated by the LLM?
+## 18. Limitations
 
-### Relevance
+- **The model is a prototype.** It is a linear model on application and installment data only; bureau, previous applications, and card balances are not used. Precision at 0.65 is 22.6%, so most predicted defaults do not default. Do not use it for lending decisions.
+- **Probabilities are estimates.** Class weighting raises predicted probabilities above the 8% base rate (portfolio average 41.8%), so treat scores as rankings rather than calibrated frequencies.
+- **Bands and threshold are not validated policy.** The 30/60 risk bands are presentation choices. The 0.65 threshold maximises F1 on the training split, not a business cost function. The insight rules (50% late, 30 days late, payment ratio 0.9) are descriptive review rules.
+- **The data is static.** The portfolio is a fixed historical snapshot scored offline; nothing updates in real time, and there are no real loans, names, or collections actions.
+- **Query routing is rule-based.** The router recognises the phrasings in [section 8](#8-hybrid-rag-architecture). Unrecognised wording falls back to TF-IDF text matching, which is lexical, not semantic.
+- **There is no authentication or user management.** The API is meant for local or trusted-network use.
+- **Some recovery-workflow pages are demos.** They use sample data and simulate actions.
 
-Does the response directly answer the user's question?
+## 19. Future improvements
 
----
-
-# 🚀 Future Enhancements
-
-Potential future versions of RepayX can include:
-
-* Automated follow-up scheduling
-* SMS integration
-* WhatsApp integration
-* Email notifications
-* Call-management integration
-* AI-generated follow-up summaries
-* Customer communication history
-* Advanced recovery analytics
-* Role-based dashboards
-* Exportable reports
-* PDF report generation
-* Advanced portfolio segmentation
-* Predictive analytics
-* AI-assisted collection workflows
-* Multi-language AI assistant
-* Real-time notifications
-
----
-
-# 📌 Project Goals
-
-The primary goals of RepayX are to:
-
-1. Centralize loan and payment information.
-2. Reduce manual data searching.
-3. Improve visibility into overdue accounts.
-4. Provide accurate portfolio analytics.
-5. Enable natural-language interaction with loan data.
-6. Use RAG to retrieve relevant contextual information.
-7. Keep numerical calculations grounded in structured data.
-8. Provide collection teams with a modern operational dashboard.
-9. Create a scalable foundation for AI-assisted loan recovery workflows.
+- Add bureau, previous-application, and card features; compare gradient-boosted models; calibrate probabilities (Platt or isotonic).
+- Choose the threshold from a cost matrix (missed default vs unnecessary intervention) rather than F1.
+- Add per-customer explanations (feature contributions) to the AI Insight.
+- Add fairness monitoring across segments and drift monitoring for scored populations.
+- Score new applications through an API endpoint, versioning models and datasets with an experiment tracker.
+- Add semantic retrieval alongside TF-IDF, and optional LLM phrasing grounded in computed results.
+- Add authentication, role-based access, and audit logging; containerised deployment.
+- Connect the recovery-workflow pages to real loan and collections data.
 
 ---
 
-# 🔒 Responsible AI
+## Testing
 
-RepayX should treat AI-generated responses as **data-assisted outputs**, not independent financial decisions.
+| Suite | Command | Count |
+|---|---|---|
+| Backend | `cd backend && pytest` | 190 tests, plus 8 real-data acceptance tests that run when the artifacts exist |
+| ML | `cd ml && pytest` | 29 |
+| Frontend | `cd frontend && npm test` | 39 |
 
-The AI system should:
+The suites use fixtures and a fake API, so they need neither the dataset nor a running server. GitHub Actions (`.github/workflows/ci.yml`) runs all of them, plus the frontend lint and build, on pushes to `main` and `repayx-fullstack` and on pull requests.
 
-* Use available source data
-* Avoid fabricating loan information
-* Clearly distinguish retrieved facts from generated explanations
-* Use structured calculations for numerical questions
-* Provide appropriate uncertainty when information is unavailable
-* Respect access permissions
-* Avoid exposing unauthorized borrower information
+## Security and data privacy
 
----
+- No secrets are required or stored. `.env` is git-ignored, and `.env.example` contains only local defaults.
+- CORS allows only the configured frontend origins.
+- All input is validated: customer IDs, query length (1–500 characters), and list parameters. Validation errors do not echo input back.
+- Errors never expose stack traces, exception text, or file paths; paths appear only in server logs.
+- Model and index files are checked against SHA-256 checksums before they are loaded.
+- Actual outcomes (`TARGET`) never appear in API responses, customer data, or retrieval documents.
 
-# 📖 Documentation
+## License
 
-Additional project documentation can include:
+This project is intended for internal/company use. Add the organization's official license and usage terms here if applicable. The Home Credit dataset is subject to the Kaggle competition rules and is not included.
 
-* Product Requirements Document (PRD)
-* System Architecture
-* API Documentation
-* Database Schema
-* RAG Architecture
-* Deployment Guide
-* Testing Documentation
-* User Guide
+## Project
 
----
-
-# 🤝 Contribution
-
-Contributions should follow the project's development workflow.
-
-```text
-Create Branch
-     ↓
-Implement Changes
-     ↓
-Test
-     ↓
-Commit
-     ↓
-Push
-     ↓
-Pull Request
-     ↓
-Code Review
-     ↓
-Merge
-```
-
-Use meaningful commit messages, for example:
-
-```bash
-git commit -m "feat: add overdue loan analytics"
-git commit -m "fix: validate payment date"
-git commit -m "feat: integrate RAG assistant"
-```
-
----
-
-# 📄 License
-
-This project is intended for internal/company use.
-
-Add the organization's official license and usage terms here if applicable.
-
----
-
-# 👩‍💻 Project
-
-**RepayX — AI-Powered Loan Follow-Up & Recovery Dashboard**
-
-Built to bring **loan monitoring, payment analytics, recovery workflows, and AI-powered data interaction** into one intelligent platform.
-
-> **RepayX — From Loan Data to Actionable Recovery Intelligence.**
-
+**RepayX: AI-Powered Loan Risk & Recovery Intelligence Platform**, by Priya Parihar.
