@@ -2,6 +2,8 @@
 
 ### AI-Powered Loan Follow-Up & Recovery Dashboard
 
+> Project status (Phase 2): the existing frontend runs with mock data. A FastAPI backend skeleton is in place (health check, input validation, CORS, error handling); its data endpoints return `503` until customer data and model artifacts are added in later phases. ML and retrieval directories are scaffolding only. Architecture and feature descriptions below include planned capabilities.
+
 RepayX is an intelligent **loan follow-up and recovery management platform** designed to help lending and financial organizations efficiently monitor loan accounts, identify upcoming and overdue payments, prioritize follow-ups, and interact with loan records using an AI-powered Retrieval-Augmented Generation (RAG) system.
 
 The platform combines **structured loan data, analytics, automated follow-up workflows, and natural-language querying** into a centralized dashboard for collection and recovery teams.
@@ -620,18 +622,18 @@ RepayX/
 
 Make sure the following are installed:
 
-* Node.js
+* Node.js 22.12+
 * npm
-* Python 3.x
 * Git
-* PostgreSQL (if required by the configured backend)
+
+* Python 3.12+ (tested with 3.14) for the backend
 
 ---
 
 ## Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/priyaparihar2006/RepayX.git
 
 cd RepayX
 ```
@@ -648,7 +650,9 @@ npm install
 npm run dev
 ```
 
-The frontend will then be available through the local development server.
+The frontend will be available at http://localhost:3000. From `frontend/`, run `npm run lint` for TypeScript checking and `npm run build` for a production build.
+
+The two original CSV datasets remain unchanged at the repository root. They are separate datasets and are not joined or consumed by the current UI.
 
 ---
 
@@ -659,48 +663,36 @@ Open another terminal:
 ```bash
 cd backend
 
-python -m venv venv
+python -m venv .venv
 ```
 
-### Windows
+Activate it — Windows: `.venv\Scripts\activate`, macOS/Linux: `source .venv/bin/activate`. Then:
 
 ```bash
-venv\Scripts\activate
+pip install -r requirements-dev.txt
+
+python run.py          # serves http://127.0.0.1:8000 (API_HOST / API_PORT override)
+pytest                 # backend test suite
 ```
 
-### macOS / Linux
+Interactive API docs are at http://127.0.0.1:8000/docs.
 
-```bash
-source venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Start the backend:
-
-```bash
-python app.py
-```
-
-> The exact backend startup command may vary depending on the configured application entry point.
+Currently implemented: `GET /api/health` reports which data/model artifacts are present. `GET /api/customer/{id}`, `GET /api/customers`, `GET /api/analytics`, and `POST /api/query` validate their input but return `503` because customer data and model artifacts are not available yet. The `ml/`, `models/`, `rag/`, and `notebooks/` directories are placeholders for later phases.
 
 ---
 
 # 🔑 Environment Configuration
 
-Create a `.env` file based on `.env.example`.
+The root `.env.example` lists all variables. Copy the `VITE_` line to `frontend/.env` (Vite reads env files from `frontend/`); the current mock-data UI does not require it yet. Backend variables (`API_HOST`, `API_PORT`, `CORS_ALLOWED_ORIGINS`) are read from the environment of the shell running `backend/run.py`, and default to local development values.
 
 Example:
 
 ```env
-DATABASE_URL=your_database_url
-OPENAI_API_KEY=your_api_key
-VECTOR_DB_URL=your_vector_database_url
-JWT_SECRET=your_secret
+VITE_API_BASE_URL=http://localhost:8000
+
+API_HOST=127.0.0.1
+API_PORT=8000
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
 Never commit the `.env` file to Git.
