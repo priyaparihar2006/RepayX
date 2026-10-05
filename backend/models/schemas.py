@@ -87,10 +87,38 @@ class CustomerDetail(CustomerSummary):
     total_payment_amount: float | None
 
 
+class InsightIndicator(BaseModel):
+    key: str
+    label: str
+    detail: str
+    severity: Literal["high", "medium", "low", "info"]
+
+
+class CustomerInsight(BaseModel):
+    summary: str = Field(description="Rule-based summary generated from this customer's data.")
+    indicators: list[InsightIndicator]
+
+
+class Benchmarks(BaseModel):
+    """Portfolio averages in the same units as the customer fields (repayment averages exclude no-history customers)."""
+
+    risk_score: float | None
+    default_probability: float | None
+    late_payment_rate: float | None
+    avg_days_late: float | None
+    underpaid_rate: float | None
+    payment_ratio: float | None
+    total_unpaid_amount: float | None
+    installment_count: float | None
+
+
 class CustomerResponse(BaseModel):
     success: Literal[True] = True
     model_version: str | None
     customer: CustomerDetail
+    insight: CustomerInsight
+    benchmarks: Benchmarks
+    classification_threshold: float | None = Field(description="Probability (0-1); null if the model is not loaded.")
 
 
 class Pagination(BaseModel):
