@@ -26,6 +26,7 @@ export type NavTab =
   | 'risk-analytics'
   | 'repayment-analytics'
   | 'demo-overview'
+  | 'demo-insights'
   | 'loans'
   | 'follow-ups'
   | 'conversations'
@@ -84,6 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       group: 'DEMO WORKFLOW',
       items: [
         { id: 'demo-overview' as NavTab, label: 'Recovery Overview', icon: Presentation },
+        { id: 'demo-insights' as NavTab, label: 'Recovery Funnel', icon: TrendingUp },
         { id: 'loans' as NavTab, label: 'Loans', icon: CreditCard },
         { id: 'follow-ups' as NavTab, label: 'Follow-ups', icon: CalendarClock },
         {

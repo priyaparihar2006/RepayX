@@ -114,7 +114,7 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold tracking-tight">RepayX Copilot</h3>
-              <p className="text-[11px] text-purple-200">Policy & Portfolio Intelligence</p>
+              <p className="text-[11px] text-purple-200">Demo · sample responses, not connected to the RepayX API</p>
             </div>
           </div>
 
