@@ -55,3 +55,53 @@ class QueryRequest(BaseModel):
         if not stripped:
             raise ValueError("Query must not be empty.")
         return stripped
+
+
+class CustomerSummary(BaseModel):
+    customer_id: int
+    risk_score: float = Field(description="0-100; estimated default probability x 100.")
+    default_probability: float = Field(description="Estimated default probability, percent (0-100).")
+    risk_category: RiskCategory
+    predicted_default: Literal[0, 1] = Field(description="1 if the estimate meets the classification threshold.")
+    late_payment_rate: float | None = Field(description="Percent of paid installments paid late; null without history.")
+    total_unpaid_amount: float | None
+    payment_ratio: float | None = Field(description="Total paid / total due; 1.0 means paid in full.")
+
+
+class CustomerDetail(CustomerSummary):
+    annual_income: float | None
+    credit_amount: float | None
+    annuity_amount: float | None
+    income_type: str | None
+    education: str | None
+    family_status: str | None
+    occupation: str | None
+    has_installment_history: bool
+    installment_count: int | None
+    late_payment_count: int | None
+    avg_days_late: float | None
+    max_days_late: float | None
+    underpaid_count: int | None
+    underpaid_rate: float | None = Field(description="Percent of installments underpaid.")
+    total_installment_amount: float | None
+    total_payment_amount: float | None
+
+
+class CustomerResponse(BaseModel):
+    success: Literal[True] = True
+    model_version: str | None
+    customer: CustomerDetail
+
+
+class Pagination(BaseModel):
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+
+
+class CustomerListResponse(BaseModel):
+    success: Literal[True] = True
+    model_version: str | None
+    customers: list[CustomerSummary]
+    pagination: Pagination
