@@ -2,7 +2,7 @@
 
 ### AI-Powered Loan Follow-Up & Recovery Dashboard
 
-> Project status (Phase 10): the dashboard, Risk Analytics, Repayment Analytics, Customers, customer details, and AI Insights (`/insights`, natural-language questions answered by `POST /api/query`) all run on real data from the FastAPI backend. The navbar's AI Copilot opens AI Insights. The recovery-workflow pages, including the original AI assistant drawer and recovery funnel, are grouped under *Demo workflow* and use sample data. Architecture and feature descriptions below include planned capabilities.
+> Project status (Phase 11): the dashboard, Risk Analytics, Repayment Analytics, Customers, customer details, and AI Insights (`POST /api/query`) run on real data from the FastAPI backend, with automated backend, ML, and frontend tests and CI. The recovery-workflow pages are grouped under *Demo workflow* and use sample data. Architecture and feature descriptions below include planned capabilities.
 
 RepayX is an intelligent **loan follow-up and recovery management platform** designed to help lending and financial organizations efficiently monitor loan accounts, identify upcoming and overdue payments, prioritize follow-ups, and interact with loan records using an AI-powered Retrieval-Augmented Generation (RAG) system.
 
@@ -752,29 +752,17 @@ Never commit the `.env` file to Git.
 
 # 🧪 Testing
 
-Testing should cover the major application layers.
+No running backend or dataset is needed for the automated suites; they use fixtures and a fake API.
 
-### Frontend
+| Suite | Command | Covers |
+|---|---|---|
+| Backend (190 + 8 real-data) | `cd backend && pytest` | health, CORS, input validation, error handling (no stack traces or paths), model/data/index loading and tamper detection, customer lookup and listing, analytics, insights, query routing and all four query types, empty/invalid queries, no outcome fields in responses |
+| ML (29) | `cd ml && pytest` | installment features (partial payments, missing payments, tolerances), preprocessing, risk bands vs classification threshold, TF-IDF index building |
+| Frontend (39) | `cd frontend && npm test` | API client error handling, dashboard rendering, customer search, risk filtering, sorting/pagination, customer details (including invalid, unknown, and no-history customers), AI query submission and error states |
 
-```bash
-npm run build
-```
+`backend/tests/test_real_data.py` checks the five reference questions and cross-endpoint consistency against the real artifacts. It runs automatically once the ML pipeline has produced them and is skipped otherwise.
 
-### Backend
-
-Run the configured backend test suite.
-
-Testing should cover:
-
-* API endpoints
-* Authentication
-* Loan retrieval
-* Payment retrieval
-* Data validation
-* Analytics
-* RAG retrieval
-* AI responses
-* Error handling
+GitHub Actions (`.github/workflows/ci.yml`) runs the backend, ML, and frontend checks (lint, tests, build) on every push to `main` or `repayx-fullstack` and on pull requests.
 
 ---
 
