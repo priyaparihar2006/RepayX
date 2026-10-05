@@ -3,10 +3,13 @@ import { Link, useParams } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
 import { useCustomer } from '../hooks/useCustomers';
 import { ApiError } from '../services/api';
-import type { CustomerDetail } from '../types/api';
+import type { CustomerResponse } from '../types/api';
 import { RiskBadge } from '../components/common/RiskBadge';
 import { ErrorState, LoadingState } from '../components/common/RequestState';
 import { Disclaimer } from '../components/common/Disclaimer';
+import { RiskPositionMeter } from '../components/customers/RiskPositionMeter';
+import { InsightCard } from '../components/customers/InsightCard';
+import { RepaymentComparison } from '../components/customers/RepaymentComparison';
 import { formatAmount, formatNumber, formatPercent, formatRatio, formatScore } from '../lib/format';
 
 export function parseCustomerId(raw: string | undefined): number | null {
@@ -47,7 +50,7 @@ export const CustomerDetailsPage: React.FC = () => {
       ) : result.status === 'loading' || !result.data ? (
         <Card><LoadingState label={`Loading customer ${customerId}…`} /></Card>
       ) : (
-        <CustomerProfile customer={result.data.customer} />
+        <CustomerProfile data={result.data} />
       )}
 
       <Disclaimer />
@@ -55,7 +58,9 @@ export const CustomerDetailsPage: React.FC = () => {
   );
 };
 
-const CustomerProfile: React.FC<{ customer: CustomerDetail }> = ({ customer: c }) => (
+const CustomerProfile: React.FC<{ data: CustomerResponse }> = ({ data }) => {
+  const c = data.customer;
+  return (
   <>
     <Card className="p-5 sm:p-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -72,7 +77,20 @@ const CustomerProfile: React.FC<{ customer: CustomerDetail }> = ({ customer: c }
           <Stat label="Predicted Default" value={c.predicted_default ? 'Yes' : 'No'} tone={c.predicted_default ? 'bad' : 'good'} />
         </div>
       </div>
+      <div className="mt-5 pt-4 border-t border-slate-100">
+        <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mb-1">Risk position</p>
+        <RiskPositionMeter score={c.risk_score} category={c.risk_category} threshold={data.classification_threshold} />
+      </div>
     </Card>
+
+    <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+      <div className="xl:col-span-3">
+        <InsightCard summary={data.insight.summary} indicators={data.insight.indicators} />
+      </div>
+      <div className="xl:col-span-2">
+        <RepaymentComparison customer={c} benchmarks={data.benchmarks} />
+      </div>
+    </div>
 
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <Section title="Financial Information">
@@ -104,7 +122,8 @@ const CustomerProfile: React.FC<{ customer: CustomerDetail }> = ({ customer: c }
       </Section>
     </div>
   </>
-);
+  );
+};
 
 const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
   <div className={`bg-white rounded-2xl border border-slate-200/80 shadow-xs ${className}`}>{children}</div>

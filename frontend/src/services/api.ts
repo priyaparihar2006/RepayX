@@ -53,7 +53,7 @@ const has = (body: unknown, ...keys: string[]): body is Record<string, unknown> 
 
 const isHealth: Validator<HealthResponse> = (b): b is HealthResponse => has(b, 'status', 'resources');
 const isCustomer: Validator<CustomerResponse> = (b): b is CustomerResponse =>
-  has(b, 'customer') && isObject(b.customer) && typeof b.customer.customer_id === 'number';
+  has(b, 'customer', 'insight', 'benchmarks') && isObject(b.customer) && typeof b.customer.customer_id === 'number';
 const isCustomerList: Validator<CustomerListResponse> = (b): b is CustomerListResponse =>
   has(b, 'customers', 'pagination') && Array.isArray(b.customers) && isObject(b.pagination);
 const isAnalytics: Validator<AnalyticsResponse> = (b): b is AnalyticsResponse =>
