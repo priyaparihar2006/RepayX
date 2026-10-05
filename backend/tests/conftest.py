@@ -82,3 +82,51 @@ def write_test_model(settings: Settings, **metadata_overrides) -> dict:
     metadata.update(metadata_overrides)
     settings.model_metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
     return metadata
+
+
+CUSTOMER_ROWS = [
+    # id, probability, history?, installments, late, avg_late, max_late, underpaid, unpaid, late_rate, underpaid_rate, ratio
+    (385772, 0.801271, 1, 3, 3, 13 / 3, 6.0, 1, 0.225, 1.0, 1 / 3, 0.999984),
+    (385001, 0.45, 1, 10, 1, 0.5, 5.0, 0, 0.0, 0.1, 0.0, 1.0),
+    (100002, 0.20, 1, 19, 0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 1.0),
+    (100003, 0.45, 1, 25, 5, 2.0, 12.0, 4, 1500.0, 0.2, 0.16, 0.95),
+    (200004, 0.65, 0, None, None, None, None, None, None, None, None, None),
+    (300005, 0.05, 1, 4, 0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 1.02),
+]
+
+
+def write_test_customers(settings: Settings, model_version: str | None = "test-model-1", mutate=None) -> "pd.DataFrame":
+    """Write customer data in the format produced by ml.scoring.score_customers."""
+    import numpy as np
+    import pandas as pd
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    cols = ["customer_id", "default_probability", "has_installment_history", "installment_count",
+            "late_payment_count", "avg_days_late", "max_days_late", "underpaid_count", "total_unpaid_amount",
+            "late_payment_rate", "underpaid_rate", "payment_ratio"]
+    df = pd.DataFrame(CUSTOMER_ROWS, columns=cols)
+    df["risk_score"] = df["default_probability"] * 100
+    df["risk_category"] = np.select([df.risk_score >= 60, df.risk_score >= 30], ["High Risk", "Medium Risk"], "Low Risk")
+    df["predicted_default"] = (df["default_probability"] >= 0.65).astype("int8")
+    df["annual_income"] = 135000.0
+    df["credit_amount"] = 668304.0
+    df["annuity_amount"] = 28444.5
+    df["income_type"] = "Working"
+    df["education"] = "Lower secondary"
+    df["family_status"] = "Married"
+    df["occupation"] = [None if i == 1 else "Laborers" for i in range(len(df))]
+    df["has_installment_history"] = df["has_installment_history"].astype("int8")
+    for col in ("installment_count", "late_payment_count", "underpaid_count"):
+        df[col] = df[col].astype("Int64")
+    for col in ("avg_days_late", "max_days_late", "total_unpaid_amount", "late_payment_rate", "underpaid_rate", "payment_ratio"):
+        df[col] = df[col].astype("float64")
+    df["total_installment_amount"] = df["installment_count"].astype("float64") * 100
+    df["total_payment_amount"] = df["total_installment_amount"] * df["payment_ratio"]
+    if mutate:
+        df = mutate(df)
+    table = pa.Table.from_pandas(df, preserve_index=False)
+    if model_version:
+        table = table.replace_schema_metadata({**(table.schema.metadata or {}), b"repayx.model_version": model_version.encode()})
+    pq.write_table(table, settings.customer_data_path)
+    return df
