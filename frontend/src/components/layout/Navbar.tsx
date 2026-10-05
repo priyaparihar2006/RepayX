@@ -101,9 +101,18 @@ export const Navbar: React.FC<NavbarProps> = ({
       )
     : [];
 
+  // A numeric query can be a RepayX customer ID (opens the real risk profile).
+  const riskCustomerId = /^\d{1,10}$/.test(q) ? q : null;
+
   const hasSearchResults =
     q.length > 0 &&
-    (matchedCustomers.length > 0 || matchedLoans.length > 0 || matchedConversations.length > 0);
+    (riskCustomerId !== null || matchedCustomers.length > 0 || matchedLoans.length > 0 || matchedConversations.length > 0);
+
+  const openRiskCustomer = (customerId: string) => {
+    onNavigate('risk-customer', customerId);
+    setShowSearchResults(false);
+    setSearchQuery('');
+  };
 
   return (
     <header className="h-16 px-6 bg-white border-b border-slate-200/80 flex items-center justify-between sticky top-0 z-20">
@@ -133,13 +142,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Search className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
             <input
               type="text"
-              placeholder="Search customer, loan ID, phone..."
+              placeholder="Customer ID (e.g. 385772) or demo search..."
+              aria-label="Search by customer ID or demo data"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
                 setShowSearchResults(true);
               }}
               onFocus={() => setShowSearchResults(true)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && riskCustomerId) openRiskCustomer(riskCustomerId);
+              }}
               className="bg-transparent border-none outline-none w-full text-slate-800 placeholder-slate-400 text-xs"
             />
             {searchQuery && (
@@ -157,6 +170,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="absolute top-full mt-1.5 right-0 w-80 md:w-96 bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-50 max-h-96 overflow-y-auto">
               {hasSearchResults ? (
                 <div className="space-y-3">
+                  {riskCustomerId && (
+                    <button
+                      onClick={() => openRiskCustomer(riskCustomerId)}
+                      className="w-full text-left p-2 rounded-lg bg-blue-50/60 hover:bg-blue-50 transition-colors flex items-center gap-2 text-xs"
+                    >
+                      <User className="w-3.5 h-3.5 text-blue-600" />
+                      <span className="font-semibold text-slate-800">Open customer {riskCustomerId}</span>
+                      <span className="text-slate-500 text-[11px]">risk profile</span>
+                    </button>
+                  )}
+                  {(matchedCustomers.length > 0 || matchedLoans.length > 0 || matchedConversations.length > 0) && (
+                    <p className="text-[10px] font-semibold text-amber-700 px-1">Demo workflow results (sample data)</p>
+                  )}
                   {matchedCustomers.length > 0 && (
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 px-1">

@@ -33,12 +33,18 @@ const LoansPage = lazy(() => import('./components/loans/LoansPage').then((m) => 
 const SettingsPage = lazy(() => import('./components/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const ReportsPage = lazy(() => import('./components/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 const CustomersPage = lazy(() => import('./pages/Customers').then((m) => ({ default: m.CustomersPage })));
+const DashboardPage = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.DashboardPage })));
+const RiskAnalyticsPage = lazy(() => import('./pages/RiskAnalytics').then((m) => ({ default: m.RiskAnalyticsPage })));
+const RepaymentAnalyticsPage = lazy(() => import('./pages/RepaymentAnalytics').then((m) => ({ default: m.RepaymentAnalyticsPage })));
 const CustomerDetailsPage = lazy(() => import('./pages/CustomerDetails').then((m) => ({ default: m.CustomerDetailsPage })));
 
 // URL for each sidebar tab. 'ai-assistant' opens the drawer instead of a page.
 const TAB_PATHS: Record<Exclude<NavTab, 'ai-assistant'>, string> = {
   overview: '/',
   customers: '/customers',
+  'risk-analytics': '/analytics/risk',
+  'repayment-analytics': '/analytics/repayment',
+  'demo-overview': '/demo/overview',
   loans: '/loans',
   'follow-ups': '/follow-ups',
   conversations: '/conversations',
@@ -62,9 +68,15 @@ function pageMeta(pathname: string): { title: string; breadcrumb: string } {
   if (pathname.startsWith('/demo-customers')) return { title: 'Demo Customer Workflow', breadcrumb: 'Demo / Customers' };
   switch (tabForPath(pathname)) {
     case 'overview':
-      return pathname === '/' ? { title: 'Loan Recovery Dashboard', breadcrumb: 'Overview' } : { title: 'Page not found', breadcrumb: 'RepayX' };
+      return pathname === '/' ? { title: 'Risk Dashboard', breadcrumb: 'Dashboard' } : { title: 'Page not found', breadcrumb: 'RepayX' };
     case 'customers':
       return { title: 'Customer Risk Portfolio', breadcrumb: 'Customers' };
+    case 'risk-analytics':
+      return { title: 'Risk Analytics', breadcrumb: 'Analytics / Risk' };
+    case 'repayment-analytics':
+      return { title: 'Repayment Analytics', breadcrumb: 'Analytics / Repayment' };
+    case 'demo-overview':
+      return { title: 'Loan Recovery Overview', breadcrumb: 'Demo / Recovery Overview' };
     case 'loans':
       return { title: 'Loan Portfolio Ledger', breadcrumb: 'Loans' };
     case 'follow-ups':
@@ -124,6 +136,8 @@ function AppContent() {
       setIsAiAssistantOpen(true);
     } else if (tab === 'conversations') {
       openConversation(targetId);
+    } else if (tab === 'risk-customer' && targetId) {
+      navigate(`/customers/${encodeURIComponent(targetId)}`);
     } else if (tab === 'customers' && targetId) {
       openDemoCustomer(targetId);
     } else {
@@ -192,12 +206,15 @@ function AppContent() {
           <Suspense fallback={<LoadingState />}>
           <Routes>
             {/* Connected to the RepayX API */}
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/analytics/risk" element={<RiskAnalyticsPage />} />
+            <Route path="/analytics/repayment" element={<RepaymentAnalyticsPage />} />
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/customers/:customerId" element={<CustomerDetailsPage />} />
 
             {/* Demo workflow pages (sample data) */}
             <Route
-              path="/"
+              path="/demo/overview"
               element={
                 <Demo>
                   <OverviewDashboard

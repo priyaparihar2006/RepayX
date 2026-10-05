@@ -14,12 +14,18 @@ import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
+  PieChart,
+  Wallet,
+  Presentation,
 } from 'lucide-react';
 import { MANAGER_PROFILE } from '../../data/mockData';
 
 export type NavTab =
   | 'overview'
   | 'customers'
+  | 'risk-analytics'
+  | 'repayment-analytics'
+  | 'demo-overview'
   | 'loans'
   | 'follow-ups'
   | 'conversations'
@@ -64,10 +70,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const navSections: NavSection[] = [
     {
-      group: 'MAIN',
+      group: 'RISK INTELLIGENCE',
       items: [
-        { id: 'overview' as NavTab, label: 'Overview', icon: LayoutDashboard },
+        { id: 'overview' as NavTab, label: 'Dashboard', icon: LayoutDashboard },
         { id: 'customers' as NavTab, label: 'Customers', icon: Users },
+        { id: 'risk-analytics' as NavTab, label: 'Risk Analytics', icon: PieChart },
+        { id: 'repayment-analytics' as NavTab, label: 'Repayment Analytics', icon: Wallet },
+        { id: 'ai-insights' as NavTab, label: 'AI Insights', icon: LineChart, isAi: true },
+      ],
+    },
+    {
+      // Recovery workflow pages that still run on sample data.
+      group: 'DEMO WORKFLOW',
+      items: [
+        { id: 'demo-overview' as NavTab, label: 'Recovery Overview', icon: Presentation },
         { id: 'loans' as NavTab, label: 'Loans', icon: CreditCard },
         { id: 'follow-ups' as NavTab, label: 'Follow-ups', icon: CalendarClock },
         {
@@ -76,19 +92,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: MessageSquare,
           badge: unreadCount > 0 ? unreadCount : undefined,
         },
-      ],
-    },
-    {
-      group: 'AI ENGINE',
-      items: [
         { id: 'ai-assistant' as NavTab, label: 'AI Assistant', icon: Bot, isAi: true },
-        { id: 'rag-knowledge' as NavTab, label: 'RAG Knowledge Base', icon: BookOpen, isAi: true },
-        { id: 'ai-insights' as NavTab, label: 'AI Insights', icon: LineChart, isAi: true },
-      ],
-    },
-    {
-      group: 'MANAGEMENT',
-      items: [
+        { id: 'rag-knowledge' as NavTab, label: 'Knowledge Base', icon: BookOpen, isAi: true },
         { id: 'payments' as NavTab, label: 'Payments', icon: FileCheck2 },
         {
           id: 'escalations' as NavTab,

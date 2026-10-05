@@ -1,10 +1,11 @@
 import React from 'react';
 import type { RiskCategory } from '../../types/api';
 
+// Same hues as the risk chart colors (lib/chartTheme.ts); the text label carries the meaning.
 const STYLES: Record<RiskCategory, string> = {
-  'High Risk': 'bg-rose-50 text-rose-700 border-rose-200',
-  'Medium Risk': 'bg-amber-50 text-amber-700 border-amber-200',
-  'Low Risk': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'High Risk': 'bg-red-50 text-red-800 border-red-200',
+  'Medium Risk': 'bg-amber-50 text-amber-800 border-amber-200',
+  'Low Risk': 'bg-blue-50 text-blue-800 border-blue-200',
 };
 
 export const RiskBadge: React.FC<{ category: RiskCategory; className?: string }> = ({ category, className = '' }) => (

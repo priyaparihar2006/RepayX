@@ -2,7 +2,7 @@
 
 ### AI-Powered Loan Follow-Up & Recovery Dashboard
 
-> Project status (Phase 7): the frontend uses React Router, and the Customers pages (`/customers`, `/customers/:customerId`) load real risk data from the FastAPI backend. Other pages (overview dashboard, loans, conversations, follow-ups, knowledge base, payments, escalations, reports, AI insights) are demo workflows on sample data and are labelled as such until their phases connect them. Architecture and feature descriptions below include planned capabilities.
+> Project status (Phase 8): the dashboard (`/`), Risk Analytics (`/analytics/risk`), Repayment Analytics (`/analytics/repayment`), and Customers pages run on real data from the FastAPI backend, with Recharts charts that each offer a table view. The recovery-workflow pages (loans, conversations, follow-ups, knowledge base, payments, escalations, reports) are grouped under *Demo workflow* in the sidebar and use sample data. AI Insights is connected in a later phase. Architecture and feature descriptions below include planned capabilities.
 
 RepayX is an intelligent **loan follow-up and recovery management platform** designed to help lending and financial organizations efficiently monitor loan accounts, identify upcoming and overdue payments, prioritize follow-ups, and interact with loan records using an AI-powered Retrieval-Augmented Generation (RAG) system.
 
