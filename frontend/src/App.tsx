@@ -33,6 +33,7 @@ const LoansPage = lazy(() => import('./components/loans/LoansPage').then((m) => 
 const SettingsPage = lazy(() => import('./components/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const ReportsPage = lazy(() => import('./components/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 const CustomersPage = lazy(() => import('./pages/Customers').then((m) => ({ default: m.CustomersPage })));
+const AIInsightsPage = lazy(() => import('./pages/AIInsights').then((m) => ({ default: m.AIInsightsPage })));
 const DashboardPage = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.DashboardPage })));
 const RiskAnalyticsPage = lazy(() => import('./pages/RiskAnalytics').then((m) => ({ default: m.RiskAnalyticsPage })));
 const RepaymentAnalyticsPage = lazy(() => import('./pages/RepaymentAnalytics').then((m) => ({ default: m.RepaymentAnalyticsPage })));
@@ -45,6 +46,7 @@ const TAB_PATHS: Record<Exclude<NavTab, 'ai-assistant'>, string> = {
   'risk-analytics': '/analytics/risk',
   'repayment-analytics': '/analytics/repayment',
   'demo-overview': '/demo/overview',
+  'demo-insights': '/demo/insights',
   loans: '/loans',
   'follow-ups': '/follow-ups',
   conversations: '/conversations',
@@ -86,7 +88,9 @@ function pageMeta(pathname: string): { title: string; breadcrumb: string } {
     case 'rag-knowledge':
       return { title: 'RAG Policy Knowledge Base', breadcrumb: 'AI / Knowledge Base' };
     case 'ai-insights':
-      return { title: 'AI Recovery Analytics & Funnel', breadcrumb: 'AI / Insights' };
+      return { title: 'AI Insights', breadcrumb: 'AI Insights' };
+    case 'demo-insights':
+      return { title: 'AI Recovery Analytics & Funnel', breadcrumb: 'Demo / Recovery Funnel' };
     case 'payments':
       return { title: 'Payments & Settlement Verification', breadcrumb: 'Management / Payments' };
     case 'escalations':
@@ -195,7 +199,7 @@ function AppContent() {
         <Navbar
           pageTitle={title}
           breadcrumb={breadcrumb}
-          onOpenAiAssistant={() => setIsAiAssistantOpen(true)}
+          onOpenAiAssistant={() => navigate(TAB_PATHS['ai-insights'])}
           onNavigate={handleNavigate}
           customers={customers}
           loans={loans}
@@ -304,7 +308,8 @@ function AppContent() {
                 </Demo>
               }
             />
-            <Route path="/insights" element={<Demo><AiInsightsPage /></Demo>} />
+            <Route path="/insights" element={<AIInsightsPage />} />
+            <Route path="/demo/insights" element={<Demo><AiInsightsPage /></Demo>} />
             <Route path="/reports" element={<Demo><ReportsPage /></Demo>} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFound />} />
