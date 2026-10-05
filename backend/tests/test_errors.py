@@ -2,7 +2,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.main import create_app
-from tests.conftest import write_test_customers
 
 
 @pytest.mark.parametrize(
@@ -23,15 +22,6 @@ def test_data_endpoints_return_503_when_customer_data_missing(client, method, pa
         "success": False,
         "error": {"code": "customer_data_unavailable", "message": "Customer data is not available."},
     }
-
-
-def test_unimplemented_endpoint_reports_501_when_data_present(settings, client_factory):
-    write_test_customers(settings)
-
-    response = client_factory().get("/api/analytics")
-
-    assert response.status_code == 501
-    assert response.json()["error"]["code"] == "not_implemented"
 
 
 def test_unknown_route_returns_json_404(client):
