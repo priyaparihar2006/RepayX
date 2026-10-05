@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
+import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate, useParams } from 'react-router';
 import {
   INITIAL_CUSTOMERS,
   INITIAL_LOANS,
@@ -13,78 +14,123 @@ import {
 import { Customer, Loan, Conversation, FollowUpItem } from './types';
 import { Sidebar, NavTab } from './components/layout/Sidebar';
 import { Navbar } from './components/layout/Navbar';
-import { ToastProvider, useToast } from './components/common/Toast';
-import { OverviewDashboard } from './components/dashboard/OverviewDashboard';
-import { ConversationView } from './components/conversations/ConversationView';
-import { CustomersPage } from './components/customers/CustomersPage';
-import { CustomerDetailView } from './components/customers/CustomerDetailView';
-import { FollowupsPage } from './components/followups/FollowupsPage';
-import { RagKnowledgeBasePage } from './components/rag/RagKnowledgeBasePage';
-import { PaymentsPage } from './components/payments/PaymentsPage';
-import { EscalationsPage } from './components/escalations/EscalationsPage';
-import { AiInsightsPage } from './components/insights/AiInsightsPage';
-import { LoansPage } from './components/loans/LoansPage';
-import { SettingsPage } from './components/settings/SettingsPage';
-import { ReportsPage } from './components/reports/ReportsPage';
+import { ToastProvider } from './components/common/Toast';
+import { DemoDataNotice } from './components/common/DemoDataNotice';
 import { AiAssistantDrawer } from './components/ai-drawer/AiAssistantDrawer';
+import { EmptyState, LoadingState } from './components/common/RequestState';
+
+// Pages are loaded on first visit to keep the initial bundle small.
+const OverviewDashboard = lazy(() => import('./components/dashboard/OverviewDashboard').then((m) => ({ default: m.OverviewDashboard })));
+const ConversationView = lazy(() => import('./components/conversations/ConversationView').then((m) => ({ default: m.ConversationView })));
+const DemoCustomersPage = lazy(() => import('./components/customers/CustomersPage').then((m) => ({ default: m.CustomersPage })));
+const CustomerDetailView = lazy(() => import('./components/customers/CustomerDetailView').then((m) => ({ default: m.CustomerDetailView })));
+const FollowupsPage = lazy(() => import('./components/followups/FollowupsPage').then((m) => ({ default: m.FollowupsPage })));
+const RagKnowledgeBasePage = lazy(() => import('./components/rag/RagKnowledgeBasePage').then((m) => ({ default: m.RagKnowledgeBasePage })));
+const PaymentsPage = lazy(() => import('./components/payments/PaymentsPage').then((m) => ({ default: m.PaymentsPage })));
+const EscalationsPage = lazy(() => import('./components/escalations/EscalationsPage').then((m) => ({ default: m.EscalationsPage })));
+const AiInsightsPage = lazy(() => import('./components/insights/AiInsightsPage').then((m) => ({ default: m.AiInsightsPage })));
+const LoansPage = lazy(() => import('./components/loans/LoansPage').then((m) => ({ default: m.LoansPage })));
+const SettingsPage = lazy(() => import('./components/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const ReportsPage = lazy(() => import('./components/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
+const CustomersPage = lazy(() => import('./pages/Customers').then((m) => ({ default: m.CustomersPage })));
+const CustomerDetailsPage = lazy(() => import('./pages/CustomerDetails').then((m) => ({ default: m.CustomerDetailsPage })));
+
+// URL for each sidebar tab. 'ai-assistant' opens the drawer instead of a page.
+const TAB_PATHS: Record<Exclude<NavTab, 'ai-assistant'>, string> = {
+  overview: '/',
+  customers: '/customers',
+  loans: '/loans',
+  'follow-ups': '/follow-ups',
+  conversations: '/conversations',
+  'rag-knowledge': '/knowledge-base',
+  'ai-insights': '/insights',
+  payments: '/payments',
+  escalations: '/escalations',
+  reports: '/reports',
+  settings: '/settings',
+};
+
+function tabForPath(pathname: string): NavTab {
+  if (pathname.startsWith('/customers') || pathname.startsWith('/demo-customers')) return 'customers';
+  const match = (Object.entries(TAB_PATHS) as [NavTab, string][]).find(([, path]) => path !== '/' && pathname.startsWith(path));
+  return match ? match[0] : 'overview';
+}
+
+function pageMeta(pathname: string): { title: string; breadcrumb: string } {
+  const customer = pathname.match(/^\/customers\/([^/]+)/);
+  if (customer) return { title: `Customer ${decodeURIComponent(customer[1])}`, breadcrumb: `Customers / ${decodeURIComponent(customer[1])}` };
+  if (pathname.startsWith('/demo-customers')) return { title: 'Demo Customer Workflow', breadcrumb: 'Demo / Customers' };
+  switch (tabForPath(pathname)) {
+    case 'overview':
+      return pathname === '/' ? { title: 'Loan Recovery Dashboard', breadcrumb: 'Overview' } : { title: 'Page not found', breadcrumb: 'RepayX' };
+    case 'customers':
+      return { title: 'Customer Risk Portfolio', breadcrumb: 'Customers' };
+    case 'loans':
+      return { title: 'Loan Portfolio Ledger', breadcrumb: 'Loans' };
+    case 'follow-ups':
+      return { title: 'Follow-up Scheduler & Queue', breadcrumb: 'Follow-ups' };
+    case 'conversations':
+      return { title: 'AI Conversation & RAG Analysis', breadcrumb: 'Conversations' };
+    case 'rag-knowledge':
+      return { title: 'RAG Policy Knowledge Base', breadcrumb: 'AI / Knowledge Base' };
+    case 'ai-insights':
+      return { title: 'AI Recovery Analytics & Funnel', breadcrumb: 'AI / Insights' };
+    case 'payments':
+      return { title: 'Payments & Settlement Verification', breadcrumb: 'Management / Payments' };
+    case 'escalations':
+      return { title: 'Escalations & Authorization Queue', breadcrumb: 'Management / Escalations' };
+    case 'reports':
+      return { title: 'Recovery Reports & Audits', breadcrumb: 'Management / Reports' };
+    case 'settings':
+      return { title: 'Recovery Settings & Policy Rules', breadcrumb: 'System / Settings' };
+    default:
+      return { title: 'RepayX', breadcrumb: 'Dashboard' };
+  }
+}
+
+/** Wraps pages that still run on sample data. */
+const Demo: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <>
+    <DemoDataNotice />
+    {children}
+  </>
+);
 
 function AppContent() {
-  const { addToast } = useToast();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const currentTab = tabForPath(pathname);
 
-  // Navigation State
-  const [currentTab, setCurrentTab] = useState<NavTab>('overview');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
 
-  // Application Data State
-  const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
-  const [loans, setLoans] = useState<Loan[]>(INITIAL_LOANS);
-  const [conversations, setConversations] = useState<Conversation[]>(INITIAL_CONVERSATIONS);
+  // Demo workflow data (sample data; not connected to the RepayX API)
+  const [customers] = useState<Customer[]>(INITIAL_CUSTOMERS);
+  const [loans] = useState<Loan[]>(INITIAL_LOANS);
+  const [conversations] = useState<Conversation[]>(INITIAL_CONVERSATIONS);
   const [followups, setFollowups] = useState<FollowUpItem[]>(INITIAL_FOLLOWUPS);
-
-  // Selected Detail states
   const [activeConversationId, setActiveConversationId] = useState<string>('CONV001');
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
-  // Quick navigation handler
+  const openDemoCustomer = (customerId: string) => navigate(`/demo-customers/${encodeURIComponent(customerId)}`);
+
+  const openConversation = (conversationId?: string) => {
+    if (conversationId) setActiveConversationId(conversationId);
+    navigate(TAB_PATHS.conversations);
+  };
+
+  // Navigation requests from the navbar, drawer, and demo pages (which use sample IDs).
   const handleNavigate = (tab: string, targetId?: string) => {
-    if (tab === 'conversations') {
-      setCurrentTab('conversations');
-      if (targetId) setActiveConversationId(targetId);
-      setSelectedCustomerId(null);
-    } else if (tab === 'customers') {
-      setCurrentTab('customers');
-      if (targetId) setSelectedCustomerId(targetId);
-    } else if (tab === 'loans') {
-      setCurrentTab('loans');
-      setSelectedCustomerId(null);
-    } else if (tab === 'rag-knowledge') {
-      setCurrentTab('rag-knowledge');
-      setSelectedCustomerId(null);
-    } else if (tab === 'payments') {
-      setCurrentTab('payments');
-      setSelectedCustomerId(null);
-    } else if (tab === 'escalations') {
-      setCurrentTab('escalations');
-      setSelectedCustomerId(null);
-    } else if (tab === 'settings') {
-      setCurrentTab('settings');
-      setSelectedCustomerId(null);
-    } else if (tab === 'reports') {
-      setCurrentTab('reports');
-      setSelectedCustomerId(null);
-    } else if (tab === 'ai-insights') {
-      setCurrentTab('ai-insights');
-      setSelectedCustomerId(null);
-    } else if (tab === 'ai-assistant') {
+    if (tab === 'ai-assistant') {
       setIsAiAssistantOpen(true);
+    } else if (tab === 'conversations') {
+      openConversation(targetId);
+    } else if (tab === 'customers' && targetId) {
+      openDemoCustomer(targetId);
     } else {
-      setCurrentTab(tab as NavTab);
-      setSelectedCustomerId(null);
+      navigate(TAB_PATHS[tab as keyof typeof TAB_PATHS] ?? '/');
     }
   };
 
-  // Add scheduled follow-up
   const handleScheduleFollowup = (newFollowup: {
     customerId: string;
     customerName: string;
@@ -110,77 +156,28 @@ function AppContent() {
     setFollowups([item, ...followups]);
   };
 
-  // Update followup status
-  const handleUpdateFollowupStatus = (id: string, status: any) => {
+  const handleUpdateFollowupStatus = (id: string, status: FollowUpItem['status']) => {
     setFollowups((prev) => prev.map((f) => (f.id === id ? { ...f, status } : f)));
   };
 
-  // Page titles and breadcrumbs
-  const getPageMeta = () => {
-    if (selectedCustomerId && currentTab === 'customers') {
-      const cust = customers.find((c) => c.id === selectedCustomerId);
-      return {
-        title: cust?.name || 'Customer Details',
-        breadcrumb: `Customers / ${cust?.id || 'Details'}`,
-      };
-    }
-
-    switch (currentTab) {
-      case 'overview':
-        return { title: 'Loan Recovery Dashboard', breadcrumb: 'Overview' };
-      case 'customers':
-        return { title: 'Customer Management', breadcrumb: 'Customers' };
-      case 'loans':
-        return { title: 'Loan Portfolio Ledger', breadcrumb: 'Loans' };
-      case 'follow-ups':
-        return { title: 'Follow-up Scheduler & Queue', breadcrumb: 'Follow-ups' };
-      case 'conversations':
-        return { title: 'AI Conversation & RAG Analysis', breadcrumb: 'Conversations' };
-      case 'rag-knowledge':
-        return { title: 'RAG Policy Knowledge Base', breadcrumb: 'AI / Knowledge Base' };
-      case 'ai-insights':
-        return { title: 'AI Recovery Analytics & Funnel', breadcrumb: 'AI / Insights' };
-      case 'payments':
-        return { title: 'Payments & Settlement Verification', breadcrumb: 'Management / Payments' };
-      case 'escalations':
-        return { title: 'Escalations & Authorization Queue', breadcrumb: 'Management / Escalations' };
-      case 'reports':
-        return { title: 'Recovery Reports & Audits', breadcrumb: 'Management / Reports' };
-      case 'settings':
-        return { title: 'Recovery Settings & Policy Rules', breadcrumb: 'System / Settings' };
-      default:
-        return { title: 'RepayX', breadcrumb: 'Dashboard' };
-    }
-  };
-
-  const { title, breadcrumb } = getPageMeta();
+  const { title, breadcrumb } = pageMeta(pathname);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex">
-      {/* Fixed Left Sidebar */}
       <Sidebar
         currentTab={currentTab}
-        onSelectTab={(tab) => {
-          if (tab === 'ai-assistant') {
-            setIsAiAssistantOpen(true);
-          } else {
-            setCurrentTab(tab);
-            setSelectedCustomerId(null);
-          }
-        }}
+        onSelectTab={(tab) => (tab === 'ai-assistant' ? setIsAiAssistantOpen(true) : navigate(TAB_PATHS[tab]))}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         unreadCount={conversations.filter((c) => c.unread).length}
         pendingEscalationsCount={5}
       />
 
-      {/* Main Content Area */}
       <div
         className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
           isSidebarCollapsed ? 'ml-20' : 'ml-64'
         }`}
       >
-        {/* Top Navbar */}
         <Navbar
           pageTitle={title}
           breadcrumb={breadcrumb}
@@ -191,112 +188,114 @@ function AppContent() {
           conversations={conversations}
         />
 
-        {/* Viewport Content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          {currentTab === 'overview' && (
-            <OverviewDashboard
-              loans={loans}
-              customers={customers}
-              followups={followups}
-              onSelectCustomer={(cId) => {
-                setSelectedCustomerId(cId);
-                setCurrentTab('customers');
-              }}
-              onOpenConversation={(convId) => {
-                setActiveConversationId(convId);
-                setCurrentTab('conversations');
-              }}
-              onNavigateTab={(tab) => handleNavigate(tab)}
+          <Suspense fallback={<LoadingState />}>
+          <Routes>
+            {/* Connected to the RepayX API */}
+            <Route path="/customers" element={<CustomersPage />} />
+            <Route path="/customers/:customerId" element={<CustomerDetailsPage />} />
+
+            {/* Demo workflow pages (sample data) */}
+            <Route
+              path="/"
+              element={
+                <Demo>
+                  <OverviewDashboard
+                    loans={loans}
+                    customers={customers}
+                    followups={followups}
+                    onSelectCustomer={openDemoCustomer}
+                    onOpenConversation={openConversation}
+                    onNavigateTab={(tab) => handleNavigate(tab)}
+                  />
+                </Demo>
+              }
             />
-          )}
-
-          {currentTab === 'customers' && (
-            selectedCustomerId ? (
-              <CustomerDetailView
-                customer={customers.find((c) => c.id === selectedCustomerId) || customers[0]}
-                loan={loans.find((l) => l.customerId === selectedCustomerId)}
-                onBack={() => setSelectedCustomerId(null)}
-                onOpenConversation={() => {
-                  const matchConv = conversations.find((c) => c.customerId === selectedCustomerId);
-                  if (matchConv) setActiveConversationId(matchConv.id);
-                  setCurrentTab('conversations');
-                  setSelectedCustomerId(null);
-                }}
-              />
-            ) : (
-              <CustomersPage
-                customers={customers}
-                loans={loans}
-                onSelectCustomer={(cId) => setSelectedCustomerId(cId)}
-                onOpenConversation={() => setCurrentTab('conversations')}
-              />
-            )
-          )}
-
-          {currentTab === 'conversations' && (
-            <ConversationView
-              conversations={conversations}
-              activeConversationId={activeConversationId}
-              onSelectConversation={(id) => setActiveConversationId(id)}
-              customers={customers}
-              loans={loans}
-              onScheduleFollowup={handleScheduleFollowup}
-              onNavigateToCustomer={(cId) => {
-                setSelectedCustomerId(cId);
-                setCurrentTab('customers');
-              }}
+            <Route
+              path="/demo-customers"
+              element={
+                <Demo>
+                  <DemoCustomersPage
+                    customers={customers}
+                    loans={loans}
+                    onSelectCustomer={openDemoCustomer}
+                    onOpenConversation={() => openConversation()}
+                  />
+                </Demo>
+              }
             />
-          )}
-
-          {currentTab === 'loans' && (
-            <LoansPage
-              loans={loans}
-              customers={customers}
-              onSelectCustomer={(cId) => {
-                setSelectedCustomerId(cId);
-                setCurrentTab('customers');
-              }}
-              onOpenConversation={(loanId) => {
-                const matchConv = conversations.find((c) => c.loanId === loanId);
-                if (matchConv) setActiveConversationId(matchConv.id);
-                setCurrentTab('conversations');
-              }}
+            <Route
+              path="/demo-customers/:demoId"
+              element={
+                <Demo>
+                  <DemoCustomerDetail customers={customers} loans={loans} conversations={conversations} onOpenConversation={openConversation} />
+                </Demo>
+              }
             />
-          )}
-
-          {currentTab === 'follow-ups' && (
-            <FollowupsPage
-              followups={followups}
-              onOpenConversation={() => setCurrentTab('conversations')}
-              onUpdateFollowupStatus={handleUpdateFollowupStatus}
+            <Route
+              path="/conversations"
+              element={
+                <Demo>
+                  <ConversationView
+                    conversations={conversations}
+                    activeConversationId={activeConversationId}
+                    onSelectConversation={(id) => setActiveConversationId(id)}
+                    customers={customers}
+                    loans={loans}
+                    onScheduleFollowup={handleScheduleFollowup}
+                    onNavigateToCustomer={openDemoCustomer}
+                  />
+                </Demo>
+              }
             />
-          )}
-
-          {currentTab === 'rag-knowledge' && <RagKnowledgeBasePage />}
-
-          {currentTab === 'payments' && <PaymentsPage />}
-
-          {currentTab === 'escalations' && (
-            <EscalationsPage
-              onOpenConversation={(cId) => {
-                if (cId) {
-                  const matchConv = conversations.find((c) => c.customerId === cId);
-                  if (matchConv) setActiveConversationId(matchConv.id);
-                }
-                setCurrentTab('conversations');
-              }}
+            <Route
+              path="/loans"
+              element={
+                <Demo>
+                  <LoansPage
+                    loans={loans}
+                    customers={customers}
+                    onSelectCustomer={openDemoCustomer}
+                    onOpenConversation={(loanId) => openConversation(conversations.find((c) => c.loanId === loanId)?.id)}
+                  />
+                </Demo>
+              }
             />
-          )}
-
-          {currentTab === 'ai-insights' && <AiInsightsPage />}
-
-          {currentTab === 'reports' && <ReportsPage />}
-
-          {currentTab === 'settings' && <SettingsPage />}
+            <Route
+              path="/follow-ups"
+              element={
+                <Demo>
+                  <FollowupsPage
+                    followups={followups}
+                    onOpenConversation={() => openConversation()}
+                    onUpdateFollowupStatus={handleUpdateFollowupStatus}
+                  />
+                </Demo>
+              }
+            />
+            <Route path="/knowledge-base" element={<Demo><RagKnowledgeBasePage /></Demo>} />
+            <Route path="/payments" element={<Demo><PaymentsPage /></Demo>} />
+            <Route
+              path="/escalations"
+              element={
+                <Demo>
+                  <EscalationsPage
+                    onOpenConversation={(cId) =>
+                      openConversation(cId ? conversations.find((c) => c.customerId === cId)?.id : undefined)
+                    }
+                  />
+                </Demo>
+              }
+            />
+            <Route path="/insights" element={<Demo><AiInsightsPage /></Demo>} />
+            <Route path="/reports" element={<Demo><ReportsPage /></Demo>} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          </Suspense>
         </main>
       </div>
 
-      {/* Global AI Copilot Slide-Over Drawer */}
       <AiAssistantDrawer
         isOpen={isAiAssistantOpen}
         onClose={() => setIsAiAssistantOpen(false)}
@@ -308,10 +307,48 @@ function AppContent() {
   );
 }
 
+/** Sample-data customer detail. Unknown IDs show a not-found state instead of another customer's data. */
+const DemoCustomerDetail: React.FC<{
+  customers: Customer[];
+  loans: Loan[];
+  conversations: Conversation[];
+  onOpenConversation: (conversationId?: string) => void;
+}> = ({ customers, loans, conversations, onOpenConversation }) => {
+  const { demoId } = useParams();
+  const navigate = useNavigate();
+  const customer = customers.find((c) => c.id === demoId);
+  if (!customer) {
+    return (
+      <div className="max-w-7xl mx-auto bg-white rounded-2xl border border-slate-200/80">
+        <EmptyState title={`Demo customer ${demoId ?? ''} not found`} message="Open a customer from the demo workflow pages." />
+      </div>
+    );
+  }
+  return (
+    <CustomerDetailView
+      customer={customer}
+      loan={loans.find((l) => l.customerId === customer.id)}
+      onBack={() => navigate(-1)}
+      onOpenConversation={() => onOpenConversation(conversations.find((c) => c.customerId === customer.id)?.id)}
+    />
+  );
+};
+
+const NotFound: React.FC = () => (
+  <div className="max-w-7xl mx-auto bg-white rounded-2xl border border-slate-200/80 text-center">
+    <EmptyState title="Page not found" message="The page you requested does not exist." />
+    <Link to="/" className="inline-block mb-10 text-xs font-semibold text-blue-600 hover:underline">
+      Go to the dashboard
+    </Link>
+  </div>
+);
+
 export default function App() {
   return (
-    <ToastProvider>
-      <AppContent />
-    </ToastProvider>
+    <BrowserRouter>
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
+    </BrowserRouter>
   );
 }
