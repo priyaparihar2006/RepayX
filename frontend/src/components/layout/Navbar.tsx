@@ -110,7 +110,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Left: Title & Breadcrumbs */}
       <div>
         <div className="flex items-center gap-2 text-xs text-slate-500">
-          <span>LoanFlow</span>
+          <span>RepayX</span>
           <span>/</span>
           <span className="text-slate-600 font-medium">{breadcrumb}</span>
         </div>

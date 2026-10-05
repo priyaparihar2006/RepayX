@@ -33,7 +33,7 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
   >([
     {
       sender: 'ai',
-      text: "Hello Priya! I'm your LoanFlow AI Copilot. I can search borrower histories, synthesize RAG policies, review overdue accounts, or draft WhatsApp follow-ups.",
+      text: "Hello Priya! I'm your RepayX Copilot. I can search borrower histories, synthesize RAG policies, review overdue accounts, or draft WhatsApp follow-ups.",
     },
   ]);
   const [input, setInput] = useState('');
@@ -79,7 +79,7 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
         actionTab = 'escalations';
         actionLabel = 'View Dispute Ticket';
       } else {
-        reply = `Under LoanFlow collection guidelines, active borrowers are monitored through automated WhatsApp and IVR channels with strict compliance to RBI 8 AM - 7 PM contact hours. You can inspect customer dossiers or configure cadence rules anytime.`;
+        reply = `Under RepayX collection guidelines, active borrowers are monitored through automated WhatsApp and IVR channels with strict compliance to RBI 8 AM - 7 PM contact hours. You can inspect customer dossiers or configure cadence rules anytime.`;
         actionTab = 'overview';
         actionLabel = 'Go to Dashboard';
       }
@@ -113,7 +113,7 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold tracking-tight">LoanFlow AI Copilot</h3>
+              <h3 className="text-sm font-bold tracking-tight">RepayX Copilot</h3>
               <p className="text-[11px] text-purple-200">Policy & Portfolio Intelligence</p>
             </div>
           </div>

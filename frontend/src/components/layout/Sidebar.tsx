@@ -121,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-base text-white tracking-tight">LoanFlow</span>
+                <span className="font-bold text-base text-white tracking-tight">RepayX</span>
                 <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-400/30 tracking-wide">
                   AI
                 </span>

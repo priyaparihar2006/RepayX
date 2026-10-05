@@ -149,7 +149,7 @@ function AppContent() {
       case 'settings':
         return { title: 'Recovery Settings & Policy Rules', breadcrumb: 'System / Settings' };
       default:
-        return { title: 'LoanFlow AI', breadcrumb: 'Dashboard' };
+        return { title: 'RepayX', breadcrumb: 'Dashboard' };
     }
   };
 

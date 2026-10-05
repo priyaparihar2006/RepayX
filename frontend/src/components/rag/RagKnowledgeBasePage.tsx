@@ -443,7 +443,7 @@ export const RagKnowledgeBasePage: React.FC = () => {
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         title="Upload & Index Recovery Document"
-        subtitle="Extract, chunk, and embed policy documents into LoanFlow RAG vector database."
+        subtitle="Extract, chunk, and embed policy documents into RepayX RAG vector database."
       >
         <div className="space-y-4 text-xs">
           <div>

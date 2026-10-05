@@ -49,11 +49,11 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
   const [followupChannel, setFollowupChannel] = useState<'WhatsApp' | 'SMS'>('WhatsApp');
   const [followupTemplate, setFollowupTemplate] = useState('reminder');
   const [followupMessageText, setFollowupMessageText] = useState(
-    `Dear ${customer.name}, gentle reminder from LoanFlow that your scheduled EMI of ₹${
+    `Dear ${customer.name}, gentle reminder from RepayX that your scheduled EMI of ₹${
       loan?.emi.toLocaleString('en-IN') || '8,500'
     } for loan ${loan?.id || 'LN1001'} was due on ${
       loan?.dueDate || '25 Sep 2026'
-    }. Please click here to make your payment: https://pay.loanflow.internal/${loan?.id || 'LN1001'}`
+    }. Please click here to make your payment: https://pay.repayx.internal/${loan?.id || 'LN1001'}`
   );
 
   const handleSendFollowupSubmit = () => {
@@ -462,7 +462,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                 const loanId = loan ? loan.id : 'LN1001';
                 if (tpl === 'reminder') {
                   setFollowupMessageText(
-                    `Dear ${customer.name}, gentle reminder that your scheduled EMI of ${outstanding} for loan ${loanId} is due. Please click here to make payment: https://pay.loanflow.internal/${loanId}`
+                    `Dear ${customer.name}, gentle reminder that your scheduled EMI of ${outstanding} for loan ${loanId} is due. Please click here to make payment: https://pay.repayx.internal/${loanId}`
                   );
                 } else if (tpl === 'overdue') {
                   setFollowupMessageText(
@@ -470,7 +470,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                   );
                 } else if (tpl === 'delay') {
                   setFollowupMessageText(
-                    `Hello ${customer.name}, we have noted your timeline. When your salary credits, please use this verified UPI link: https://pay.loanflow.internal/upi/${loanId}`
+                    `Hello ${customer.name}, we have noted your timeline. When your salary credits, please use this verified UPI link: https://pay.repayx.internal/upi/${loanId}`
                   );
                 }
               }}

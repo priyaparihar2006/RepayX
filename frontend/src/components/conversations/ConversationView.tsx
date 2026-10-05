@@ -184,7 +184,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
 
     switch (intent) {
       case 'PAYMENT_DELAY':
-        draft = `Hello ${currentConv.customerName}, we have noted your salary delay. Your grace window has been extended until ${scheduleDate}. Kindly use this link to complete payment once credited: https://pay.loanflow.internal/${currentConv.loanId}`;
+        draft = `Hello ${currentConv.customerName}, we have noted your salary delay. Your grace window has been extended until ${scheduleDate}. Kindly use this link to complete payment once credited: https://pay.repayx.internal/${currentConv.loanId}`;
         break;
       case 'PAYMENT_PROMISE':
         draft = `Hi ${currentConv.customerName}, your promise to pay ₹${currentLoan?.outstanding.toLocaleString(
@@ -250,13 +250,13 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
 
     switch (tpl) {
       case 'reminder':
-        return `Hello ${c.name}, gentle reminder from LoanFlow that your scheduled EMI for loan ${loanId} was due on ${dueDate}. Kindly complete payment today using this secure link: https://pay.loanflow.internal/${loanId}`;
+        return `Hello ${c.name}, gentle reminder from RepayX that your scheduled EMI for loan ${loanId} was due on ${dueDate}. Kindly complete payment today using this secure link: https://pay.repayx.internal/${loanId}`;
       case 'overdue':
         return `Urgent Notice: Dear ${c.name}, your loan ${loanId} has an outstanding balance of ${outstanding}. Please clear dues to prevent regulatory credit bureau (CIBIL) score downgrade.`;
       case 'delay_ack':
-        return `Hello ${c.name}, this is Priya Parihar from LoanFlow. We have acknowledged your payment delay. Here is your direct UPI payment link to clear when salary credits: https://pay.loanflow.internal/upi/${loanId}`;
+        return `Hello ${c.name}, this is Priya Parihar from RepayX. We have acknowledged your payment delay. Here is your direct UPI payment link to clear when salary credits: https://pay.repayx.internal/upi/${loanId}`;
       case 'link':
-        return `Dear ${c.name}, please find your official Bharat QR / UPI quick repayment link for loan ${loanId} (${outstanding}): https://pay.loanflow.internal/pay?id=${loanId}`;
+        return `Dear ${c.name}, please find your official Bharat QR / UPI quick repayment link for loan ${loanId} (${outstanding}): https://pay.repayx.internal/pay?id=${loanId}`;
       default:
         return '';
     }
@@ -565,7 +565,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
                 <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mb-1 px-1">
                   {isAI && (
                     <span className="flex items-center gap-1 font-semibold text-purple-600">
-                      <Sparkles className="w-3 h-3" /> LoanFlow AI Agent
+                      <Sparkles className="w-3 h-3" /> RepayX Agent
                     </span>
                   )}
                   {isManager && (
@@ -641,7 +641,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
                 setChatInputText(
                   `Hello ${currentConv?.customerName}, gentle reminder that your EMI of ₹${
                     currentLoan?.emi.toLocaleString('en-IN') || '8,500'
-                  } is due. Please click here to complete payment: https://pay.loanflow.internal/${
+                  } is due. Please click here to complete payment: https://pay.repayx.internal/${
                     currentLoan?.id || 'LN1001'
                   }`
                 )
@@ -653,7 +653,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
             <button
               onClick={() =>
                 setChatInputText(
-                  `Hello ${currentConv?.customerName}, here is your verified UPI payment link for instant loan clearance: https://pay.loanflow.internal/upi/${
+                  `Hello ${currentConv?.customerName}, here is your verified UPI payment link for instant loan clearance: https://pay.repayx.internal/upi/${
                     currentLoan?.id || 'LN1001'
                   }`
                 )

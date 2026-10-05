@@ -2,6 +2,8 @@
 
 ### AI-Powered Loan Follow-Up & Recovery Dashboard
 
+> Phase 1 status: the existing frontend runs with mock data. Backend, ML, and retrieval directories are scaffolding only. Architecture and feature descriptions below include planned capabilities.
+
 RepayX is an intelligent **loan follow-up and recovery management platform** designed to help lending and financial organizations efficiently monitor loan accounts, identify upcoming and overdue payments, prioritize follow-ups, and interact with loan records using an AI-powered Retrieval-Augmented Generation (RAG) system.
 
 The platform combines **structured loan data, analytics, automated follow-up workflows, and natural-language querying** into a centralized dashboard for collection and recovery teams.
@@ -620,18 +622,18 @@ RepayX/
 
 Make sure the following are installed:
 
-* Node.js
+* Node.js 22.12+
 * npm
-* Python 3.x
 * Git
-* PostgreSQL (if required by the configured backend)
+
+Python and backend dependencies are not required for Phase 1.
 
 ---
 
 ## Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/priyaparihar2006/RepayX.git
 
 cd RepayX
 ```
@@ -648,59 +650,26 @@ npm install
 npm run dev
 ```
 
-The frontend will then be available through the local development server.
+The frontend will be available at http://localhost:3000. From `frontend/`, run `npm run lint` for TypeScript checking and `npm run build` for a production build.
+
+The two original CSV datasets remain unchanged at the repository root. They are separate datasets and are not joined or consumed by the current UI.
 
 ---
 
 ## Backend Setup
 
-Open another terminal:
-
-```bash
-cd backend
-
-python -m venv venv
-```
-
-### Windows
-
-```bash
-venv\Scripts\activate
-```
-
-### macOS / Linux
-
-```bash
-source venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Start the backend:
-
-```bash
-python app.py
-```
-
-> The exact backend startup command may vary depending on the configured application entry point.
+The backend is not implemented yet. The `backend/`, `ml/`, `models/`, `rag/`, and `notebooks/` directories are placeholders for later phases. There is no backend startup command in Phase 1.
 
 ---
 
 # 🔑 Environment Configuration
 
-Create a `.env` file based on `.env.example`.
+For future API integration, copy the root `.env.example` to `frontend/.env`. Vite reads frontend environment files from `frontend/`. The current mock-data UI does not require this variable.
 
 Example:
 
 ```env
-DATABASE_URL=your_database_url
-OPENAI_API_KEY=your_api_key
-VECTOR_DB_URL=your_vector_database_url
-JWT_SECRET=your_secret
+VITE_API_BASE_URL=http://localhost:8000
 ```
 
 Never commit the `.env` file to Git.

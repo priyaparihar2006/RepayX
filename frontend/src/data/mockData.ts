@@ -1,3 +1,6 @@
+import managerAvatar from '../assets/images/avatar_manager_priya_1790666241592.jpg';
+import rahulAvatar from '../assets/images/avatar_customer_rahul_1790666258908.jpg';
+import ananyaAvatar from '../assets/images/avatar_customer_ananya_1790666273341.jpg';
 import {
   Customer,
   Loan,
@@ -15,9 +18,9 @@ export const MANAGER_PROFILE = {
   name: 'Priya Parihar',
   role: 'Collection Manager',
   department: 'Retail Credit & Recovery',
-  avatar: '/src/assets/images/avatar_manager_priya_1790666241592.jpg',
+  avatar: managerAvatar,
   status: 'Online',
-  email: 'priya.parihar@loanflow.bank.internal',
+  email: 'priya.parihar@repayx.bank.internal',
   branch: 'Regional Hub - Mumbai Central',
 };
 
@@ -28,7 +31,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     phone: '+91 98201 54321',
     email: 'rahul.sharma@syntheticsample.in',
     city: 'Mumbai',
-    avatar: '/src/assets/images/avatar_customer_rahul_1790666258908.jpg',
+    avatar: rahulAvatar,
     totalLoans: 1,
     activeLoanId: 'LN1001',
     riskCategory: 'High',
@@ -40,7 +43,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     phone: '+91 98112 87654',
     email: 'ananya.verma@syntheticsample.in',
     city: 'Bengaluru',
-    avatar: '/src/assets/images/avatar_customer_ananya_1790666273341.jpg',
+    avatar: ananyaAvatar,
     totalLoans: 2,
     activeLoanId: 'LN1002',
     riskCategory: 'Medium',
@@ -382,7 +385,7 @@ export const INITIAL_CONVERSATIONS: Conversation[] = [
     customerId: 'CUS001',
     customerName: 'Rahul Sharma',
     customerPhone: '+91 98201 54321',
-    customerAvatar: '/src/assets/images/avatar_customer_rahul_1790666258908.jpg',
+    customerAvatar: rahulAvatar,
     lastMessageTime: '2 min ago',
     unread: false,
     channel: 'WhatsApp',
@@ -443,7 +446,7 @@ export const INITIAL_CONVERSATIONS: Conversation[] = [
     customerId: 'CUS002',
     customerName: 'Ananya Verma',
     customerPhone: '+91 98112 87654',
-    customerAvatar: '/src/assets/images/avatar_customer_ananya_1790666273341.jpg',
+    customerAvatar: ananyaAvatar,
     lastMessageTime: '10 min ago',
     unread: true,
     channel: 'WhatsApp',
@@ -691,7 +694,7 @@ export const INITIAL_CONVERSATIONS: Conversation[] = [
       {
         id: 'M701',
         sender: 'ai',
-        text: 'LoanFlow Alert: Overdue installment of ₹6,800 is pending for loan LN1007.',
+        text: 'RepayX Alert: Overdue installment of ₹6,800 is pending for loan LN1007.',
         timestamp: '26 Sep, 09:00 AM',
         status: 'delivered',
       },
