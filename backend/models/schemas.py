@@ -105,3 +105,35 @@ class CustomerListResponse(BaseModel):
     model_version: str | None
     customers: list[CustomerSummary]
     pagination: Pagination
+
+
+QueryType = Literal["customer_query", "aggregate_query", "retrieval_query", "general_retrieval"]
+
+
+class QueryCustomer(CustomerSummary):
+    installment_count: int | None
+    late_payment_count: int | None
+    avg_days_late: float | None
+    similarity: float | None = Field(default=None, description="TF-IDF cosine similarity (general retrieval only).")
+
+
+class QueryMetric(BaseModel):
+    name: str
+    label: str
+    value: float | int | None
+    unit: str
+    population: int = Field(description="Number of customers the value was computed over.")
+
+
+class QueryResponse(BaseModel):
+    success: Literal[True] = True
+    query: str
+    query_type: QueryType
+    result: str = Field(description="Answer generated from the computed results.")
+    model_version: str | None
+    customer: CustomerDetail | None = None
+    customers: list[QueryCustomer] | None = None
+    metrics: list[QueryMetric] | None = None
+    total_matches: int | None = None
+    criteria: str | None = None
+    not_found_ids: list[int] | None = None
