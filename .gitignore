@@ -13,3 +13,9 @@ venv/
 .DS_Store
 *.log
 .pytest_cache/
+
+# Raw and derived data (Home Credit dataset terms; regenerate with the ml pipeline)
+datasets/**
+!datasets/.gitkeep
+backend/data/*.parquet
+models/holdout_customer_ids.npy

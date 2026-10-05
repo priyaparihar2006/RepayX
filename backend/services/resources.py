@@ -1,7 +1,8 @@
 """Tracks which data/model artifacts the backend can use.
 
-Phase 2 only checks that each artifact file exists. Later phases load the
-artifacts once at startup and record a failed load as unavailable.
+Artifacts are checked once at startup (`refresh`). The risk model is loaded
+and validated here; customer data and retrieval artifacts are presence-checked
+until their services are added in later phases.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from pathlib import Path
 
 from api.errors import ServiceUnavailableError
 from config import Settings
+from services.repayx_engine import ModelLoadError, RiskModel, load_risk_model
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,7 @@ class Resource(str, Enum):
 class ResourceStatus(str, Enum):
     AVAILABLE = "available"
     MISSING = "missing"
+    INVALID = "invalid"  # present but failed to load or validate
 
 
 _UNAVAILABLE_MESSAGES = {
@@ -38,6 +41,7 @@ _UNAVAILABLE_MESSAGES = {
 
 class ResourceRegistry:
     def __init__(self, settings: Settings) -> None:
+        self._settings = settings
         self._paths: dict[Resource, Path] = {
             Resource.CUSTOMER_DATA: settings.customer_data_path,
             Resource.MODEL: settings.model_path,
@@ -45,14 +49,31 @@ class ResourceRegistry:
             Resource.TFIDF_MATRIX: settings.tfidf_matrix_path,
         }
         self._status: dict[Resource, ResourceStatus] = {}
+        self.risk_model: RiskModel | None = None
 
     def refresh(self) -> None:
         for resource, path in self._paths.items():
-            status = ResourceStatus.AVAILABLE if path.is_file() else ResourceStatus.MISSING
-            self._status[resource] = status
-            if status is ResourceStatus.MISSING:
+            if path.is_file():
+                self._status[resource] = ResourceStatus.AVAILABLE
+            else:
+                self._status[resource] = ResourceStatus.MISSING
                 # Paths are logged server-side only; they are never sent to clients.
                 logger.warning("Resource %s not found at %s", resource.value, path)
+        self._load_model()
+
+    def _load_model(self) -> None:
+        self.risk_model = None
+        if self._status[Resource.MODEL] is ResourceStatus.MISSING:
+            return
+        if not self._settings.model_metadata_path.is_file():
+            logger.warning("Model metadata not found at %s", self._settings.model_metadata_path)
+            self._status[Resource.MODEL] = ResourceStatus.MISSING
+            return
+        try:
+            self.risk_model = load_risk_model(self._settings.model_path, self._settings.model_metadata_path)
+        except ModelLoadError as exc:
+            logger.error("Risk model unavailable: %s", exc, exc_info=exc.__cause__ is not None)
+            self._status[Resource.MODEL] = ResourceStatus.INVALID
 
     def status(self) -> dict[str, ResourceStatus]:
         return {resource.value: self._status.get(resource, ResourceStatus.MISSING) for resource in Resource}
