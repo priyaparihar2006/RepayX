@@ -137,3 +137,96 @@ class QueryResponse(BaseModel):
     total_matches: int | None = None
     criteria: str | None = None
     not_found_ids: list[int] | None = None
+
+
+DISCLAIMER = (
+    "RepayX provides model-based risk estimates for analytical and demonstration purposes. Risk scores are not "
+    "guaranteed outcomes and should not be treated as a final lending decision."
+)
+
+
+class RiskCategoryCount(BaseModel):
+    risk_category: RiskCategory
+    customers: int
+    share: float = Field(description="Percent of all scored customers.")
+
+
+class PortfolioMetrics(BaseModel):
+    total_customers: int
+    risk_categories: list[RiskCategoryCount]
+    average_risk_score: float | None
+    median_risk_score: float | None
+    average_default_probability: float | None = Field(description="Percent.")
+    predicted_defaults: int
+    predicted_default_share: float = Field(description="Percent of all scored customers.")
+
+
+class RepaymentMetrics(BaseModel):
+    customers_with_history: int
+    customers_without_history: int
+    average_late_payment_rate: float | None = Field(description="Percent; customers with a known late rate only.")
+    customers_with_late_payments: int
+    customers_with_late_payments_share: float = Field(description="Percent of customers with installment history.")
+    customers_always_late: int = Field(description="Customers with a 100% late payment rate.")
+    average_days_late: float | None
+    average_underpaid_rate: float | None = Field(description="Percent.")
+    customers_with_unpaid_amounts: int
+    total_unpaid_amount: float
+    average_payment_ratio: float | None
+
+
+class HistogramBin(BaseModel):
+    range: str
+    min: int
+    max: int
+    customers: int
+
+
+class LateRateBucket(BaseModel):
+    bucket: str
+    customers: int
+
+
+class Segment(BaseModel):
+    segment: str
+    customers: int
+    average_risk_score: float
+    high_risk_share: float = Field(description="Percent of the segment in High Risk.")
+    average_late_payment_rate: float | None = Field(description="Percent.")
+
+
+class Segments(BaseModel):
+    income_type: list[Segment]
+    education: list[Segment]
+    occupation: list[Segment]
+
+
+class ModelEvaluation(BaseModel):
+    roc_auc: float | None = Field(description="Percent, on the 20% holdout split.")
+    accuracy: float | None = Field(description="Percent, at the classification threshold.")
+    precision: float | None = Field(description="Percent, at the classification threshold.")
+    recall: float | None = Field(description="Percent, at the classification threshold.")
+    f1: float | None = Field(description="Percent, at the classification threshold.")
+    holdout_customers: int | None
+    note: str
+
+
+class ModelInfo(BaseModel):
+    model_version: str
+    classification_threshold: float = Field(description="Probability (0-1) at or above which a default is predicted.")
+    risk_band_medium_from: float
+    risk_band_high_from: float
+    risk_band_note: str
+    evaluation: ModelEvaluation
+
+
+class AnalyticsResponse(BaseModel):
+    success: Literal[True] = True
+    model_version: str | None
+    portfolio: PortfolioMetrics
+    repayment: RepaymentMetrics
+    risk_score_histogram: list[HistogramBin]
+    late_payment_rate_buckets: list[LateRateBucket]
+    segments: Segments
+    model: ModelInfo | None = Field(description="Null when the risk model is not loaded.")
+    disclaimer: str = DISCLAIMER

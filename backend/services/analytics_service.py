@@ -10,6 +10,7 @@ population it was computed over.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 
 import numpy as np
 import pandas as pd
@@ -119,6 +120,100 @@ class AnalyticsService:
 
     def ids_matching(self, mask: np.ndarray) -> pd.DataFrame:
         return self._df[mask]
+
+    @cached_property
+    def portfolio_summary(self) -> dict:
+        """Portfolio-wide metrics and chart data. Computed once; the data is immutable while the API runs."""
+        df = self._df
+        total = len(df)
+        history = df["has_installment_history"] == 1
+        late_rate = df["late_payment_rate"].astype("Float64") * 100
+        unpaid = df["total_unpaid_amount"].astype("Float64")
+
+        def pct(n: int, of: int) -> float:
+            return round(n / of * 100, 2) if of else 0.0
+
+        def mean(series: pd.Series, scale: float = 1.0) -> float | None:
+            values = series.dropna()
+            return None if values.empty else round(float(values.mean()) * scale, 2)
+
+        distribution = self.risk_distribution(np.ones(total, dtype=bool))
+        late_customers = int((df["late_payment_count"].fillna(0) > 0).sum())
+        unpaid_customers = int((unpaid.fillna(0) > 0).sum())
+        predicted = int((df["predicted_default"] == 1).sum())
+
+        return {
+            "portfolio": {
+                "total_customers": total,
+                "risk_categories": [
+                    {"risk_category": c, "customers": n, "share": pct(n, total)} for c, n in distribution.items()
+                ],
+                "average_risk_score": mean(df["risk_score"]),
+                "median_risk_score": round(float(df["risk_score"].median()), 2) if total else None,
+                "average_default_probability": mean(df["default_probability"], 100),
+                "predicted_defaults": predicted,
+                "predicted_default_share": pct(predicted, total),
+            },
+            "repayment": {
+                "customers_with_history": int(history.sum()),
+                "customers_without_history": int((~history).sum()),
+                "average_late_payment_rate": mean(late_rate),
+                "customers_with_late_payments": late_customers,
+                "customers_with_late_payments_share": pct(late_customers, int(history.sum())),
+                "customers_always_late": int((df["late_payment_rate"] == 1).fillna(False).sum()),
+                "average_days_late": mean(df["avg_days_late"]),
+                "average_underpaid_rate": mean(df["underpaid_rate"], 100),
+                "customers_with_unpaid_amounts": unpaid_customers,
+                "total_unpaid_amount": round(float(unpaid.sum()), 2),
+                "average_payment_ratio": mean(df["payment_ratio"]),
+            },
+            "risk_score_histogram": self._histogram(df["risk_score"]),
+            "late_payment_rate_buckets": self._late_buckets(late_rate, int((~history).sum())),
+            "segments": {field: self._segment(field) for field in ("income_type", "education", "occupation")},
+        }
+
+    @staticmethod
+    def _histogram(scores: pd.Series) -> list[dict]:
+        edges = np.arange(0, 101, 10)
+        # The last bin is closed so a score of exactly 100 is counted.
+        counts, _ = np.histogram(scores.to_numpy(dtype=float), bins=edges)
+        return [
+            {"range": f"{lo}-{hi}", "min": int(lo), "max": int(hi), "customers": int(n)}
+            for lo, hi, n in zip(edges[:-1], edges[1:], counts)
+        ]
+
+    @staticmethod
+    def _late_buckets(late_rate: pd.Series, without_history: int) -> list[dict]:
+        known = late_rate.dropna()
+        buckets = [
+            ("0% (always on time)", known == 0),
+            ("0-10%", (known > 0) & (known <= 10)),
+            ("10-25%", (known > 10) & (known <= 25)),
+            ("25-50%", (known > 25) & (known <= 50)),
+            ("50-<100%", (known > 50) & (known < 100)),
+            ("100% (always late)", known == 100),
+        ]
+        rows = [{"bucket": label, "customers": int(mask.sum())} for label, mask in buckets]
+        # Customers whose late rate is unknown: no history, or no recorded payment dates.
+        rows.append({"bucket": "Unknown", "customers": int(len(late_rate) - len(known))})
+        return rows
+
+    def _segment(self, field: str) -> list[dict]:
+        df = self._df
+        grouped = df.assign(_segment=df[field].fillna("Unknown"), _high=df["risk_category"] == "High Risk").groupby(
+            "_segment", sort=False
+        )
+        rows = []
+        for name, grp in grouped:
+            late = grp["late_payment_rate"].dropna()
+            rows.append({
+                "segment": str(name),
+                "customers": int(len(grp)),
+                "average_risk_score": round(float(grp["risk_score"].mean()), 2),
+                "high_risk_share": round(float(grp["_high"].mean()) * 100, 2),
+                "average_late_payment_rate": None if late.empty else round(float(late.mean()) * 100, 2),
+            })
+        return sorted(rows, key=lambda r: (-r["customers"], r["segment"]))
 
 
 def describe_population(*, risk_category=None, predicted_default=False, profile=(), conditions=(), threshold=None) -> str:

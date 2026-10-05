@@ -33,11 +33,6 @@ class ServiceUnavailableError(APIError):
         super().__init__(HTTPStatus.SERVICE_UNAVAILABLE, code, message)
 
 
-class NotImplementedYetError(APIError):
-    def __init__(self, message: str) -> None:
-        super().__init__(HTTPStatus.NOT_IMPLEMENTED, "not_implemented", message)
-
-
 def error_body(code: str, message: str, details: list[dict] | None = None) -> dict:
     error: dict = {"code": code, "message": message}
     if details:
