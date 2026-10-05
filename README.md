@@ -2,7 +2,7 @@
 
 ### AI-Powered Loan Follow-Up & Recovery Dashboard
 
-> Project status (Phase 6): the existing frontend still runs with mock data. The ML pipeline is implemented, and the FastAPI backend serves customer lookup, customer listing, portfolio analytics, and natural-language queries (structured calculations plus TF-IDF retrieval). Connecting the frontend to the API is the next phase. Architecture and feature descriptions below include planned capabilities.
+> Project status (Phase 7): the frontend uses React Router, and the Customers pages (`/customers`, `/customers/:customerId`) load real risk data from the FastAPI backend. Other pages (overview dashboard, loans, conversations, follow-ups, knowledge base, payments, escalations, reports, AI insights) are demo workflows on sample data and are labelled as such until their phases connect them. Architecture and feature descriptions below include planned capabilities.
 
 RepayX is an intelligent **loan follow-up and recovery management platform** designed to help lending and financial organizations efficiently monitor loan accounts, identify upcoming and overdue payments, prioritize follow-ups, and interact with loan records using an AI-powered Retrieval-Augmented Generation (RAG) system.
 
@@ -650,7 +650,7 @@ npm install
 npm run dev
 ```
 
-The frontend will be available at http://localhost:3000. From `frontend/`, run `npm run lint` for TypeScript checking and `npm run build` for a production build.
+Before starting, copy `.env.example` to `.env` in the repository root (Vite reads it from there) so `VITE_API_BASE_URL` points at the backend, and start the backend (see below). The frontend will be available at http://localhost:3000. From `frontend/`, run `npm run lint` for TypeScript checking and `npm run build` for a production build.
 
 The two original CSV datasets remain unchanged at the repository root. They are separate datasets and are not joined or consumed by the current UI.
 
@@ -734,7 +734,7 @@ Holdout results (61,503 customers, 8.07% default rate): ROC-AUC 0.753. At thresh
 
 # 🔑 Environment Configuration
 
-The root `.env.example` lists all variables. Copy the `VITE_` line to `frontend/.env` (Vite reads env files from `frontend/`); the current mock-data UI does not require it yet. Backend variables (`API_HOST`, `API_PORT`, `CORS_ALLOWED_ORIGINS`) are read from the environment of the shell running `backend/run.py`, and default to local development values.
+The root `.env.example` lists all variables. Copy it to `.env` in the repository root: Vite is configured (`envDir`) to read it from there and only exposes `VITE_`-prefixed values to the browser. Without `VITE_API_BASE_URL` the API-connected pages show a configuration error. Backend variables (`API_HOST`, `API_PORT`, `CORS_ALLOWED_ORIGINS`) are read from the environment of the shell running `backend/run.py`, and default to local development values.
 
 Example:
 
