@@ -2,7 +2,7 @@
 
 ### AI-Powered Loan Follow-Up & Recovery Dashboard
 
-> Project status (Phase 3): the existing frontend still runs with mock data. The ML pipeline (installment features, logistic-regression training, evaluation, batch scoring) is implemented and the FastAPI backend loads and validates the trained model at startup. Customer, analytics, and query endpoints are not implemented yet. Architecture and feature descriptions below include planned capabilities.
+> Project status (Phase 4): the existing frontend still runs with mock data. The ML pipeline is implemented, and the FastAPI backend loads the trained model and scored customer data at startup and serves customer lookup and listing. Analytics and natural-language query endpoints are not implemented yet. Architecture and feature descriptions below include planned capabilities.
 
 RepayX is an intelligent **loan follow-up and recovery management platform** designed to help lending and financial organizations efficiently monitor loan accounts, identify upcoming and overdue payments, prioritize follow-ups, and interact with loan records using an AI-powered Retrieval-Augmented Generation (RAG) system.
 
@@ -677,7 +677,15 @@ pytest                 # backend test suite
 
 Interactive API docs are at http://127.0.0.1:8000/docs.
 
-Currently implemented: `GET /api/health` reports which artifacts are available (the risk model is loaded and validated against its metadata at startup). `GET /api/customer/{id}`, `GET /api/customers`, `GET /api/analytics`, and `POST /api/query` validate their input but return `503` when customer data is missing and `501` otherwise, until later phases. `rag/` and `notebooks/` are placeholders.
+Currently implemented (requires `backend/data/customer_data.parquet` from the ML pipeline below):
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/health` | Artifact status (`available` / `missing` / `invalid`) and model version |
+| `GET /api/customer/{id}` | Full risk profile; `404` if the customer is not in the scored dataset |
+| `GET /api/customers` | Paginated summaries. Query params: `page`, `page_size` (≤100), `risk_category` (`Low Risk` / `Medium Risk` / `High Risk`), `search` (customer ID or ID prefix, digits only), `sort_by` (`risk_score`, `default_probability`, `late_payment_rate`, `total_unpaid_amount`, `payment_ratio`, `customer_id`), `sort_order` (`asc` / `desc`) |
+
+Units: `default_probability`, `late_payment_rate`, and `underpaid_rate` are percentages (0–100); `risk_score` is 0–100; `payment_ratio` is paid ÷ due (1.0 = paid in full). Repayment fields are `null` for customers without installment history, and missing values sort last. Customer data scored by a different model version than the one loaded is rejected as `invalid`. `GET /api/analytics` and `POST /api/query` validate input but return `501` until later phases.
 
 
 ---
