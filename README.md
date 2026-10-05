@@ -2,7 +2,7 @@
 
 ### AI-Powered Loan Follow-Up & Recovery Dashboard
 
-> Project status (Phase 2): the existing frontend runs with mock data. A FastAPI backend skeleton is in place (health check, input validation, CORS, error handling); its data endpoints return `503` until customer data and model artifacts are added in later phases. ML and retrieval directories are scaffolding only. Architecture and feature descriptions below include planned capabilities.
+> Project status (Phase 3): the existing frontend still runs with mock data. The ML pipeline (installment features, logistic-regression training, evaluation, batch scoring) is implemented and the FastAPI backend loads and validates the trained model at startup. Customer, analytics, and query endpoints are not implemented yet. Architecture and feature descriptions below include planned capabilities.
 
 RepayX is an intelligent **loan follow-up and recovery management platform** designed to help lending and financial organizations efficiently monitor loan accounts, identify upcoming and overdue payments, prioritize follow-ups, and interact with loan records using an AI-powered Retrieval-Augmented Generation (RAG) system.
 
@@ -677,8 +677,34 @@ pytest                 # backend test suite
 
 Interactive API docs are at http://127.0.0.1:8000/docs.
 
-Currently implemented: `GET /api/health` reports which data/model artifacts are present. `GET /api/customer/{id}`, `GET /api/customers`, `GET /api/analytics`, and `POST /api/query` validate their input but return `503` because customer data and model artifacts are not available yet. The `ml/`, `models/`, `rag/`, and `notebooks/` directories are placeholders for later phases.
+Currently implemented: `GET /api/health` reports which artifacts are available (the risk model is loaded and validated against its metadata at startup). `GET /api/customer/{id}`, `GET /api/customers`, `GET /api/analytics`, and `POST /api/query` validate their input but return `503` when customer data is missing and `501` otherwise, until later phases. `rag/` and `notebooks/` are placeholders.
 
+
+---
+
+## ML Pipeline Setup
+
+The backend virtual environment already includes the ML requirements (`backend/requirements.txt` includes `ml/requirements.txt`). Run these from the repository root with that environment active.
+
+1. Download the [Home Credit Default Risk](https://www.kaggle.com/competitions/home-credit-default-risk/data) data and copy `application_train.csv`, `application_test.csv`, and `installments_payments.csv` into `datasets/`. Raw and derived data are git-ignored and must not be committed.
+2. Train, evaluate, and score:
+
+```bash
+python -m ml.training.train_model          # ~5 min: writes models/repayx_model.joblib + metadata
+python -m ml.evaluation.evaluate_model     # re-checks the holdout, writes models/evaluation_report.json
+python -m ml.scoring.score_customers       # writes backend/data/customer_data.parquet (no TARGET)
+cd ml && pytest                            # ML unit tests
+```
+
+Key modelling decisions:
+
+* Installment rows are collapsed to one record per installment (`SK_ID_PREV`, version, number) before features are computed; about 5% of installments are paid in several rows that each repeat the full amount.
+* Customers without installment history keep missing repayment features plus a `HAS_INSTALLMENT_HISTORY` flag; missing history is not treated as on-time repayment.
+* `CODE_GENDER` and `NAME_FAMILY_STATUS` are not model inputs (family status is still shown on profiles).
+* Stratified 80/20 split (seed 42). The 0.65 classification threshold is the best F1 threshold from a 5-fold out-of-fold sweep on the training split only. Risk bands (Low < 30, Medium 30–60, High ≥ 60 on the 0–100 score) are prototype presentation bands, separate from that threshold.
+* The backend refuses to load a model whose checksum, scikit-learn version, or input columns do not match its metadata.
+
+Holdout results (61,503 customers, 8.07% default rate): ROC-AUC 0.753. At threshold 0.65: accuracy 83.5%, precision 22.6%, recall 43.4%, F1 29.8%. At 0.5: accuracy 69.7%, precision 16.4%, recall 67.4%, F1 26.4%. These are prototype evaluation results; the model is not production-ready and its outputs are estimated probabilities, not guaranteed outcomes.
 ---
 
 # 🔑 Environment Configuration

@@ -1,4 +1,5 @@
 from config import API_VERSION
+from tests.conftest import write_test_model
 
 
 def test_health_reports_degraded_when_artifacts_missing(client):
@@ -10,6 +11,7 @@ def test_health_reports_degraded_when_artifacts_missing(client):
         "success": True,
         "status": "degraded",
         "version": API_VERSION,
+        "model_version": None,
         "resources": {
             "customer_data": "missing",
             "model": "missing",
@@ -20,17 +22,14 @@ def test_health_reports_degraded_when_artifacts_missing(client):
 
 
 def test_health_reports_ok_when_all_artifacts_present(settings, client_factory):
-    for path in (
-        settings.customer_data_path,
-        settings.model_path,
-        settings.tfidf_vectorizer_path,
-        settings.tfidf_matrix_path,
-    ):
+    write_test_model(settings)
+    for path in (settings.customer_data_path, settings.tfidf_vectorizer_path, settings.tfidf_matrix_path):
         path.write_bytes(b"")
 
     body = client_factory().get("/api/health").json()
 
     assert body["status"] == "ok"
+    assert body["model_version"] == "test-model-1"
     assert set(body["resources"].values()) == {"available"}
 
 

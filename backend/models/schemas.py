@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 RiskCategory = Literal["Low Risk", "Medium Risk", "High Risk"]
-ResourceState = Literal["available", "missing"]
+ResourceState = Literal["available", "missing", "invalid"]
 
 MAX_QUERY_LENGTH = 500
 
@@ -39,6 +39,7 @@ class HealthResponse(BaseModel):
     success: Literal[True] = True
     status: Literal["ok", "degraded"]
     version: str
+    model_version: str | None = None
     resources: ResourcesStatus
 
 
