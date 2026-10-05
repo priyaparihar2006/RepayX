@@ -6,6 +6,8 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    // Read .env from the repository root so the frontend and backend share one file.
+    envDir: path.resolve(import.meta.dirname, '..'),
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, '.'),
