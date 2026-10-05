@@ -22,6 +22,8 @@ def make_settings(tmp_path: Path) -> Settings:
         model_metadata_path=tmp_path / "repayx_model.metadata.json",
         tfidf_vectorizer_path=tmp_path / "tfidf_vectorizer.joblib",
         tfidf_matrix_path=tmp_path / "customer_tfidf_matrix.npz",
+        tfidf_ids_path=tmp_path / "customer_tfidf_ids.npy",
+        tfidf_metadata_path=tmp_path / "tfidf_index.metadata.json",
     )
 
 
@@ -130,3 +132,36 @@ def write_test_customers(settings: Settings, model_version: str | None = "test-m
         table = table.replace_schema_metadata({**(table.schema.metadata or {}), b"repayx.model_version": model_version.encode()})
     pq.write_table(table, settings.customer_data_path)
     return df
+
+
+def write_test_index(settings: Settings, model_version: str | None = "test-model-1", documents: dict | None = None) -> None:
+    """Write a small TF-IDF index in the format produced by ml.retrieval.build_tfidf_index."""
+    import hashlib
+    import json
+
+    import joblib
+    import numpy as np
+    import sklearn
+    from scipy import sparse
+    from sklearn.feature_extraction.text import TfidfVectorizer
+
+    documents = documents or {
+        100002: "low risk working secondary married laborers always on time",
+        100003: "medium risk commercial associate higher education single managers frequent late payments",
+        200004: "high risk pensioner secondary widow no installment history",
+        300005: "low risk state servant higher education married core staff always on time",
+        385001: "medium risk working secondary married occasional late payments",
+        385772: "high risk working lower secondary married laborers always late underpaid installments",
+    }
+    ids = np.array(sorted(documents), dtype=np.int64)
+    vectorizer = TfidfVectorizer(sublinear_tf=True)
+    matrix = vectorizer.fit_transform([documents[i] for i in ids]).astype(np.float32).tocsr()
+    joblib.dump(vectorizer, settings.tfidf_vectorizer_path)
+    sparse.save_npz(settings.tfidf_matrix_path, matrix)
+    np.save(settings.tfidf_ids_path, ids)
+    sha = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+           for p in (settings.tfidf_vectorizer_path, settings.tfidf_matrix_path, settings.tfidf_ids_path)}
+    settings.tfidf_metadata_path.write_text(json.dumps({
+        "schema_version": 1, "customer_model_version": model_version, "documents": len(ids),
+        "scikit_learn": sklearn.__version__, "sha256": sha,
+    }), encoding="utf-8")
