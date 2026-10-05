@@ -1,8 +1,8 @@
 """Tracks which data/model artifacts the backend can use.
 
-Artifacts are checked once at startup (`refresh`). The risk model and customer
-data are loaded and validated here; retrieval artifacts are presence-checked
-until the retrieval service is added in a later phase.
+Artifacts are loaded and validated once at startup (`refresh`): the risk model,
+the scored customer data, and the TF-IDF retrieval index. Each is reported as
+available, missing, or invalid; nothing is reloaded per request.
 """
 
 from __future__ import annotations
@@ -13,7 +13,11 @@ from pathlib import Path
 
 from api.errors import ServiceUnavailableError
 from config import Settings
+import numpy as np
+
 from services.customer_service import CustomerDataError, CustomerService
+from services.query_service import QueryService
+from services.rag_service import RetrievalIndexError, TfidfRetriever
 from services.repayx_engine import ModelLoadError, RiskModel, load_risk_model
 
 logger = logging.getLogger(__name__)
@@ -52,6 +56,8 @@ class ResourceRegistry:
         self._status: dict[Resource, ResourceStatus] = {}
         self.risk_model: RiskModel | None = None
         self.customers: CustomerService | None = None
+        self.retriever: TfidfRetriever | None = None
+        self.query_service: QueryService | None = None
 
     def refresh(self) -> None:
         for resource, path in self._paths.items():
@@ -63,6 +69,16 @@ class ResourceRegistry:
                 logger.warning("Resource %s not found at %s", resource.value, path)
         self._load_model()
         self._load_customers()
+        self._load_retriever()
+        self.query_service = (
+            QueryService(
+                self.customers,
+                self.retriever,
+                self.risk_model.classification_threshold if self.risk_model else None,
+            )
+            if self.customers
+            else None
+        )
 
     def _load_model(self) -> None:
         self.risk_model = None
@@ -97,6 +113,36 @@ class ResourceRegistry:
             self._status[Resource.CUSTOMER_DATA] = ResourceStatus.INVALID
             return
         self.customers = customers
+
+    def _load_retriever(self) -> None:
+        self.retriever = None
+        rag = (Resource.TFIDF_VECTORIZER, Resource.TFIDF_MATRIX)
+        if any(self._status[r] is ResourceStatus.MISSING for r in rag):
+            return
+        s = self._settings
+        if not s.tfidf_ids_path.is_file() or not s.tfidf_metadata_path.is_file():
+            logger.warning("Retrieval index IDs or metadata not found in %s", s.tfidf_ids_path.parent)
+            self._set(rag, ResourceStatus.MISSING)
+            return
+        try:
+            retriever = TfidfRetriever.load(
+                s.tfidf_vectorizer_path, s.tfidf_matrix_path, s.tfidf_ids_path, s.tfidf_metadata_path
+            )
+        except RetrievalIndexError as exc:
+            logger.error("Retrieval index unavailable: %s", exc, exc_info=exc.__cause__ is not None)
+            self._set(rag, ResourceStatus.INVALID)
+            return
+        if self.customers is not None:
+            same_ids = np.array_equal(np.sort(retriever.customer_ids), self.customers.frame.index.to_numpy())
+            if retriever.customer_model_version != self.customers.model_version or not same_ids:
+                logger.error("Retrieval index was built from different customer data; re-run ml.retrieval.build_tfidf_index")
+                self._set(rag, ResourceStatus.INVALID)
+                return
+        self.retriever = retriever
+
+    def _set(self, resources, status: ResourceStatus) -> None:
+        for resource in resources:
+            self._status[resource] = status
 
     def status(self) -> dict[str, ResourceStatus]:
         return {resource.value: self._status.get(resource, ResourceStatus.MISSING) for resource in Resource}

@@ -1,5 +1,5 @@
 from config import API_VERSION
-from tests.conftest import write_test_customers, write_test_model
+from tests.conftest import write_test_customers, write_test_index, write_test_model
 
 
 def test_health_reports_degraded_when_artifacts_missing(client):
@@ -24,8 +24,7 @@ def test_health_reports_degraded_when_artifacts_missing(client):
 def test_health_reports_ok_when_all_artifacts_present(settings, client_factory):
     write_test_model(settings)
     write_test_customers(settings)
-    for path in (settings.tfidf_vectorizer_path, settings.tfidf_matrix_path):
-        path.write_bytes(b"")
+    write_test_index(settings)
 
     body = client_factory().get("/api/health").json()
 

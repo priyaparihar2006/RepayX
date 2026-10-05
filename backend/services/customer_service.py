@@ -173,6 +173,32 @@ class CustomerService:
     def __len__(self) -> int:
         return len(self._df)
 
+    @property
+    def frame(self) -> pd.DataFrame:
+        """Read-only view for structured calculations; callers must not modify it."""
+        return self._df
+
+    def profile_values(self) -> dict[str, list[str]]:
+        """Distinct values of each profile field, used to recognise them in questions."""
+        return {
+            field: sorted(str(v) for v in self._df[field].dropna().unique())
+            for field in ("income_type", "education", "family_status", "occupation")
+        }
+
+    def summaries(self, customer_ids) -> list[dict]:
+        """Summaries in the given order, skipping unknown IDs."""
+        known = [i for i in customer_ids if i in self._df.index]
+        return [self.retrieval_item(row) for row in self._df.loc[known].to_dict("records")]
+
+    @classmethod
+    def retrieval_item(cls, row) -> dict:
+        return {
+            **cls._summary(row),
+            "installment_count": _int(row["installment_count"]),
+            "late_payment_count": _int(row["late_payment_count"]),
+            "avg_days_late": _round(row["avg_days_late"]),
+        }
+
     def get(self, customer_id: int) -> dict | None:
         try:
             row = self._df.loc[customer_id]
