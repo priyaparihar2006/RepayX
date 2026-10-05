@@ -2,7 +2,7 @@
 
 ### AI-Powered Loan Follow-Up & Recovery Dashboard
 
-> Phase 1 status: the existing frontend runs with mock data. Backend, ML, and retrieval directories are scaffolding only. Architecture and feature descriptions below include planned capabilities.
+> Project status (Phase 2): the existing frontend runs with mock data. A FastAPI backend skeleton is in place (health check, input validation, CORS, error handling); its data endpoints return `503` until customer data and model artifacts are added in later phases. ML and retrieval directories are scaffolding only. Architecture and feature descriptions below include planned capabilities.
 
 RepayX is an intelligent **loan follow-up and recovery management platform** designed to help lending and financial organizations efficiently monitor loan accounts, identify upcoming and overdue payments, prioritize follow-ups, and interact with loan records using an AI-powered Retrieval-Augmented Generation (RAG) system.
 
@@ -626,7 +626,7 @@ Make sure the following are installed:
 * npm
 * Git
 
-Python and backend dependencies are not required for Phase 1.
+* Python 3.12+ (tested with 3.14) for the backend
 
 ---
 
@@ -658,18 +658,41 @@ The two original CSV datasets remain unchanged at the repository root. They are 
 
 ## Backend Setup
 
-The backend is not implemented yet. The `backend/`, `ml/`, `models/`, `rag/`, and `notebooks/` directories are placeholders for later phases. There is no backend startup command in Phase 1.
+Open another terminal:
+
+```bash
+cd backend
+
+python -m venv .venv
+```
+
+Activate it — Windows: `.venv\Scripts\activate`, macOS/Linux: `source .venv/bin/activate`. Then:
+
+```bash
+pip install -r requirements-dev.txt
+
+python run.py          # serves http://127.0.0.1:8000 (API_HOST / API_PORT override)
+pytest                 # backend test suite
+```
+
+Interactive API docs are at http://127.0.0.1:8000/docs.
+
+Currently implemented: `GET /api/health` reports which data/model artifacts are present. `GET /api/customer/{id}`, `GET /api/customers`, `GET /api/analytics`, and `POST /api/query` validate their input but return `503` because customer data and model artifacts are not available yet. The `ml/`, `models/`, `rag/`, and `notebooks/` directories are placeholders for later phases.
 
 ---
 
 # 🔑 Environment Configuration
 
-For future API integration, copy the root `.env.example` to `frontend/.env`. Vite reads frontend environment files from `frontend/`. The current mock-data UI does not require this variable.
+The root `.env.example` lists all variables. Copy the `VITE_` line to `frontend/.env` (Vite reads env files from `frontend/`); the current mock-data UI does not require it yet. Backend variables (`API_HOST`, `API_PORT`, `CORS_ALLOWED_ORIGINS`) are read from the environment of the shell running `backend/run.py`, and default to local development values.
 
 Example:
 
 ```env
 VITE_API_BASE_URL=http://localhost:8000
+
+API_HOST=127.0.0.1
+API_PORT=8000
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
 Never commit the `.env` file to Git.
