@@ -2,7 +2,7 @@
 
 ### AI-Powered Loan Follow-Up & Recovery Dashboard
 
-> Project status (Phase 4): the existing frontend still runs with mock data. The ML pipeline is implemented, and the FastAPI backend loads the trained model and scored customer data at startup and serves customer lookup and listing. Analytics and natural-language query endpoints are not implemented yet. Architecture and feature descriptions below include planned capabilities.
+> Project status (Phase 5): the existing frontend still runs with mock data. The ML pipeline is implemented, and the FastAPI backend serves customer lookup, customer listing, and natural-language queries through a hybrid router (structured calculations plus TF-IDF retrieval). The analytics endpoint is not implemented yet. Architecture and feature descriptions below include planned capabilities.
 
 RepayX is an intelligent **loan follow-up and recovery management platform** designed to help lending and financial organizations efficiently monitor loan accounts, identify upcoming and overdue payments, prioritize follow-ups, and interact with loan records using an AI-powered Retrieval-Augmented Generation (RAG) system.
 
@@ -685,7 +685,22 @@ Currently implemented (requires `backend/data/customer_data.parquet` from the ML
 | `GET /api/customer/{id}` | Full risk profile; `404` if the customer is not in the scored dataset |
 | `GET /api/customers` | Paginated summaries. Query params: `page`, `page_size` (≤100), `risk_category` (`Low Risk` / `Medium Risk` / `High Risk`), `search` (customer ID or ID prefix, digits only), `sort_by` (`risk_score`, `default_probability`, `late_payment_rate`, `total_unpaid_amount`, `payment_ratio`, `customer_id`), `sort_order` (`asc` / `desc`) |
 
-Units: `default_probability`, `late_payment_rate`, and `underpaid_rate` are percentages (0–100); `risk_score` is 0–100; `payment_ratio` is paid ÷ due (1.0 = paid in full). Repayment fields are `null` for customers without installment history, and missing values sort last. Customer data scored by a different model version than the one loaded is rejected as `invalid`. `GET /api/analytics` and `POST /api/query` validate input but return `501` until later phases.
+Units: `default_probability`, `late_payment_rate`, and `underpaid_rate` are percentages (0–100); `risk_score` is 0–100; `payment_ratio` is paid ÷ due (1.0 = paid in full). Repayment fields are `null` for customers without installment history, and missing values sort last. Customer data scored by a different model version than the one loaded is rejected as `invalid`. `GET /api/analytics` validates input but returns `501` until a later phase.
+
+### `POST /api/query`
+
+Body: `{"query": "..."}` (1–500 characters). `route_repayx_query()` classifies each question in priority order, without a language model:
+
+| Priority | `query_type` | Triggered by | Answered with |
+|---|---|---|---|
+| 1 | `customer_query` | a customer ID (`customer 385772`, `#385772`, or a bare 6-digit ID) | direct lookup |
+| 2 | `aggregate_query` | how many / percentage / average / median / total / distribution | pandas calculation over all scored customers |
+| 3 | `retrieval_query` | late or overdue payers, on-time payers, unpaid amounts, predicted defaults, highest/lowest risk | structured filter + sort |
+| 4 | `general_retrieval` | anything else (e.g. profile descriptions) | TF-IDF cosine similarity |
+
+Numeric questions are never answered by TF-IDF. Questions can add a risk category (`high risk`), profile values (`pensioners`, `laborers`, `married`), a numeric threshold (`over 100000`, `above 50%`), and a limit (`top 5`, max 50). Answers are generated from the computed values and state the population used; averages of repayment metrics exclude customers without installment history. Only general retrieval needs the TF-IDF index; without it those questions return `503` while the others still work.
+
+Example: `{"query": "How many high-risk customers are there?"}` → `{"query_type": "aggregate_query", "result": "There are 12,646 High Risk customers, 20.56% of the 61,503 scored customers.", "metrics": [...]}`
 
 
 ---
@@ -701,6 +716,7 @@ The backend virtual environment already includes the ML requirements (`backend/r
 python -m ml.training.train_model          # ~5 min: writes models/repayx_model.joblib + metadata
 python -m ml.evaluation.evaluate_model     # re-checks the holdout, writes models/evaluation_report.json
 python -m ml.scoring.score_customers       # writes backend/data/customer_data.parquet (no TARGET)
+python -m ml.retrieval.build_tfidf_index   # writes the TF-IDF index to backend/rag/
 cd ml && pytest                            # ML unit tests
 ```
 

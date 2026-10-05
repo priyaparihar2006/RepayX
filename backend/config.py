@@ -59,6 +59,14 @@ class Settings:
             "TFIDF_MATRIX_PATH", BACKEND_DIR / "rag" / "customer_tfidf_matrix.npz"
         )
     )
+    tfidf_ids_path: Path = field(
+        default_factory=lambda: _path_from_env("TFIDF_IDS_PATH", BACKEND_DIR / "rag" / "customer_tfidf_ids.npy")
+    )
+    tfidf_metadata_path: Path = field(
+        default_factory=lambda: _path_from_env(
+            "TFIDF_METADATA_PATH", BACKEND_DIR / "rag" / "tfidf_index.metadata.json"
+        )
+    )
 
 
 def get_settings() -> Settings:

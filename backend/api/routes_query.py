@@ -3,8 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from api.dependencies import get_resources
-from api.errors import NotImplementedYetError
-from models.schemas import ErrorResponse, QueryRequest
+from models.schemas import ErrorResponse, QueryRequest, QueryResponse
 from services.resources import Resource, ResourceRegistry
 
 router = APIRouter(
@@ -14,9 +13,13 @@ router = APIRouter(
 )
 
 
-@router.post("/query")
+@router.post("/query", response_model=QueryResponse, response_model_exclude_none=True)
 def run_query(request: QueryRequest, resources: ResourceRegistry = Depends(get_resources)):
-    # Structured customer/aggregate/repayment queries only need customer data;
-    # TF-IDF artifacts are required only for general retrieval (Phase 5).
+    """Answer a natural-language question about the portfolio.
+
+    Routed to customer lookup, structured aggregate calculation, structured
+    repayment retrieval, or TF-IDF retrieval (only general retrieval needs the
+    TF-IDF index).
+    """
     resources.require(Resource.CUSTOMER_DATA)
-    raise NotImplementedYetError("Natural-language queries are not implemented yet.")
+    return QueryResponse(**resources.query_service.answer(request.query))
