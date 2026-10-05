@@ -1,0 +1,8 @@
+# Shared by training (ml/) and serving (backend/). The backend refuses to load a
+# model trained with a different scikit-learn version, so keep these in sync.
+numpy==2.5.3
+pandas==3.0.6
+scikit-learn==1.9.1
+scipy==1.18.1
+joblib==1.6.0
+pyarrow==25.0.1

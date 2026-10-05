@@ -44,6 +44,11 @@ class Settings:
     model_path: Path = field(
         default_factory=lambda: _path_from_env("MODEL_PATH", REPO_ROOT / "models" / "repayx_model.joblib")
     )
+    model_metadata_path: Path = field(
+        default_factory=lambda: _path_from_env(
+            "MODEL_METADATA_PATH", REPO_ROOT / "models" / "repayx_model.metadata.json"
+        )
+    )
     tfidf_vectorizer_path: Path = field(
         default_factory=lambda: _path_from_env(
             "TFIDF_VECTORIZER_PATH", BACKEND_DIR / "rag" / "tfidf_vectorizer.joblib"

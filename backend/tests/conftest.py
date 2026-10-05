@@ -19,6 +19,7 @@ def make_settings(tmp_path: Path) -> Settings:
         cors_allowed_origins=[ALLOWED_ORIGIN],
         customer_data_path=tmp_path / "customer_data.parquet",
         model_path=tmp_path / "repayx_model.joblib",
+        model_metadata_path=tmp_path / "repayx_model.metadata.json",
         tfidf_vectorizer_path=tmp_path / "tfidf_vectorizer.joblib",
         tfidf_matrix_path=tmp_path / "customer_tfidf_matrix.npz",
     )
@@ -48,3 +49,36 @@ def client_factory(settings: Settings) -> Iterator[Callable[..., TestClient]]:
 def client(client_factory) -> TestClient:
     """Client for an app where no data/model artifacts exist."""
     return client_factory()
+
+
+def write_test_model(settings: Settings, **metadata_overrides) -> dict:
+    """Train a tiny real pipeline and write it with metadata in the ml pipeline's format."""
+    import hashlib
+    import json
+
+    import joblib
+    import numpy as np
+    import pandas as pd
+    import sklearn
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    X = pd.DataFrame({"f1": np.arange(20.0), "f2": np.arange(20.0)[::-1]})
+    y = np.array([0, 1] * 10)
+    pipeline = Pipeline([("scale", StandardScaler()), ("classifier", LogisticRegression())]).fit(X, y)
+    joblib.dump(pipeline, settings.model_path)
+
+    metadata = {
+        "schema_version": 1,
+        "model_version": "test-model-1",
+        "artifact_sha256": hashlib.sha256(settings.model_path.read_bytes()).hexdigest(),
+        "environment": {"scikit_learn": sklearn.__version__},
+        "features": {"model_input_columns": ["f1", "f2"]},
+        "classification_threshold": 0.65,
+        "risk_bands": {"medium_from": 30.0, "high_from": 60.0},
+        "holdout_metrics": {"roc_auc": 0.75},
+    }
+    metadata.update(metadata_overrides)
+    settings.model_metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+    return metadata

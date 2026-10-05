@@ -17,5 +17,6 @@ def health(resources: ResourceRegistry = Depends(get_resources)) -> HealthRespon
     return HealthResponse(
         status="ok" if all_available else "degraded",
         version=API_VERSION,
+        model_version=resources.risk_model.model_version if resources.risk_model else None,
         resources=statuses,
     )
