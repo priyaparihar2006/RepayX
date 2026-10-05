@@ -9,6 +9,7 @@ from api.dependencies import get_resources, require_customers
 from api.errors import APIError
 from models.schemas import CustomerListResponse, CustomerResponse, ErrorResponse, Pagination, RiskCategory
 from services.customer_service import SortField, SortOrder
+from services.insight_service import build_insight
 from services.resources import ResourceRegistry
 
 router = APIRouter(
@@ -26,7 +27,15 @@ def get_customer(customer_id: CustomerId, resources: ResourceRegistry = Depends(
     customer = customers.get(customer_id)
     if customer is None:
         raise APIError(HTTPStatus.NOT_FOUND, "customer_not_found", f"Customer {customer_id} was not found.")
-    return CustomerResponse(model_version=customers.model_version, customer=customer)
+    threshold = resources.risk_model.classification_threshold if resources.risk_model else None
+    benchmarks = resources.analytics.benchmarks
+    return CustomerResponse(
+        model_version=customers.model_version,
+        customer=customer,
+        insight=build_insight(customer, benchmarks, threshold),
+        benchmarks=benchmarks,
+        classification_threshold=threshold,
+    )
 
 
 @router.get("/customers", response_model=CustomerListResponse)

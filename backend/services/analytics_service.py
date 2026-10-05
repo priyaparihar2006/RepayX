@@ -122,6 +122,19 @@ class AnalyticsService:
         return self._df[mask]
 
     @cached_property
+    def benchmarks(self) -> dict[str, float | None]:
+        """Portfolio averages in display units, for comparing one customer with the portfolio.
+
+        Repayment averages are over customers with a known value (no-history customers excluded).
+        """
+        out: dict[str, float | None] = {}
+        for metric in ("risk_score", "default_probability", "late_payment_rate", "avg_days_late",
+                       "underpaid_rate", "payment_ratio", "total_unpaid_amount", "installment_count"):
+            values = self.display_values(metric).dropna()
+            out[metric] = None if values.empty else round(float(values.mean()), 2)
+        return out
+
+    @cached_property
     def portfolio_summary(self) -> dict:
         """Portfolio-wide metrics and chart data. Computed once; the data is immutable while the API runs."""
         df = self._df
