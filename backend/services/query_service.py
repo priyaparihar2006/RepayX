@@ -44,9 +44,15 @@ _RETRIEVAL_DESCRIPTION = {
 
 
 class QueryService:
-    def __init__(self, customers: CustomerService, retriever: TfidfRetriever | None, classification_threshold: float | None):
+    def __init__(
+        self,
+        customers: CustomerService,
+        analytics: AnalyticsService,
+        retriever: TfidfRetriever | None,
+        classification_threshold: float | None,
+    ):
         self._customers = customers
-        self._analytics = AnalyticsService(customers.frame)
+        self._analytics = analytics
         self._retriever = retriever
         self._threshold = classification_threshold
         self._profile_values = customers.profile_values()

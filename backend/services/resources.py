@@ -15,6 +15,7 @@ from api.errors import ServiceUnavailableError
 from config import Settings
 import numpy as np
 
+from services.analytics_service import AnalyticsService
 from services.customer_service import CustomerDataError, CustomerService
 from services.query_service import QueryService
 from services.rag_service import RetrievalIndexError, TfidfRetriever
@@ -57,6 +58,7 @@ class ResourceRegistry:
         self.risk_model: RiskModel | None = None
         self.customers: CustomerService | None = None
         self.retriever: TfidfRetriever | None = None
+        self.analytics: AnalyticsService | None = None
         self.query_service: QueryService | None = None
 
     def refresh(self) -> None:
@@ -70,15 +72,19 @@ class ResourceRegistry:
         self._load_model()
         self._load_customers()
         self._load_retriever()
+        self.analytics = AnalyticsService(self.customers.frame) if self.customers else None
         self.query_service = (
             QueryService(
                 self.customers,
+                self.analytics,
                 self.retriever,
                 self.risk_model.classification_threshold if self.risk_model else None,
             )
             if self.customers
             else None
         )
+        if self.analytics is not None:
+            _ = self.analytics.portfolio_summary  # compute once at startup, not on the first request
 
     def _load_model(self) -> None:
         self.risk_model = None

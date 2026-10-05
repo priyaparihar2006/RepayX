@@ -2,7 +2,7 @@
 
 ### AI-Powered Loan Follow-Up & Recovery Dashboard
 
-> Project status (Phase 5): the existing frontend still runs with mock data. The ML pipeline is implemented, and the FastAPI backend serves customer lookup, customer listing, and natural-language queries through a hybrid router (structured calculations plus TF-IDF retrieval). The analytics endpoint is not implemented yet. Architecture and feature descriptions below include planned capabilities.
+> Project status (Phase 6): the existing frontend still runs with mock data. The ML pipeline is implemented, and the FastAPI backend serves customer lookup, customer listing, portfolio analytics, and natural-language queries (structured calculations plus TF-IDF retrieval). Connecting the frontend to the API is the next phase. Architecture and feature descriptions below include planned capabilities.
 
 RepayX is an intelligent **loan follow-up and recovery management platform** designed to help lending and financial organizations efficiently monitor loan accounts, identify upcoming and overdue payments, prioritize follow-ups, and interact with loan records using an AI-powered Retrieval-Augmented Generation (RAG) system.
 
@@ -684,8 +684,9 @@ Currently implemented (requires `backend/data/customer_data.parquet` from the ML
 | `GET /api/health` | Artifact status (`available` / `missing` / `invalid`) and model version |
 | `GET /api/customer/{id}` | Full risk profile; `404` if the customer is not in the scored dataset |
 | `GET /api/customers` | Paginated summaries. Query params: `page`, `page_size` (≤100), `risk_category` (`Low Risk` / `Medium Risk` / `High Risk`), `search` (customer ID or ID prefix, digits only), `sort_by` (`risk_score`, `default_probability`, `late_payment_rate`, `total_unpaid_amount`, `payment_ratio`, `customer_id`), `sort_order` (`asc` / `desc`) |
+| `GET /api/analytics` | Portfolio metrics computed from the scored data: risk-category counts and shares, average/median risk score, predicted defaults; repayment statistics (average late payment rate, customers with late payments, always-late customers, unpaid amounts, payment ratio); a 10-bin risk-score histogram; late-payment-rate buckets; segment breakdowns by income type, education, and occupation; the model's threshold, risk bands, and recorded holdout evaluation; and the RepayX disclaimer. Computed once at startup. |
 
-Units: `default_probability`, `late_payment_rate`, and `underpaid_rate` are percentages (0–100); `risk_score` is 0–100; `payment_ratio` is paid ÷ due (1.0 = paid in full). Repayment fields are `null` for customers without installment history, and missing values sort last. Customer data scored by a different model version than the one loaded is rejected as `invalid`. `GET /api/analytics` validates input but returns `501` until a later phase.
+Units: `default_probability`, `late_payment_rate`, and `underpaid_rate` are percentages (0–100); `risk_score` is 0–100; `payment_ratio` is paid ÷ due (1.0 = paid in full). Repayment fields are `null` for customers without installment history, and missing values sort last. Customer data scored by a different model version than the one loaded is rejected as `invalid`.
 
 ### `POST /api/query`
 
