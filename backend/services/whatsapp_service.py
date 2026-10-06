@@ -540,39 +540,9 @@ class WhatsAppService:
             "server_time": now_iso(),
         }
 
-    def get_conversation(self, customer_id: int | None = None, phone: str | None = None) -> list[dict]:
-        with sqlite3.connect(self.settings.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            outbox_rows = conn.execute(
-                """
-                SELECT request_id as id, recipient as phone, customer_id, customer_name,
-                       preview as text, created_at as timestamp, status, 'outgoing' as direction
-                FROM outbox
-                WHERE (? IS NOT NULL AND customer_id = ?) OR (? IS NOT NULL AND recipient = ?)
-                ORDER BY created_at ASC
-            """,
-                (customer_id, customer_id, phone, phone),
-            ).fetchall()
-
-            inbox_rows = conn.execute(
-                """
-                SELECT provider_id as id, sender as phone, NULL as customer_id, NULL as customer_name,
-                       text, received_at as timestamp, 'delivered' as status, 'incoming' as direction
-                FROM inbox
-                WHERE (? IS NOT NULL AND sender = ?)
-                ORDER BY received_at ASC
-            """,
-                (phone, phone),
-            ).fetchall()
-
-            all_msgs = [dict(r) for r in outbox_rows] + [dict(r) for r in inbox_rows]
-            all_msgs.sort(key=lambda m: m.get("timestamp") or "")
-            return all_msgs
-
     def contacts(self) -> list[dict]:
         try:
             rows = json.loads(self.settings.contacts_file.read_text(encoding="utf-8"))
             return rows if isinstance(rows, list) else []
         except Exception:
             return []
-
