@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  ExternalLink,
   LogOut,
   MessageSquare,
   QrCode,
@@ -121,6 +122,7 @@ const WhatsAppDashboard: React.FC = () => {
 
   // Single Defaulter Modal State
   const [activeModalDefaulter, setActiveModalDefaulter] = useState<WhatsAppDefaulter | null>(null);
+  const [modalRecipientPhone, setModalRecipientPhone] = useState<string>('');
   const [singleMessageText, setSingleMessageText] = useState<string>('');
   const [sendingSingle, setSendingSingle] = useState<boolean>(false);
 
@@ -136,14 +138,17 @@ const WhatsAppDashboard: React.FC = () => {
           total: 0,
           summary: { total_defaulters: 0, high_risk_count: 0, medium_risk_count: 0, total_unpaid_amount: 0 },
         })),
-        whatsapp.getMessages(25).catch(() => ({ success: false, messages: [], count: 0 })),
+        whatsapp.getMessages(50).catch(() => ({ success: false, messages: [], count: 0 })),
       ]);
 
       if (statusRes) {
         setStatus(statusRes);
-        if (statusRes.qr_code) {
+        if (statusRes.connected) {
+          setQrCode('');
+          setQrExpiresIn(0);
+        } else if (statusRes.qr_code) {
           setQrCode(statusRes.qr_code);
-          setQrExpiresIn(statusRes.qr_expires_in || 120);
+          setQrExpiresIn(statusRes.qr_expires_in || 60);
         }
       }
 
@@ -213,21 +218,17 @@ const WhatsAppDashboard: React.FC = () => {
     return () => controller.abort();
   }, []);
 
-  // Poll QR expiration & real-time connection status to detect mobile QR scans
+  // Poll connection status and QR countdown
   useEffect(() => {
-    if (status?.connected) return;
-
     const statusInterval = setInterval(async () => {
       try {
         const s = await whatsapp.getStatus();
         if (s) {
+          setStatus(s);
           if (s.connected) {
-            setStatus(s);
             setQrCode('');
-            setNotice('WhatsApp Connected successfully!');
-            await fetchAllData();
+            setQrExpiresIn(0);
           } else if (s.qr_code && s.qr_code !== qrCode) {
-            setStatus(s);
             setQrCode(s.qr_code);
             setQrExpiresIn(s.qr_expires_in || 60);
           }
@@ -240,7 +241,9 @@ const WhatsAppDashboard: React.FC = () => {
     const countdownInterval = setInterval(() => {
       setQrExpiresIn((prev) => {
         if (prev <= 1) {
-          void generateNewQR();
+          if (!status?.connected) {
+            void generateNewQR();
+          }
           return 60;
         }
         return prev - 1;
@@ -260,7 +263,7 @@ const WhatsAppDashboard: React.FC = () => {
       const res = await whatsapp.generateQR();
       if (res.qr_code) {
         setQrCode(res.qr_code);
-        setQrExpiresIn(res.expires_in || 120);
+        setQrExpiresIn(res.expires_in || 60);
         setStatus((prev) => (prev ? { ...prev, status: 'SCAN_QR_CODE', qr_code: res.qr_code } : null));
       }
     } catch (e: any) {
@@ -303,6 +306,36 @@ const WhatsAppDashboard: React.FC = () => {
     }
   };
 
+  const handleSendTestToSelf = async () => {
+    const targetPhone = status?.session_info?.phone_number || '+918650629360';
+    setSendingSingle(true);
+    setError('');
+    setNotice('');
+    try {
+      const sampleCust = defaulters[0] || {
+        customer_id: 385001,
+        customer_name: 'Rahul Sharma',
+        unpaid_amount: 28450,
+        late_days: 18,
+      };
+      const testMsg = `🔔 *RepayX Collection Follow-Up Notice*\n\nDear ${sampleCust.customer_name},\nYour loan account #${sampleCust.customer_id} has an overdue installment of ₹${sampleCust.unpaid_amount.toLocaleString('en-IN')} (${sampleCust.late_days} days past due).\n\nPlease process your payment today using the secure RepayX portal: https://pay.repayx.ai/inv/${sampleCust.customer_id}\n\nFor queries, reply directly to this WhatsApp message.`;
+      
+      await whatsapp.sendMessage({
+        customer_id: sampleCust.customer_id,
+        customer_name: sampleCust.customer_name,
+        recipient: targetPhone,
+        message: testMsg,
+        template_name: 'urgent_settlement',
+      });
+      setNotice(`✅ Test follow-up message successfully delivered to your WhatsApp (${targetPhone})!`);
+      await fetchAllData();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to send test message.');
+    } finally {
+      setSendingSingle(false);
+    }
+  };
+
   const handleAutoDispatch = async () => {
     setDispatching(true);
     setError('');
@@ -314,7 +347,7 @@ const WhatsAppDashboard: React.FC = () => {
         custom_body: customText || undefined,
       });
       const count = res.dispatched ?? (res as any).total_sent ?? 0;
-      setNotice(`Automated outreach completed: ${count} message(s) dispatched to defaulter customers.`);
+      setNotice(`✅ Automated outreach completed: ${count} follow-up message(s) dispatched to defaulters via WhatsApp Web.`);
       await fetchAllData();
     } catch (e: any) {
       setError(e?.message || 'Auto dispatch failed.');
@@ -325,6 +358,8 @@ const WhatsAppDashboard: React.FC = () => {
 
   const handleOpenSingleModal = (defaulter: WhatsAppDefaulter) => {
     setActiveModalDefaulter(defaulter);
+    // Use connected user's phone or defaulter's phone
+    setModalRecipientPhone(defaulter.phone);
     const tmpl = templates.find((t) => t.id === selectedTemplateId) || templates[0];
     const defaultTemplateBody = tmpl ? tmpl.body : 'Dear {{customer_name}}, your overdue amount of ₹{{unpaid_amount}} for Loan #{{customer_id}} is pending. Please pay immediately.';
     const rendered = defaultTemplateBody
@@ -342,14 +377,15 @@ const WhatsAppDashboard: React.FC = () => {
     setError('');
     setNotice('');
     try {
+      const recipient = modalRecipientPhone || activeModalDefaulter.phone;
       await whatsapp.sendMessage({
         customer_id: activeModalDefaulter.customer_id,
         customer_name: activeModalDefaulter.customer_name,
-        recipient: activeModalDefaulter.phone,
+        recipient,
         message: singleMessageText,
         template_name: selectedTemplateId,
       });
-      setNotice(`Message delivered to ${activeModalDefaulter.customer_name} (${activeModalDefaulter.phone}).`);
+      setNotice(`✅ Message delivered to ${activeModalDefaulter.customer_name} (${recipient}).`);
       setActiveModalDefaulter(null);
       await fetchAllData();
     } catch (e: any) {
@@ -388,7 +424,7 @@ const WhatsAppDashboard: React.FC = () => {
             <div>
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">WhatsApp Web Defaulter Recovery</h1>
               <p className="text-sm text-slate-500">
-                Pair your WhatsApp Web QR code to trigger automated recovery messages to loan defaulters with dynamic EMI links.
+                Live WhatsApp Web multi-device connection for automated follow-up notices &amp; payment reminders.
               </p>
             </div>
           </div>
@@ -401,7 +437,7 @@ const WhatsAppDashboard: React.FC = () => {
               : 'bg-amber-50 border-amber-300 text-amber-700'
           }`}>
             <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-            {isConnected ? 'WhatsApp Web Linked' : 'Scanner Ready'}
+            {isConnected ? '🟢 WhatsApp Connected' : '🟡 Scanner Ready'}
           </div>
 
           <button
@@ -488,7 +524,9 @@ const WhatsAppDashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <QrCode className="w-5 h-5 text-emerald-600" />
-              <h2 className="text-lg font-bold text-slate-900">WhatsApp Web Scanner</h2>
+              <h2 className="text-lg font-bold text-slate-900">
+                {isConnected ? 'Connected WhatsApp Account' : 'WhatsApp Web Scanner'}
+              </h2>
             </div>
             {isConnected && (
               <button
@@ -555,29 +593,54 @@ const WhatsAppDashboard: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="p-5 bg-emerald-50/50 border border-emerald-200 rounded-2xl space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-emerald-600/20">
-                  WA
+            <div className="space-y-4">
+              <div className="p-5 bg-gradient-to-br from-emerald-50 to-teal-50/50 border border-emerald-200 rounded-2xl space-y-4 shadow-sm">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-emerald-600/20 shrink-0">
+                    WA
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-slate-900 truncate">
+                        {status.session_info?.user_name || 'RepayX Verified Agent'}
+                      </h3>
+                      <span className="px-2 py-0.5 bg-emerald-600 text-white rounded-full text-[10px] font-bold">
+                        ACTIVE
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-800 font-mono font-bold mt-0.5">
+                      {status.session_info?.phone_number || '+91 86506 29360'}
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                      {status.session_info?.device || 'WhatsApp Multi-Device Web (Baileys)'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    {status.session_info?.user_name || 'RepayX Collections Team'}
-                  </h3>
-                  <p className="text-xs text-emerald-700 font-mono font-medium">
-                    {status.session_info?.phone_number || '+91 98201 54321'}
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    {status.session_info?.device || 'WhatsApp Web (Chrome / Windows)'}
-                  </p>
+
+                <div className="border-t border-emerald-200/70 pt-3 text-xs text-slate-600 flex justify-between">
+                  <span>Session Linked:</span>
+                  <span className="font-semibold text-slate-800">
+                    {formatTimestamp(status.session_info?.connected_at || status.server_time)}
+                  </span>
                 </div>
               </div>
 
-              <div className="border-t border-emerald-200/60 pt-3 text-xs text-slate-600 flex justify-between">
-                <span>Linked Since:</span>
-                <span className="font-medium text-slate-800">
-                  {formatTimestamp(status.session_info?.connected_at || status.server_time)}
-                </span>
+              {/* Instant Test Message Action Button */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" /> Verify Live Message Delivery
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Send an instant test recovery notice directly to your connected WhatsApp phone ({status.session_info?.phone_number}).
+                </p>
+                <button
+                  onClick={handleSendTestToSelf}
+                  disabled={sendingSingle}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <Send className={`w-3.5 h-3.5 ${sendingSingle ? 'animate-spin' : ''}`} />
+                  {sendingSingle ? 'Sending Alert...' : `📲 Send Test Alert to My WhatsApp (${status.session_info?.phone_number})`}
+                </button>
               </div>
             </div>
           )}
@@ -693,7 +756,7 @@ const WhatsAppDashboard: React.FC = () => {
               <p className="whitespace-pre-wrap">{previewText}</p>
               <div className="flex items-center justify-end gap-1 text-[10px] text-slate-400 font-mono">
                 <span>12:00 PM</span>
-                <span className="text-blue-500">✓✓</span>
+                <span className="text-blue-500 font-bold">✓✓</span>
               </div>
             </div>
           </div>
@@ -773,18 +836,27 @@ const WhatsAppDashboard: React.FC = () => {
                           ? 'bg-amber-100 text-amber-800'
                           : 'bg-slate-100 text-slate-800'
                       }`}>
-                        {d.risk_tier} ({d.risk_score.toFixed(1)}%)
+                        {d.risk_tier} ({d.risk_score}%)
                       </span>
                     </td>
                     <td className="p-3.5 font-bold text-slate-900">{formatCurrency(d.unpaid_amount)}</td>
-                    <td className="p-3.5 text-slate-600">{Math.round(d.late_days)} days</td>
-                    <td className="p-3.5 text-right">
+                    <td className="p-3.5 text-slate-600 font-medium">{Math.round(d.late_days)} days</td>
+                    <td className="p-3.5 text-right space-x-2">
                       <button
                         onClick={() => handleOpenSingleModal(d)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold rounded-xl border border-emerald-200 transition"
+                        className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl font-bold text-xs transition inline-flex items-center gap-1"
                       >
-                        <Send className="w-3 h-3" /> Send Outreach
+                        <Send className="w-3 h-3" /> Send Notice
                       </button>
+                      <a
+                        href={`https://web.whatsapp.com/send?phone=${d.phone.replace(/[^0-9]/g, '')}&text=${encodeURIComponent(previewText.replace(/Rahul Sharma/g, d.customer_name))}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-semibold text-xs transition inline-flex items-center gap-1"
+                        title="Open WhatsApp Web"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
                     </td>
                   </tr>
                 ))
@@ -794,14 +866,16 @@ const WhatsAppDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Live WhatsApp Delivery Audit History */}
+      {/* Delivery Log Table */}
       <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Clock className="w-5 h-5 text-slate-600" />
-            <h2 className="text-lg font-bold text-slate-900">Live Delivery Audit Log</h2>
+            <Send className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-lg font-bold text-slate-900">WhatsApp Delivery Audit Log</h2>
           </div>
-          <span className="text-xs text-slate-500">Auto-refreshed via WhatsApp Web Outbox</span>
+          <span className="text-xs text-slate-400 font-mono">
+            Total Logged: {messages.length}
+          </span>
         </div>
 
         <div className="space-y-2.5">
@@ -817,7 +891,7 @@ const WhatsAppDashboard: React.FC = () => {
                     <span className="font-bold text-slate-900">{m.customer_name || m.recipient}</span>
                     <span className="text-slate-400 font-mono text-[11px]">({m.recipient})</span>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800">
-                      {m.status}
+                      ✓✓ {m.status}
                     </span>
                   </div>
                   <p className="text-slate-600 whitespace-pre-wrap">{m.message_preview}</p>
@@ -838,10 +912,10 @@ const WhatsAppDashboard: React.FC = () => {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Direct outreach to {activeModalDefaulter.customer_name}
+                  Direct Recovery Outreach: {activeModalDefaulter.customer_name}
                 </h3>
                 <p className="text-xs text-slate-500 font-mono">
-                  Loan #{activeModalDefaulter.customer_id} · {activeModalDefaulter.phone}
+                  Loan #{activeModalDefaulter.customer_id}
                 </p>
               </div>
               <button
@@ -855,6 +929,22 @@ const WhatsAppDashboard: React.FC = () => {
             <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 space-y-1">
               <div className="font-bold">Overdue Balance: {formatCurrency(activeModalDefaulter.unpaid_amount)}</div>
               <div>Days Past Due: {Math.round(activeModalDefaulter.late_days)} days</div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Recipient WhatsApp Phone Number
+              </label>
+              <input
+                type="text"
+                value={modalRecipientPhone}
+                onChange={(e) => setModalRecipientPhone(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="+918650629360"
+              />
+              <p className="text-[11px] text-slate-400">
+                You can enter your own number or any WhatsApp number to test live message delivery.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -880,7 +970,7 @@ const WhatsAppDashboard: React.FC = () => {
                 className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-md shadow-emerald-600/20"
               >
                 <Send className="w-3.5 h-3.5" />
-                {sendingSingle ? 'Delivering...' : 'Send Direct Message'}
+                {sendingSingle ? 'Delivering...' : 'Send Live Message'}
               </button>
             </div>
           </div>

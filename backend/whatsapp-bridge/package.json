@@ -1,17 +1,13 @@
 {
   "name": "whatsapp-bridge",
   "version": "1.0.0",
-  "private": true,
-  "type": "commonjs",
-  "main": "server.js",
+  "description": "",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.24",
-    "cors": "^2.8.6",
-    "express": "^4.22.3",
-    "pino": "^9.14.0",
-    "qrcode": "^1.5.4"
-  }
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
 }
