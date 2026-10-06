@@ -18,6 +18,8 @@ venv/
 datasets/**
 !datasets/.gitkeep
 backend/data/*.parquet
+backend/data/whatsapp_contacts.json
+backend/data/whatsapp.sqlite3*
 models/holdout_customer_ids.npy
 backend/rag/*
 !backend/rag/.gitkeep

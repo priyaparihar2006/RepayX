@@ -17,6 +17,7 @@ import { MANAGER_PROFILE, INITIAL_NOTIFICATIONS } from '../../data/mockData';
 import { NotificationItem, Customer, Loan, Conversation } from '../../types';
 
 interface NavbarProps {
+  isLiveMessaging?: boolean;
   pageTitle: string;
   breadcrumb: string;
   onOpenAiAssistant: () => void;
@@ -27,6 +28,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
+  isLiveMessaging = false,
   pageTitle,
   breadcrumb,
   onOpenAiAssistant,
@@ -133,7 +135,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Environment Badge */}
         <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 border border-amber-200/80 text-[11px] text-amber-800 font-medium">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-          <span>DEMO ENVIRONMENT · 29 SEP 2026</span>
+          <span>{isLiveMessaging ? `MESSAGING · ${new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' })}` : 'DEMO ENVIRONMENT · 29 SEP 2026'}</span>
         </div>
 
         {/* Global Search Input */}
