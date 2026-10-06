@@ -24,9 +24,6 @@ export interface WhatsAppStatus {
   qr_expires_in?: number;
   session_info?: WhatsAppSession | null;
   stats: WhatsAppStats;
-  missing?: string[];
-  test_mode?: boolean;
-  webhook_configured?: boolean;
   server_time: string;
 }
 
@@ -49,8 +46,7 @@ export interface WhatsAppTemplate {
   category: string;
   language: string;
   body: string;
-  variables?: string[];
-  parameters?: string[] | number;
+  variables: string[];
 }
 
 export interface WhatsAppHistoryItem {
@@ -60,15 +56,10 @@ export interface WhatsAppHistoryItem {
   customer_id?: number | null;
   customer_name?: string | null;
   template_name?: string;
-  template?: string;
   message_preview: string;
-  preview?: string;
   status: 'sent' | 'delivered' | 'read' | 'failed' | 'pending';
-  delivery_status?: string;
   sent_at: string;
-  created_at?: string;
   error_message?: string | null;
-  error?: string | null;
 }
 
 export interface DefaultersResponse {
@@ -137,17 +128,8 @@ async function call<T>(path: string, body?: unknown, signal?: AbortSignal): Prom
   }
 }
 
-const getStatus = async (signal?: AbortSignal): Promise<WhatsAppStatus> => {
-  const res = await call<WhatsAppStatus>('status', undefined, signal);
-  return {
-    ...res,
-    missing: res.missing || [],
-  };
-};
-
 export const whatsapp = {
-  // Modern QR & Defaulters API
-  getStatus,
+  getStatus: (signal?: AbortSignal) => call<WhatsAppStatus>('status', undefined, signal),
   generateQR: () => call<{ success: boolean; qr_code: string; expires_in: number; status: string }>('qr/generate', {}),
   pairDevice: (payload?: { phone_number?: string; user_name?: string }) =>
     call<{ success: boolean; paired: boolean; session: WhatsAppSession; status: string }>('qr/pair', payload || {}),
@@ -166,36 +148,4 @@ export const whatsapp = {
     call<{ success: boolean; message_id: string; status: string; recipient: string }>('send', payload),
   autoDispatch: (payload: AutoDispatchPayload) => call<AutoDispatchResponse>('auto-dispatch', payload),
   getMessages: (limit = 50) => call<{ success: boolean; messages: WhatsAppHistoryItem[]; count: number }>(`messages?limit=${limit}`),
-
-  // Backward compatibility aliases
-  status: getStatus,
-  contacts: async () => {
-    const defs = await whatsapp.getDefaulters({ limit: 50 });
-    return {
-      contacts: (defs.defaulters || []).map((d) => ({
-        name: d.customer_name,
-        phone: d.phone,
-        role: 'defaulter' as const,
-        opted_in: d.opted_in,
-        test_recipient: false,
-      })),
-    };
-  },
-  templates: () => whatsapp.getTemplates(),
-  history: async (_key?: string, signal?: AbortSignal) => {
-    const res = await whatsapp.getMessages(50);
-    return {
-      messages: res.messages || [],
-      incoming: [],
-      server_time: new Date().toISOString(),
-    };
-  },
-  send: async (_key: string, data: any) => {
-    const res = await whatsapp.sendMessage({
-      recipient: data.recipient,
-      message: data.preview || data.message || '',
-      template_name: data.template || 'custom',
-    });
-    return { status: res.status, provider_id: null };
-  },
 };
