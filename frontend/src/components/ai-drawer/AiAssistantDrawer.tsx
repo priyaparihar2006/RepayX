@@ -1,99 +1,66 @@
-import React, { useState } from 'react';
-import {
-  Sparkles,
-  X,
-  Send,
-  Bot,
-  User,
-  ArrowRight,
-  BookOpen,
-  CheckCircle2,
-  Clock,
-  CreditCard,
-} from 'lucide-react';
-import { Customer, Loan } from '../../types';
+import React, { useEffect, useRef, useState } from 'react';
+import { Sparkles, X, Send, ArrowRight } from 'lucide-react';
+import { api, ApiError } from '../../services/api';
+import type { QueryResponse } from '../../types/api';
 
 interface AiAssistantDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigateToTab: (tab: string, id?: string) => void;
-  customers: Customer[];
-  loans: Loan[];
+}
+
+interface Message {
+  sender: 'ai' | 'user';
+  text: string;
+  response?: QueryResponse;
+  error?: boolean;
 }
 
 export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
   isOpen,
   onClose,
   onNavigateToTab,
-  customers,
-  loans,
 }) => {
-  const [messages, setMessages] = useState<
-    Array<{ sender: 'ai' | 'user'; text: string; actionTab?: string; actionLabel?: string }>
-  >([
-    {
-      sender: 'ai',
-      text: "Hello Priya! I'm your RepayX Copilot. I can search borrower histories, synthesize RAG policies, review overdue accounts, or draft WhatsApp follow-ups.",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([{
+    sender: 'ai',
+    text: 'Ask about portfolio risk, repayment history, or a customer by numeric ID. I use the scored portfolio; demo names and birthdays are not available. Each question is answered independently, so include the customer ID in follow-up questions.',
+  }]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const pending = useRef<AbortController | null>(null);
+  const thread = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => () => pending.current?.abort(), []);
+  useEffect(() => {
+    if (thread.current) thread.current.scrollTop = thread.current.scrollHeight;
+  }, [messages, isTyping, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSend = (textToSend?: string) => {
-    const query = textToSend || input;
-    if (!query.trim()) return;
-
+  const handleSend = async (textToSend?: string) => {
+    const query = (textToSend ?? input).trim();
+    if (!query || query.length > 500 || pending.current) return;
+    const controller = new AbortController();
+    pending.current = controller;
     setMessages((prev) => [...prev, { sender: 'user', text: query }]);
-    if (!textToSend) setInput('');
+    setInput('');
     setIsTyping(true);
-
-    setTimeout(() => {
-      setIsTyping(false);
-      const q = query.toLowerCase();
-
-      let reply = '';
-      let actionTab: string | undefined = undefined;
-      let actionLabel: string | undefined = undefined;
-
-      if (q.includes('overdue') || q.includes('delinquent')) {
-        const overdueLoans = loans.filter((l) => l.status === 'overdue');
-        reply = `There are currently ${overdueLoans.length} overdue loans in your portfolio totaling ₹${overdueLoans
-          .reduce((sum, l) => sum + l.outstanding, 0)
-          .toLocaleString(
-            'en-IN'
-          )}. Top priority is Arjun Mehta (LN1003, 14 DPD, ₹45,600) and Karan Singh (LN1004, 7 DPD).`;
-        actionTab = 'conversations';
-        actionLabel = 'Review Overdue Threads';
-      } else if (q.includes('rahul') || q.includes('salary')) {
-        reply = `Rahul Sharma (LN1001) has an outstanding balance of ₹8,500 due since 25 Sep. He reported a salary delay and promised payment in 5 days (by 30 Sep). Next follow-up is queued for 30 Sep at 10:00 AM.`;
-        actionTab = 'conversations';
-        actionLabel = 'Open Rahul Sharma Chat';
-      } else if (q.includes('policy') || q.includes('extension') || q.includes('medical')) {
-        reply = `Per Extension & Hardship Policy (Section 2.5), medical emergency extension requests up to 10 days can be approved by the Collection Manager if past repayment records show ≤1 default in 12 months. Requires your digital authorization.`;
-        actionTab = 'rag-knowledge';
-        actionLabel = 'View Extension Policy';
-      } else if (q.includes('dispute') || q.includes('karan')) {
-        reply = `Karan Singh (LN1004) disputes ₹4,000 paid at Mumbai branch counter. Dunning calls have been paused for 24 hours while teller counter vouchers are matched with cash-in-transit records.`;
-        actionTab = 'escalations';
-        actionLabel = 'View Dispute Ticket';
-      } else {
-        reply = `Under RepayX collection guidelines, active borrowers are monitored through automated WhatsApp and IVR channels with strict compliance to RBI 8 AM - 7 PM contact hours. You can inspect customer dossiers or configure cadence rules anytime.`;
-        actionTab = 'overview';
-        actionLabel = 'Go to Dashboard';
+    try {
+      const response = await api.query(query, controller.signal);
+      if (!controller.signal.aborted) {
+        setMessages((prev) => [...prev, { sender: 'ai', text: response.result, response }]);
       }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          sender: 'ai',
-          text: reply,
-          actionTab,
-          actionLabel,
-        },
-      ]);
-    }, 700);
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setMessages((prev) => [...prev, {
+          sender: 'ai', error: true,
+          text: error instanceof ApiError ? error.message : 'The answer could not be loaded. Please try again.',
+        }]);
+      }
+    } finally {
+      if (!controller.signal.aborted) setIsTyping(false);
+      pending.current = null;
+    }
   };
 
   return (
@@ -114,12 +81,13 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold tracking-tight">RepayX Copilot</h3>
-              <p className="text-[11px] text-purple-200">Demo · sample responses, not connected to the RepayX API</p>
+              <p className="text-[11px] text-purple-200">Portfolio queries - powered by the RepayX API</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
+            aria-label="Close Copilot"
             className="p-1 rounded-lg text-purple-200 hover:text-white hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -127,7 +95,7 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
         </div>
 
         {/* Message Thread */}
-        <div className="flex-1 p-4 overflow-y-auto space-y-3.5 bg-slate-50/50">
+        <div ref={thread} role="log" aria-label="Copilot conversation" aria-live="polite" className="flex-1 p-4 overflow-y-auto space-y-3.5 bg-slate-50/50">
           {messages.map((m, idx) => (
             <div
               key={idx}
@@ -152,22 +120,25 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
                     : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs'
                 }`}
               >
-                <p>{m.text}</p>
+                <p role={m.error ? 'alert' : undefined}>{m.text}</p>
 
-                {m.actionTab && m.actionLabel && (
-                  <div className="mt-2 pt-2 border-t border-slate-100">
-                    <button
-                      onClick={() => {
-                        onNavigateToTab(m.actionTab!);
-                        onClose();
-                      }}
-                      className="inline-flex items-center gap-1 font-semibold text-[11px] text-blue-600 hover:text-blue-800"
-                    >
-                      <span>{m.actionLabel}</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </button>
+                {m.response && (m.response.customer || m.response.customers?.length) ? (
+                  <div className="mt-2 pt-2 border-t border-slate-100 space-y-2">
+                    {(m.response.customers ?? (m.response.customer ? [m.response.customer] : [])).map((customer) => (
+                      <button
+                        key={customer.customer_id}
+                        onClick={() => {
+                          onNavigateToTab('risk-customer', String(customer.customer_id));
+                          onClose();
+                        }}
+                        className="flex items-center gap-1 text-left font-semibold text-[11px] text-blue-600 hover:text-blue-800"
+                      >
+                        Customer {customer.customer_id} - {customer.risk_category} - {customer.risk_score.toFixed(2)}/100
+                        <ArrowRight className="w-3 h-3 shrink-0" />
+                      </button>
+                    ))}
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           ))}
@@ -175,7 +146,7 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
           {isTyping && (
             <div className="flex items-center gap-1.5 text-xs text-purple-600 bg-purple-50 p-2.5 rounded-xl border border-purple-100 w-fit">
               <Sparkles className="w-3.5 h-3.5 animate-spin" />
-              <span>Analyzing portfolio data & RAG SOPs...</span>
+              <span>Querying portfolio data...</span>
             </div>
           )}
         </div>
@@ -183,14 +154,15 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
         {/* Quick prompt buttons */}
         <div className="p-2 border-t border-slate-100 bg-white flex flex-wrap gap-1.5 text-[11px]">
           {[
-            'Summarize overdue loans',
-            'What is the status of Rahul Sharma?',
-            'What is the policy for medical extensions?',
-            'Explain Karan Singh dispute',
+            'How many high-risk customers are there?',
+            'What is the average late payment rate?',
+            'Which customers frequently pay late?',
+            'Show customers with unpaid amounts.',
           ].map((prompt) => (
             <button
               key={prompt}
-              onClick={() => handleSend(prompt)}
+              onClick={() => void handleSend(prompt)}
+              disabled={isTyping}
               className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition-colors text-left"
             >
               {prompt}
@@ -202,7 +174,9 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
         <div className="p-3 border-t border-slate-200 bg-white flex items-center gap-2">
           <input
             type="text"
-            placeholder="Ask about loans, policies, borrower intent..."
+            aria-label="Ask RepayX Copilot"
+            maxLength={500}
+            placeholder="Ask about risk, repayments, or a customer ID..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -212,7 +186,8 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
           />
           <button
             onClick={() => handleSend()}
-            disabled={!input.trim()}
+            aria-label="Send question"
+            disabled={!input.trim() || isTyping}
             className="p-2 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white transition-colors"
           >
             <Send className="w-4 h-4" />
