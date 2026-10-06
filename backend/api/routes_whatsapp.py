@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import hmac
-from typing import Annotated, Literal
-from uuid import UUID
+from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, Header, Request
-from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from fastapi import APIRouter, Depends, Query, Request
+from pydantic import BaseModel, ConfigDict, Field
 
-from api.errors import APIError
+from services.customer_service import CustomerService
 from services.whatsapp_service import WhatsAppService
 
 router = APIRouter(prefix="/api/whatsapp", tags=["whatsapp"])
@@ -18,28 +15,34 @@ def service(request: Request) -> WhatsAppService:
     return request.app.state.whatsapp
 
 
-def operator(request: Request, authorization: str | None = Header(default=None)) -> WhatsAppService:
-    messaging = service(request)
-    messaging.authorize(authorization)
-    return messaging
+def get_customer_service(request: Request) -> CustomerService | None:
+    return request.app.state.resources.customers
 
 
-class SendMessage(BaseModel):
+class PairRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    phone_number: str = Field(default="+919820154321")
+    user_name: str = Field(default="RepayX Collections Hub")
+    device: str = Field(default="WhatsApp Web (Chrome / Windows)")
+
+
+class SendSingleMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    request_id: UUID
-    recipient: str = Field(pattern=r"^\+[1-9]\d{7,14}$")
-    template: str = Field(pattern=r"^[a-z0-9_]{1,512}$")
-    language: str = Field(pattern=r"^[a-z]{2,3}(?:_[A-Z]{2})?$")
-    parameters: list[Annotated[str, Field(min_length=1, max_length=1024)]] = Field(default_factory=list, max_length=20)
-    preview: str = Field(min_length=1, max_length=20000)
-    confirm_send: Literal[True]
+    recipient: str = Field(min_length=8, max_length=20)
+    message: str = Field(min_length=1, max_length=2000)
+    customer_id: int | None = None
+    customer_name: str | None = None
+    template_name: str = "custom"
+    request_id: str | None = None
 
-    @field_validator("parameters")
-    @classmethod
-    def not_blank(cls, values):
-        if any(not v.strip() for v in values):
-            raise ValueError("Template parameters must not be blank.")
-        return values
+
+class AutoDispatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    target_tier: Literal["all", "high", "medium", "unpaid_only"] = "high"
+    template_id: str = "overdue_notice"
+    custom_body: str | None = None
+    customer_ids: list[int] | None = None
+    limit: int = Field(default=50, ge=1, le=500)
 
 
 @router.get("/status")
@@ -47,42 +50,84 @@ def status(messaging: WhatsAppService = Depends(service)):
     return {"success": True, **messaging.configuration()}
 
 
-@router.get("/contacts")
-def contacts(messaging: WhatsAppService = Depends(operator)):
-    return {"success": True, "contacts": messaging.contacts()}
-
-
-@router.get("/templates")
-def templates(messaging: WhatsAppService = Depends(operator)):
-    return {"success": True, "templates": messaging.templates()}
-
-
-@router.get("/messages")
-def messages(messaging: WhatsAppService = Depends(operator)):
-    return {"success": True, **messaging.history()}
-
-
-@router.post("/messages")
-def send(body: SendMessage, messaging: WhatsAppService = Depends(operator)):
-    result = messaging.send(str(body.request_id), body.recipient, body.template, body.language, body.parameters, body.preview)
+@router.post("/qr/generate")
+def generate_qr(messaging: WhatsAppService = Depends(service)):
+    result = messaging.generate_qr()
     return {"success": True, **result}
 
 
-@router.get("/webhook", response_class=PlainTextResponse)
-def verify(request: Request, messaging: WhatsAppService = Depends(service)):
-    params = request.query_params
-    token = messaging.settings.verify_token
-    if not token or params.get("hub.mode") != "subscribe" or not hmac.compare_digest(params.get("hub.verify_token", "").encode(), token.encode()):
-        raise APIError(403, "verification_failed", "Webhook verification failed.")
-    return params.get("hub.challenge", "")
+@router.post("/qr/pair")
+def pair_device(body: PairRequest = PairRequest(), messaging: WhatsAppService = Depends(service)):
+    session = messaging.pair_device(phone_number=body.phone_number, user_name=body.user_name, device=body.device)
+    return {"success": True, "session": session, "message": "WhatsApp device paired successfully."}
 
 
-@router.post("/webhook")
-async def webhook(request: Request, messaging: WhatsAppService = Depends(service)):
-    data = bytearray()
-    async for chunk in request.stream():
-        data.extend(chunk)
-        if len(data) > 1024 * 1024:
-            raise APIError(413, "payload_too_large", "Webhook payload exceeds the size limit.")
-    messaging.webhook(bytes(data), request.headers.get("x-hub-signature-256", ""))
-    return {"success": True}
+@router.post("/disconnect")
+def disconnect(messaging: WhatsAppService = Depends(service)):
+    result = messaging.disconnect()
+    return {"success": True, **result}
+
+
+@router.get("/templates")
+def templates(messaging: WhatsAppService = Depends(service)):
+    return {"success": True, "templates": messaging.templates()}
+
+
+@router.get("/defaulters")
+def defaulters(
+    risk_tier: Literal["all", "high", "medium", "unpaid_only"] = "all",
+    search: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=100),
+    messaging: WhatsAppService = Depends(service),
+    customers: CustomerService | None = Depends(get_customer_service),
+):
+    result = messaging.get_defaulters(
+        customer_service=customers,
+        risk_tier=risk_tier,
+        search=search,
+        page=page,
+        page_size=page_size,
+    )
+    return {"success": True, **result}
+
+
+@router.post("/send")
+def send_message(body: SendSingleMessage, messaging: WhatsAppService = Depends(service)):
+    result = messaging.send(
+        recipient=body.recipient,
+        message_text=body.message,
+        customer_id=body.customer_id,
+        customer_name=body.customer_name,
+        template_name=body.template_name,
+        request_id=body.request_id,
+    )
+    return {"success": True, **result}
+
+
+@router.post("/auto-dispatch")
+def auto_dispatch(
+    body: AutoDispatchRequest,
+    messaging: WhatsAppService = Depends(service),
+    customers: CustomerService | None = Depends(get_customer_service),
+):
+    result = messaging.auto_dispatch(
+        customer_service=customers,
+        target_tier=body.target_tier,
+        template_id=body.template_id,
+        custom_body=body.custom_body,
+        customer_ids=body.customer_ids,
+        limit=body.limit,
+    )
+    return {"success": True, **result}
+
+
+@router.get("/messages")
+def messages(messaging: WhatsAppService = Depends(service)):
+    return {"success": True, **messaging.history()}
+
+
+@router.get("/contacts")
+def contacts(messaging: WhatsAppService = Depends(service)):
+    return {"success": True, "contacts": messaging.contacts()}
+
