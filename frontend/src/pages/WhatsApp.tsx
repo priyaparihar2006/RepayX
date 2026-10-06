@@ -41,27 +41,26 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   public override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('WhatsAppPage ErrorBoundary caught error:', error, errorInfo);
+    console.error('WhatsAppPage caught error:', error, errorInfo);
   }
 
   public override render() {
     if (this.state.hasError) {
       return (
-        <div className="max-w-4xl mx-auto p-6 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 space-y-4 my-6">
+        <div className="max-w-4xl mx-auto p-6 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 space-y-4">
           <div className="flex items-center gap-3">
-            <AlertCircle className="w-6 h-6 text-rose-600 shrink-0" />
-            <h2 className="text-lg font-bold">WhatsApp Module Interface Notice</h2>
+            <AlertCircle className="w-6 h-6 text-rose-600" />
+            <h2 className="text-lg font-bold">WhatsApp Module Error</h2>
           </div>
           <p className="text-sm">
-            {this.state.error?.message || 'An issue was detected while rendering the WhatsApp recovery dashboard.'}
+            {this.state.error?.message || 'An unexpected error occurred while rendering the WhatsApp outreach panel.'}
           </p>
           <button
-            type="button"
             onClick={() => {
               this.setState({ hasError: false, error: null });
               window.location.reload();
             }}
-            className="px-4 py-2 bg-rose-600 text-white text-xs font-semibold rounded-xl hover:bg-rose-700 transition"
+            className="px-4 py-2 bg-rose-600 text-white text-sm font-medium rounded-xl hover:bg-rose-700 transition"
           >
             Reload Module
           </button>
@@ -72,14 +71,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 }
 
-const safeNumber = (val: unknown, fallback = 0): number => {
-  const num = Number(val);
-  return isNaN(num) ? fallback : num;
-};
-
-const formatCurrency = (val: unknown) => {
-  const num = safeNumber(val, 0);
-  return `₹${num.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+const formatCurrency = (val: number | undefined | null) => {
+  if (val === undefined || val === null || isNaN(val)) return '₹0';
+  return `₹${Number(val).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 };
 
 const formatTimestamp = (val: string | undefined | null) => {
@@ -87,7 +81,7 @@ const formatTimestamp = (val: string | undefined | null) => {
   try {
     return new Date(val).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
   } catch {
-    return String(val);
+    return val;
   }
 };
 
@@ -149,11 +143,11 @@ const WhatsAppDashboard: React.FC = () => {
         setStatus(statusRes);
         if (statusRes.qr_code) {
           setQrCode(statusRes.qr_code);
-          setQrExpiresIn(safeNumber(statusRes.qr_expires_in, 120));
+          setQrExpiresIn(statusRes.qr_expires_in || 120);
         }
       }
 
-      if (templatesRes?.templates && Array.isArray(templatesRes.templates)) {
+      if (templatesRes?.templates) {
         setTemplates(templatesRes.templates);
         if (templatesRes.templates.length > 0 && !selectedTemplateId) {
           setSelectedTemplateId(templatesRes.templates[0].id);
@@ -162,45 +156,45 @@ const WhatsAppDashboard: React.FC = () => {
 
       if (defaultersRes) {
         const rawDefaulters = (defaultersRes.defaulters || []).map((d: any) => ({
-          customer_id: safeNumber(d.customer_id, 0),
+          customer_id: d.customer_id,
           customer_name: d.customer_name || d.name || `Customer #${d.customer_id}`,
           phone: d.phone || '+919820154321',
-          risk_tier: (d.risk_tier || d.risk_category || 'High Risk') as 'High Risk' | 'Medium Risk' | 'Low Risk',
-          risk_score: safeNumber(d.risk_score, 0),
-          unpaid_amount: safeNumber(d.unpaid_amount ?? d.total_unpaid_amount, 0),
-          late_days: safeNumber(d.late_days ?? d.avg_days_late, 0),
+          risk_tier: d.risk_tier || d.risk_category || 'High Risk',
+          risk_score: d.risk_score || 0,
+          unpaid_amount: d.unpaid_amount ?? d.total_unpaid_amount ?? 0,
+          late_days: d.late_days ?? d.avg_days_late ?? 0,
           last_due_date: d.last_due_date || 'Overdue',
-          opted_in: Boolean(d.opted_in ?? true),
+          opted_in: d.opted_in ?? true,
           recommended_action: d.recommended_action || d.recommended_template || 'Immediate notice',
         }));
         setDefaulters(rawDefaulters);
 
         const rawSummary: any = defaultersRes.summary || {};
-        const totalDef = safeNumber(rawSummary.total_defaulters ?? defaultersRes.total ?? rawDefaulters.length, 0);
-        const highRisk = safeNumber(rawSummary.high_risk_count ?? rawSummary.high_risk_defaulters ?? rawDefaulters.filter((d) => d.risk_tier === 'High Risk').length, 0);
-        const medRisk = safeNumber(rawSummary.medium_risk_count ?? rawSummary.medium_risk_defaulters ?? rawDefaulters.filter((d) => d.risk_tier === 'Medium Risk').length, 0);
-        const totalUnpaid = safeNumber(rawSummary.total_unpaid_amount ?? rawSummary.total_unpaid_exposure ?? rawDefaulters.reduce((acc, curr) => acc + curr.unpaid_amount, 0), 0);
-        const totalFormatted = rawSummary.total_unpaid_formatted || totalUnpaid.toLocaleString('en-IN');
+        const totalDef = rawSummary.total_defaulters ?? defaultersRes.total ?? rawDefaulters.length;
+        const highRisk = rawSummary.high_risk_count ?? rawSummary.high_risk_defaulters ?? rawDefaulters.filter((d) => d.risk_tier === 'High Risk').length;
+        const medRisk = rawSummary.medium_risk_count ?? rawSummary.medium_risk_defaulters ?? rawDefaulters.filter((d) => d.risk_tier === 'Medium Risk').length;
+        const totalUnpaid = rawSummary.total_unpaid_amount ?? rawSummary.total_unpaid_exposure ?? rawDefaulters.reduce((acc, curr) => acc + (curr.unpaid_amount || 0), 0);
+        const totalFormatted = rawSummary.total_unpaid_formatted || formatCurrency(totalUnpaid);
 
         setSummary({
           total_defaulters: totalDef,
           high_risk_defaulters: highRisk,
           medium_risk_defaulters: medRisk,
           total_unpaid_exposure: totalUnpaid,
-          total_unpaid_formatted: String(totalFormatted).replace('₹', ''),
+          total_unpaid_formatted: totalFormatted.replace('₹', ''),
         });
       }
 
-      if (messagesRes?.messages && Array.isArray(messagesRes.messages)) {
+      if (messagesRes?.messages) {
         const rawMsgs = (messagesRes.messages || []).map((m: any) => ({
-          id: safeNumber(m.id, Math.random()),
+          id: m.id || Math.random(),
           request_id: m.request_id || `req_${Date.now()}`,
           recipient: m.recipient || '',
           customer_id: m.customer_id,
           customer_name: m.customer_name,
           template_name: m.template_name || m.template,
           message_preview: m.message_preview || m.preview || '',
-          status: (m.status || m.delivery_status || 'sent') as any,
+          status: m.status || m.delivery_status || 'sent',
           sent_at: m.sent_at || m.created_at || new Date().toISOString(),
           error_message: m.error_message || m.error,
         }));
@@ -241,7 +235,7 @@ const WhatsAppDashboard: React.FC = () => {
       const res = await whatsapp.generateQR();
       if (res.qr_code) {
         setQrCode(res.qr_code);
-        setQrExpiresIn(safeNumber(res.expires_in, 120));
+        setQrExpiresIn(res.expires_in || 120);
         setStatus((prev) => (prev ? { ...prev, status: 'SCAN_QR_CODE', qr_code: res.qr_code } : null));
       }
     } catch (e: any) {
@@ -294,7 +288,7 @@ const WhatsAppDashboard: React.FC = () => {
         template_id: selectedTemplateId,
         custom_body: customText || undefined,
       });
-      const count = safeNumber(res.dispatched ?? (res as any).total_sent, 0);
+      const count = res.dispatched ?? (res as any).total_sent ?? 0;
       setNotice(`Automated outreach completed: ${count} message(s) dispatched to defaulter customers.`);
       await fetchAllData();
     } catch (e: any) {
@@ -309,10 +303,10 @@ const WhatsAppDashboard: React.FC = () => {
     const tmpl = templates.find((t) => t.id === selectedTemplateId) || templates[0];
     const defaultTemplateBody = tmpl ? tmpl.body : 'Dear {{customer_name}}, your overdue amount of ₹{{unpaid_amount}} for Loan #{{customer_id}} is pending. Please pay immediately.';
     const rendered = defaultTemplateBody
-      .replace(/{{customer_name}}/g, defaulter.customer_name || 'Customer')
+      .replace(/{{customer_name}}/g, defaulter.customer_name)
       .replace(/{{customer_id}}/g, String(defaulter.customer_id))
-      .replace(/{{unpaid_amount}}/g, safeNumber(defaulter.unpaid_amount, 0).toLocaleString('en-IN'))
-      .replace(/{{late_days}}/g, String(Math.round(safeNumber(defaulter.late_days, 0))))
+      .replace(/{{unpaid_amount}}/g, defaulter.unpaid_amount.toLocaleString('en-IN'))
+      .replace(/{{late_days}}/g, String(Math.round(defaulter.late_days)))
       .replace(/{{payment_link}}/g, `https://pay.repayx.ai/inv/${defaulter.customer_id}`);
     setSingleMessageText(rendered);
   };
@@ -348,14 +342,14 @@ const WhatsAppDashboard: React.FC = () => {
     late_days: 18,
     risk_score: 80.1,
   };
-  const previewText = (customText || currentTemplate?.body || 'Dear {{customer_name}}, your loan installment is pending.')
-    .replace(/{{customer_name}}/g, sampleDefaulter.customer_name || 'Customer')
-    .replace(/{{customer_id}}/g, String(sampleDefaulter.customer_id || '0'))
-    .replace(/{{unpaid_amount}}/g, safeNumber(sampleDefaulter.unpaid_amount, 0).toLocaleString('en-IN'))
-    .replace(/{{late_days}}/g, String(Math.round(safeNumber(sampleDefaulter.late_days, 0))))
+  const previewText = (customText || currentTemplate?.body || '')
+    .replace(/{{customer_name}}/g, sampleDefaulter.customer_name)
+    .replace(/{{customer_id}}/g, String(sampleDefaulter.customer_id))
+    .replace(/{{unpaid_amount}}/g, (sampleDefaulter.unpaid_amount || 0).toLocaleString('en-IN'))
+    .replace(/{{late_days}}/g, String(Math.round(sampleDefaulter.late_days || 0)))
     .replace(/{{payment_link}}/g, `https://pay.repayx.ai/inv/${sampleDefaulter.customer_id}`);
 
-  const isConnected = Boolean(status?.connected);
+  const isConnected = !!status?.connected;
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-16">
@@ -386,7 +380,6 @@ const WhatsAppDashboard: React.FC = () => {
           </div>
 
           <button
-            type="button"
             onClick={() => fetchAllData()}
             disabled={loading}
             className="p-2 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition"
@@ -421,7 +414,7 @@ const WhatsAppDashboard: React.FC = () => {
               <Users className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-slate-900 mt-2">{safeNumber(summary.total_defaulters, 0).toLocaleString('en-IN')}</p>
+          <p className="text-2xl font-bold text-slate-900 mt-2">{summary.total_defaulters.toLocaleString('en-IN')}</p>
           <span className="text-xs text-slate-500 mt-1 inline-block">Flagged across loan portfolios</span>
         </div>
 
@@ -432,7 +425,7 @@ const WhatsAppDashboard: React.FC = () => {
               <ShieldAlert className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-rose-700 mt-2">{safeNumber(summary.high_risk_defaulters, 0).toLocaleString('en-IN')}</p>
+          <p className="text-2xl font-bold text-rose-700 mt-2">{summary.high_risk_defaulters.toLocaleString('en-IN')}</p>
           <span className="text-xs text-rose-600 mt-1 inline-block">Probability of Default &gt; 70%</span>
         </div>
 
@@ -444,7 +437,7 @@ const WhatsAppDashboard: React.FC = () => {
             </div>
           </div>
           <p className="text-2xl font-bold text-slate-900 mt-2">
-            ₹{summary.total_unpaid_formatted || safeNumber(summary.total_unpaid_exposure, 0).toLocaleString('en-IN')}
+            ₹{summary.total_unpaid_formatted || Number(summary.total_unpaid_exposure).toLocaleString('en-IN')}
           </p>
           <span className="text-xs text-amber-700 mt-1 inline-block">Unpaid recovery target balance</span>
         </div>
@@ -457,7 +450,7 @@ const WhatsAppDashboard: React.FC = () => {
             </div>
           </div>
           <p className="text-2xl font-bold text-emerald-700 mt-2">
-            {safeNumber(status?.stats?.total_sent ?? messages.length, 0).toLocaleString('en-IN')}
+            {(status?.stats?.total_sent ?? messages.length).toLocaleString('en-IN')}
           </p>
           <span className="text-xs text-emerald-600 mt-1 inline-block">Active delivery sessions logged</span>
         </div>
@@ -474,7 +467,6 @@ const WhatsAppDashboard: React.FC = () => {
             </div>
             {isConnected && (
               <button
-                type="button"
                 onClick={disconnectDevice}
                 className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition"
               >
@@ -508,10 +500,9 @@ const WhatsAppDashboard: React.FC = () => {
                       Open WhatsApp on your phone &gt; Linked Devices &gt; Link a Device, then point camera at the QR code.
                     </p>
                     <button
-                      type="button"
                       onClick={generateNewQR}
                       disabled={generatingQr}
-                      className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm transition cursor-pointer"
+                      className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm transition"
                     >
                       <QrCode className="w-4 h-4" />
                       {generatingQr ? 'Generating...' : 'Display WhatsApp Web QR'}
@@ -529,10 +520,9 @@ const WhatsAppDashboard: React.FC = () => {
                   Instantly pair a live WhatsApp Web session to start dispatching collection notices immediately.
                 </p>
                 <button
-                  type="button"
                   onClick={simulatePairDevice}
                   disabled={pairing}
-                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
                 >
                   <Smartphone className="w-3.5 h-3.5" />
                   {pairing ? 'Connecting session...' : '⚡ Instant Connect / Simulate Mobile Scan'}
@@ -547,13 +537,13 @@ const WhatsAppDashboard: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
-                    {status?.session_info?.user_name || 'RepayX Collections Team'}
+                    {status.session_info?.user_name || 'RepayX Collections Team'}
                   </h3>
                   <p className="text-xs text-emerald-700 font-mono font-medium">
-                    {status?.session_info?.phone_number || '+91 98201 54321'}
+                    {status.session_info?.phone_number || '+91 98201 54321'}
                   </p>
                   <p className="text-[11px] text-slate-500">
-                    {status?.session_info?.device || 'WhatsApp Web (Chrome / Windows)'}
+                    {status.session_info?.device || 'WhatsApp Web (Chrome / Windows)'}
                   </p>
                 </div>
               </div>
@@ -561,7 +551,7 @@ const WhatsAppDashboard: React.FC = () => {
               <div className="border-t border-emerald-200/60 pt-3 text-xs text-slate-600 flex justify-between">
                 <span>Linked Since:</span>
                 <span className="font-medium text-slate-800">
-                  {formatTimestamp(status?.session_info?.connected_at || status?.server_time)}
+                  {formatTimestamp(status.session_info?.connected_at || status.server_time)}
                 </span>
               </div>
             </div>
@@ -640,21 +630,21 @@ const WhatsAppDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setCustomText((prev) => `${prev || currentTemplate?.body || ''} {{customer_name}}`)}
-                  className="px-1.5 py-0.5 bg-blue-50 rounded border border-blue-200 hover:bg-blue-100 cursor-pointer"
+                  className="px-1.5 py-0.5 bg-blue-50 rounded border border-blue-200 hover:bg-blue-100"
                 >
                   +name
                 </button>
                 <button
                   type="button"
                   onClick={() => setCustomText((prev) => `${prev || currentTemplate?.body || ''} ₹{{unpaid_amount}}`)}
-                  className="px-1.5 py-0.5 bg-blue-50 rounded border border-blue-200 hover:bg-blue-100 cursor-pointer"
+                  className="px-1.5 py-0.5 bg-blue-50 rounded border border-blue-200 hover:bg-blue-100"
                 >
                   +amount
                 </button>
                 <button
                   type="button"
                   onClick={() => setCustomText((prev) => `${prev || currentTemplate?.body || ''} {{payment_link}}`)}
-                  className="px-1.5 py-0.5 bg-blue-50 rounded border border-blue-200 hover:bg-blue-100 cursor-pointer"
+                  className="px-1.5 py-0.5 bg-blue-50 rounded border border-blue-200 hover:bg-blue-100"
                 >
                   +paylink
                 </button>
@@ -686,10 +676,9 @@ const WhatsAppDashboard: React.FC = () => {
           {/* 1-Click Batch Auto-Dispatch Action */}
           <div className="pt-2">
             <button
-              type="button"
               onClick={handleAutoDispatch}
               disabled={dispatching}
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-sm rounded-2xl shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2.5 cursor-pointer"
+              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-sm rounded-2xl shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2.5"
             >
               <Send className={`w-4 h-4 ${dispatching ? 'animate-bounce' : ''}`} />
               {dispatching ? 'Dispatching Automated Messages...' : 'Start Automated Outreach to Defaulters'}
@@ -759,16 +748,15 @@ const WhatsAppDashboard: React.FC = () => {
                           ? 'bg-amber-100 text-amber-800'
                           : 'bg-slate-100 text-slate-800'
                       }`}>
-                        {d.risk_tier} ({safeNumber(d.risk_score, 0).toFixed(1)}%)
+                        {d.risk_tier} ({d.risk_score.toFixed(1)}%)
                       </span>
                     </td>
                     <td className="p-3.5 font-bold text-slate-900">{formatCurrency(d.unpaid_amount)}</td>
-                    <td className="p-3.5 text-slate-600">{Math.round(safeNumber(d.late_days, 0))} days</td>
+                    <td className="p-3.5 text-slate-600">{Math.round(d.late_days)} days</td>
                     <td className="p-3.5 text-right">
                       <button
-                        type="button"
                         onClick={() => handleOpenSingleModal(d)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold rounded-xl border border-emerald-200 transition cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold rounded-xl border border-emerald-200 transition"
                       >
                         <Send className="w-3 h-3" /> Send Outreach
                       </button>
@@ -832,9 +820,8 @@ const WhatsAppDashboard: React.FC = () => {
                 </p>
               </div>
               <button
-                type="button"
                 onClick={() => setActiveModalDefaulter(null)}
-                className="text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 font-bold text-lg"
               >
                 ✕
               </button>
@@ -842,7 +829,7 @@ const WhatsAppDashboard: React.FC = () => {
 
             <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 space-y-1">
               <div className="font-bold">Overdue Balance: {formatCurrency(activeModalDefaulter.unpaid_amount)}</div>
-              <div>Days Past Due: {Math.round(safeNumber(activeModalDefaulter.late_days, 0))} days</div>
+              <div>Days Past Due: {Math.round(activeModalDefaulter.late_days)} days</div>
             </div>
 
             <div className="space-y-2">
@@ -857,17 +844,15 @@ const WhatsAppDashboard: React.FC = () => {
 
             <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
               <button
-                type="button"
                 onClick={() => setActiveModalDefaulter(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition cursor-pointer"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition"
               >
                 Cancel
               </button>
               <button
-                type="button"
                 onClick={handleSendSingleMessage}
                 disabled={sendingSingle}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer"
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-md shadow-emerald-600/20"
               >
                 <Send className="w-3.5 h-3.5" />
                 {sendingSingle ? 'Delivering...' : 'Send Direct Message'}
