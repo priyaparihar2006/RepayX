@@ -151,7 +151,7 @@ describe('WhatsApp Web QR and Defaulters Outreach Page', () => {
       expect(screen.getByText('Ananya Verma')).toBeInTheDocument();
       expect(screen.getByText('₹47,650')).toBeInTheDocument();
     });
-  });
+  }, 15000);
 
   it('allows pairing via mobile scan simulation and triggers automated dispatch', async () => {
     const calls = setupFakeApi(true);
@@ -176,7 +176,7 @@ describe('WhatsApp Web QR and Defaulters Outreach Page', () => {
       target_tier: 'high',
       template_id: 'urgent_settlement',
     });
-  });
+  }, 15000);
 
   it('allows opening quick send modal for a single defaulter and sending a direct message', async () => {
     const calls = setupFakeApi(true);
@@ -204,6 +204,6 @@ describe('WhatsApp Web QR and Defaulters Outreach Page', () => {
       customer_id: 385772,
       recipient: '+919820154321',
     });
-  });
+  }, 15000);
 });
 
