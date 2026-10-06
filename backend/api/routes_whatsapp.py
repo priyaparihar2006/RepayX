@@ -50,18 +50,30 @@ def status(messaging: WhatsAppService = Depends(service)):
     return {"success": True, **messaging.configuration()}
 
 
+@router.get("/qr/generate")
 @router.post("/qr/generate")
 def generate_qr(messaging: WhatsAppService = Depends(service)):
     result = messaging.generate_qr()
     return {"success": True, **result}
 
 
+@router.get("/qr/pair")
 @router.post("/qr/pair")
-def pair_device(body: PairRequest = PairRequest(), messaging: WhatsAppService = Depends(service)):
-    session = messaging.pair_device(phone_number=body.phone_number, user_name=body.user_name, device=body.device)
+def pair_device(
+    phone_number: str | None = None,
+    user_name: str | None = None,
+    device: str | None = None,
+    body: PairRequest | None = None,
+    messaging: WhatsAppService = Depends(service),
+):
+    phone = (body.phone_number if body else None) or phone_number or "+919820154321"
+    name = (body.user_name if body else None) or user_name or "RepayX Collections Hub"
+    dev = (body.device if body else None) or device or "WhatsApp Web (Chrome / Windows)"
+    session = messaging.pair_device(phone_number=phone, user_name=name, device=dev)
     return {"success": True, "session": session, "message": "WhatsApp device paired successfully."}
 
 
+@router.get("/disconnect")
 @router.post("/disconnect")
 def disconnect(messaging: WhatsAppService = Depends(service)):
     result = messaging.disconnect()
