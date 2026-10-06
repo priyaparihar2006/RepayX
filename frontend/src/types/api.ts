@@ -176,7 +176,7 @@ export interface AnalyticsResponse {
   disclaimer: string;
 }
 
-export type QueryType = 'customer_query' | 'aggregate_query' | 'retrieval_query' | 'general_retrieval';
+export type QueryType = 'customer_query' | 'aggregate_query' | 'retrieval_query' | 'general_retrieval' | 'unsupported_query';
 
 export interface QueryCustomer extends CustomerSummary {
   installment_count: number | null;

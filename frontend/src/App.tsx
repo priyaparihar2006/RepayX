@@ -322,8 +322,6 @@ function AppContent() {
         isOpen={isAiAssistantOpen}
         onClose={() => setIsAiAssistantOpen(false)}
         onNavigateToTab={handleNavigate}
-        customers={customers}
-        loans={loans}
       />
     </div>
   );
