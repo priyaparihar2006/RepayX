@@ -130,13 +130,9 @@ async function call<T>(path: string, body?: unknown, signal?: AbortSignal): Prom
 
 export const whatsapp = {
   getStatus: (signal?: AbortSignal) => call<WhatsAppStatus>('status', undefined, signal),
-  generateQR: () => call<{ success: boolean; qr_code: string; qr_string?: string; pairing_code?: string; expires_in: number; status: string }>('qr/generate', {}),
+  generateQR: () => call<{ success: boolean; qr_code: string; expires_in: number; status: string }>('qr/generate', {}),
   pairDevice: (payload?: { phone_number?: string; user_name?: string }) =>
     call<{ success: boolean; paired: boolean; session: WhatsAppSession; status: string }>('qr/pair', payload || {}),
-  pairByCode: (pairing_code: string, phone_number?: string) =>
-    call<{ success: boolean; session: WhatsAppSession; message: string }>('pair-code', { pairing_code, phone_number: phone_number || '+919820154321' }),
-  scanQR: (phone_number?: string) =>
-    call<{ success: boolean; session: WhatsAppSession; message: string }>(`qr/scan?phone_number=${encodeURIComponent(phone_number || '+919820154321')}`, {}),
   disconnect: () => call<{ success: boolean; status: string }>('disconnect', {}),
   getDefaulters: (params?: { tier?: string; limit?: number; offset?: number; search?: string }) => {
     const q = new URLSearchParams();
@@ -150,12 +146,6 @@ export const whatsapp = {
   getTemplates: () => call<{ success: boolean; templates: WhatsAppTemplate[] }>('templates'),
   sendMessage: (payload: { recipient: string; message: string; customer_id?: number; customer_name?: string; template_name?: string }) =>
     call<{ success: boolean; message_id: string; status: string; recipient: string }>('send', payload),
-  getConversation: (params: { customer_id?: number; phone?: string }) => {
-    const q = new URLSearchParams();
-    if (params.customer_id) q.set('customer_id', String(params.customer_id));
-    if (params.phone) q.set('phone', params.phone);
-    return call<{ success: boolean; messages: any[]; count: number }>(`conversation?${q.toString()}`);
-  },
   autoDispatch: (payload: AutoDispatchPayload) => call<AutoDispatchResponse>('auto-dispatch', payload),
   getMessages: (limit = 50) => call<{ success: boolean; messages: WhatsAppHistoryItem[]; count: number }>(`messages?limit=${limit}`),
 };
