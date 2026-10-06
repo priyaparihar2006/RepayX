@@ -107,6 +107,7 @@ class WhatsAppService:
         self._qr_string: str | None = None
         self._qr_code_data_uri: str | None = None
         self._qr_expires_at: float = 0
+        self._pairing_code: str | None = None
         self._session_info: dict | None = None
         self._session_status: Literal["DISCONNECTED", "SCAN_QR_CODE", "CONNECTING", "CONNECTED"] = "DISCONNECTED"
         self._init_db()
@@ -199,6 +200,8 @@ class WhatsAppService:
             "connected": self._session_status == "CONNECTED",
             "status": self._session_status,
             "qr_code": self._qr_code_data_uri if is_qr_valid else None,
+            "qr_string": self._qr_string if is_qr_valid else None,
+            "pairing_code": self._pairing_code if is_qr_valid else None,
             "qr_expires_in": time_left,
             "session_info": self._session_info if self._session_status == "CONNECTED" else None,
             "stats": {
@@ -216,16 +219,30 @@ class WhatsAppService:
         token = base64.urlsafe_b64encode(os.urandom(32)).decode("ascii")
         self._qr_string = f"2@{session_seed},{client_key},{token}"
         self._qr_code_data_uri = generate_qr_data_uri(self._qr_string)
-        self._qr_expires_at = time.time() + 120
+        self._qr_expires_at = time.time() + 180
+
+        # Generate 8-character pairing code for phone-linking (e.g. 7X8K-9M2P)
+        code_chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+        self._pairing_code = f"{''.join(random.choices(code_chars, k=4))}-{''.join(random.choices(code_chars, k=4))}"
         self._session_status = "SCAN_QR_CODE"
 
         return {
             "qr_code": self._qr_code_data_uri,
             "qr_string": self._qr_string,
-            "expires_in": 120,
+            "pairing_code": self._pairing_code,
+            "expires_in": 180,
             "generated_at": now_iso(),
             "status": self._session_status,
         }
+
+    def pair_by_code(
+        self,
+        pairing_code: str,
+        phone_number: str = "+919820154321",
+        user_name: str = "RepayX Collections Team",
+        device: str = "WhatsApp Mobile (Linked Device)",
+    ) -> dict:
+        return self.pair_device(phone_number=phone_number, user_name=user_name, device=device)
 
     def pair_device(
         self,

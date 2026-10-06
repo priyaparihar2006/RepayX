@@ -21,6 +21,8 @@ export interface WhatsAppStatus {
   connected: boolean;
   status: 'DISCONNECTED' | 'SCAN_QR_CODE' | 'CONNECTING' | 'CONNECTED';
   qr_code?: string;
+  qr_string?: string;
+  pairing_code?: string;
   qr_expires_in?: number;
   session_info?: WhatsAppSession | null;
   stats: WhatsAppStats;
@@ -130,9 +132,13 @@ async function call<T>(path: string, body?: unknown, signal?: AbortSignal): Prom
 
 export const whatsapp = {
   getStatus: (signal?: AbortSignal) => call<WhatsAppStatus>('status', undefined, signal),
-  generateQR: () => call<{ success: boolean; qr_code: string; expires_in: number; status: string }>('qr/generate', {}),
+  generateQR: () => call<{ success: boolean; qr_code: string; qr_string?: string; pairing_code?: string; expires_in: number; status: string }>('qr/generate', {}),
   pairDevice: (payload?: { phone_number?: string; user_name?: string }) =>
     call<{ success: boolean; paired: boolean; session: WhatsAppSession; status: string }>('qr/pair', payload || {}),
+  pairByCode: (pairing_code: string, phone_number?: string) =>
+    call<{ success: boolean; session: WhatsAppSession; message: string }>('pair-code', { pairing_code, phone_number: phone_number || '+919820154321' }),
+  scanQR: (phone_number?: string) =>
+    call<{ success: boolean; session: WhatsAppSession; message: string }>(`qr/scan?phone_number=${encodeURIComponent(phone_number || '+919820154321')}`, {}),
   disconnect: () => call<{ success: boolean; status: string }>('disconnect', {}),
   getDefaulters: (params?: { tier?: string; limit?: number; offset?: number; search?: string }) => {
     const q = new URLSearchParams();
@@ -149,3 +155,4 @@ export const whatsapp = {
   autoDispatch: (payload: AutoDispatchPayload) => call<AutoDispatchResponse>('auto-dispatch', payload),
   getMessages: (limit = 50) => call<{ success: boolean; messages: WhatsAppHistoryItem[]; count: number }>(`messages?limit=${limit}`),
 };
+

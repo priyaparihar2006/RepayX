@@ -89,6 +89,10 @@ const WhatsAppDashboard: React.FC = () => {
   const [status, setStatus] = useState<WhatsAppStatus | null>(null);
   const [qrCode, setQrCode] = useState<string>('');
   const [qrExpiresIn, setQrExpiresIn] = useState<number>(0);
+  const [pairingCode, setPairingCode] = useState<string>('');
+  const [pairMethod, setPairMethod] = useState<'qr' | 'phone' | 'code'>('qr');
+  const [inputPhoneNumber, setInputPhoneNumber] = useState<string>('+919820154321');
+  const [inputCode, setInputCode] = useState<string>('');
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
   const [defaulters, setDefaulters] = useState<WhatsAppDefaulter[]>([]);
   const [messages, setMessages] = useState<WhatsAppHistoryItem[]>([]);
@@ -141,10 +145,15 @@ const WhatsAppDashboard: React.FC = () => {
 
       if (statusRes) {
         setStatus(statusRes);
-        if (statusRes.qr_code) {
+        if (statusRes.qr_code && !statusRes.connected) {
           setQrCode(statusRes.qr_code);
-          setQrExpiresIn(statusRes.qr_expires_in || 120);
+          setQrExpiresIn(statusRes.qr_expires_in || 180);
+          if (statusRes.pairing_code) setPairingCode(statusRes.pairing_code);
+        } else if (!statusRes.connected) {
+          void generateNewQR();
         }
+      } else {
+        void generateNewQR();
       }
 
       if (templatesRes?.templates) {
@@ -213,6 +222,24 @@ const WhatsAppDashboard: React.FC = () => {
     return () => controller.abort();
   }, []);
 
+  // Background polling while disconnected to detect scans/linking immediately
+  useEffect(() => {
+    if (status?.connected) return;
+    const pollInterval = setInterval(async () => {
+      try {
+        const liveStatus = await whatsapp.getStatus();
+        if (liveStatus?.connected) {
+          setStatus(liveStatus);
+          setNotice('WhatsApp connected successfully!');
+          void fetchAllData();
+        }
+      } catch {
+        // ignore background poll errors
+      }
+    }, 4000);
+    return () => clearInterval(pollInterval);
+  }, [status?.connected]);
+
   // Poll QR expiration / status if scanning
   useEffect(() => {
     if (!qrCode || status?.connected) return;
@@ -220,7 +247,7 @@ const WhatsAppDashboard: React.FC = () => {
       setQrExpiresIn((prev) => {
         if (prev <= 1) {
           void generateNewQR();
-          return 120;
+          return 180;
         }
         return prev - 1;
       });
@@ -235,8 +262,9 @@ const WhatsAppDashboard: React.FC = () => {
       const res = await whatsapp.generateQR();
       if (res.qr_code) {
         setQrCode(res.qr_code);
-        setQrExpiresIn(res.expires_in || 120);
-        setStatus((prev) => (prev ? { ...prev, status: 'SCAN_QR_CODE', qr_code: res.qr_code } : null));
+        setQrExpiresIn(res.expires_in || 180);
+        if (res.pairing_code) setPairingCode(res.pairing_code);
+        setStatus((prev) => (prev ? { ...prev, status: 'SCAN_QR_CODE', qr_code: res.qr_code, pairing_code: res.pairing_code } : null));
       }
     } catch (e: any) {
       setError(e?.message || 'Failed to generate QR Code.');
@@ -245,17 +273,54 @@ const WhatsAppDashboard: React.FC = () => {
     }
   };
 
-  const simulatePairDevice = async () => {
+  const linkWithPhoneNumber = async () => {
     setPairing(true);
     setError('');
     setNotice('');
     try {
       const res = await whatsapp.pairDevice({
-        phone_number: '+919820154321',
-        user_name: 'RepayX Collections Hub',
+        phone_number: inputPhoneNumber,
+        user_name: 'RepayX Collections Team',
       });
-      if (res.success) {
-        setNotice('WhatsApp device paired successfully.');
+      if (res.success || res.paired || res.session) {
+        setNotice(`WhatsApp linked successfully with ${inputPhoneNumber}!`);
+        setQrCode('');
+        await fetchAllData();
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Phone number linking failed. Please check the number.');
+    } finally {
+      setPairing(false);
+    }
+  };
+
+  const linkWithPairingCode = async () => {
+    setPairing(true);
+    setError('');
+    setNotice('');
+    try {
+      const codeToUse = inputCode.trim() || pairingCode;
+      const res = await whatsapp.pairByCode(codeToUse, inputPhoneNumber);
+      if (res.success || res.session) {
+        setNotice('WhatsApp linked successfully via pairing code!');
+        setQrCode('');
+        await fetchAllData();
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Pairing code linking failed.');
+    } finally {
+      setPairing(false);
+    }
+  };
+
+  const simulatePairDevice = async () => {
+    setPairing(true);
+    setError('');
+    setNotice('');
+    try {
+      const res = await whatsapp.scanQR(inputPhoneNumber);
+      if (res.success || res.session) {
+        setNotice('WhatsApp device paired successfully via scanner.');
         setQrCode('');
         await fetchAllData();
       }
@@ -463,7 +528,7 @@ const WhatsAppDashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <QrCode className="w-5 h-5 text-emerald-600" />
-              <h2 className="text-lg font-bold text-slate-900">WhatsApp Web Scanner</h2>
+              <h2 className="text-lg font-bold text-slate-900">WhatsApp Device Pairing</h2>
             </div>
             {isConnected && (
               <button
@@ -477,56 +542,160 @@ const WhatsAppDashboard: React.FC = () => {
 
           {!isConnected ? (
             <div className="space-y-4">
-              <div className="text-center bg-slate-50 border border-slate-200/80 rounded-2xl p-6 flex flex-col items-center justify-center">
-                {qrCode ? (
-                  <div className="space-y-3 flex flex-col items-center">
-                    <div className="p-3 bg-white border-2 border-emerald-500/30 rounded-2xl shadow-md">
-                      <img
-                        src={qrCode}
-                        alt="WhatsApp Web QR Code"
-                        className="w-52 h-52 object-contain"
-                      />
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                      <Clock className="w-3.5 h-3.5 text-amber-500" />
-                      <span>QR expires in <strong className="text-slate-800">{qrExpiresIn}s</strong></span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="py-8 space-y-3">
-                    <Smartphone className="w-12 h-12 text-slate-400 mx-auto animate-bounce" />
-                    <p className="text-sm font-semibold text-slate-800">Scan QR Code to Connect WhatsApp</p>
-                    <p className="text-xs text-slate-500 max-w-xs">
-                      Open WhatsApp on your phone &gt; Linked Devices &gt; Link a Device, then point camera at the QR code.
-                    </p>
-                    <button
-                      onClick={generateNewQR}
-                      disabled={generatingQr}
-                      className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm transition"
-                    >
-                      <QrCode className="w-4 h-4" />
-                      {generatingQr ? 'Generating...' : 'Display WhatsApp Web QR'}
-                    </button>
-                  </div>
-                )}
+              {/* Method Switcher Tabs */}
+              <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-2xl text-xs font-medium text-slate-600">
+                <button
+                  type="button"
+                  onClick={() => setPairMethod('qr')}
+                  className={`py-1.5 rounded-xl transition ${pairMethod === 'qr' ? 'bg-white text-emerald-700 font-bold shadow-sm' : 'hover:text-slate-900'}`}
+                >
+                  📷 Scan QR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPairMethod('phone')}
+                  className={`py-1.5 rounded-xl transition ${pairMethod === 'phone' ? 'bg-white text-emerald-700 font-bold shadow-sm' : 'hover:text-slate-900'}`}
+                >
+                  📱 Phone Link
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPairMethod('code')}
+                  className={`py-1.5 rounded-xl transition ${pairMethod === 'code' ? 'bg-white text-emerald-700 font-bold shadow-sm' : 'hover:text-slate-900'}`}
+                >
+                  🔑 Pairing Code
+                </button>
               </div>
 
-              {/* Dev Simulation Button */}
-              <div className="p-4 bg-emerald-50/60 border border-emerald-200/70 rounded-2xl space-y-2">
-                <div className="flex items-center gap-2 text-emerald-800 text-xs font-semibold">
-                  <Zap className="w-4 h-4 text-emerald-600" /> Quick Link WhatsApp Session
+              {pairMethod === 'qr' && (
+                <div className="text-center bg-slate-50 border border-slate-200/80 rounded-2xl p-5 flex flex-col items-center justify-center space-y-3">
+                  {qrCode ? (
+                    <>
+                      <div
+                        onClick={simulatePairDevice}
+                        className="p-3 bg-white border-2 border-emerald-500/40 rounded-2xl shadow-md cursor-pointer hover:border-emerald-600 transition group relative"
+                        title="Click QR Code to simulate scan & pair"
+                      >
+                        <img
+                          src={qrCode}
+                          alt="WhatsApp Web QR Code"
+                          className="w-56 h-56 object-contain rounded-lg"
+                        />
+                        <div className="absolute inset-0 bg-emerald-950/0 group-hover:bg-emerald-950/10 rounded-2xl flex items-center justify-center transition">
+                          <span className="opacity-0 group-hover:opacity-100 bg-emerald-600 text-white text-[11px] font-bold px-3 py-1 rounded-full shadow transition">
+                            Click to Pair
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between w-full max-w-xs text-xs text-slate-500 px-2">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Expires in <strong className="text-slate-800">{qrExpiresIn}s</strong></span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={generateNewQR}
+                          disabled={generatingQr}
+                          className="text-emerald-600 hover:text-emerald-700 font-semibold inline-flex items-center gap-1"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${generatingQr ? 'animate-spin' : ''}`} /> Refresh
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="py-6 space-y-3">
+                      <Smartphone className="w-10 h-10 text-slate-400 mx-auto animate-bounce" />
+                      <p className="text-sm font-semibold text-slate-800">Scan QR Code to Link WhatsApp</p>
+                      <button
+                        onClick={generateNewQR}
+                        disabled={generatingQr}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm transition"
+                      >
+                        <QrCode className="w-4 h-4" />
+                        {generatingQr ? 'Generating...' : 'Generate New QR'}
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={simulatePairDevice}
+                    disabled={pairing}
+                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    {pairing ? 'Connecting session...' : '⚡ Simulate Phone Camera Scan & Pair'}
+                  </button>
                 </div>
-                <p className="text-xs text-emerald-700">
-                  Instantly pair a live WhatsApp Web session to start dispatching collection notices immediately.
+              )}
+
+              {pairMethod === 'phone' && (
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-700">WhatsApp Phone Number</label>
+                    <input
+                      type="text"
+                      value={inputPhoneNumber}
+                      onChange={(e) => setInputPhoneNumber(e.target.value)}
+                      placeholder="+919820154321"
+                      className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                    <p className="text-[11px] text-slate-500">Enter phone number with international country code (e.g. +91)</p>
+                  </div>
+                  <button
+                    onClick={linkWithPhoneNumber}
+                    disabled={pairing || !inputPhoneNumber}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    {pairing ? 'Linking device...' : 'Link Phone Number to RepayX'}
+                  </button>
+                </div>
+              )}
+
+              {pairMethod === 'code' && (
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+                  <div className="text-center space-y-2">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">8-Character Pairing Code</p>
+                    <div className="p-3 bg-white border-2 border-dashed border-emerald-500/50 rounded-xl font-mono text-xl font-bold tracking-widest text-emerald-800">
+                      {pairingCode || '7X8K-9M2P'}
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Open WhatsApp on Phone &gt; Linked Devices &gt; Link with phone number instead, then verify this code.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-700">Enter Code or Custom Code</label>
+                    <input
+                      type="text"
+                      value={inputCode}
+                      onChange={(e) => setInputCode(e.target.value)}
+                      placeholder={pairingCode || 'ABCD-1234'}
+                      className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono uppercase tracking-wider focus:ring-2 focus:ring-emerald-500 focus:outline-none text-center font-bold"
+                    />
+                  </div>
+
+                  <button
+                    onClick={linkWithPairingCode}
+                    disabled={pairing}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    {pairing ? 'Verifying...' : 'Verify Code & Connect'}
+                  </button>
+                </div>
+              )}
+
+              {/* Step-by-step guide */}
+              <div className="p-3.5 bg-emerald-50/60 border border-emerald-200/60 rounded-2xl space-y-1 text-xs text-emerald-900">
+                <p className="font-bold flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-emerald-600" /> How to Link:
                 </p>
-                <button
-                  onClick={simulatePairDevice}
-                  disabled={pairing}
-                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
-                >
-                  <Smartphone className="w-3.5 h-3.5" />
-                  {pairing ? 'Connecting session...' : '⚡ Instant Connect / Simulate Mobile Scan'}
-                </button>
+                <ol className="list-decimal list-inside space-y-0.5 text-[11px] text-emerald-800">
+                  <li>Open <strong>WhatsApp</strong> on your mobile phone.</li>
+                  <li>Tap <strong>Menu ⋮</strong> (or <strong>Settings</strong>) &gt; <strong>Linked Devices</strong>.</li>
+                  <li>Tap <strong>Link a Device</strong> and point camera at the QR code, or use the Pairing Code.</li>
+                </ol>
               </div>
             </div>
           ) : (
