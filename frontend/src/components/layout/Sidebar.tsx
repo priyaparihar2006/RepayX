@@ -23,6 +23,7 @@ import { MANAGER_PROFILE } from '../../data/mockData';
 export type NavTab =
   | 'overview'
   | 'customers'
+  | 'whatsapp'
   | 'risk-analytics'
   | 'repayment-analytics'
   | 'demo-overview'
@@ -79,6 +80,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'repayment-analytics' as NavTab, label: 'Repayment Analytics', icon: Wallet },
         { id: 'ai-insights' as NavTab, label: 'AI Insights', icon: LineChart, isAi: true },
       ],
+    },
+    {
+      group: 'MESSAGING',
+      items: [{ id: 'whatsapp', label: 'WhatsApp Messages', icon: MessageSquare }],
     },
     {
       // Recovery workflow pages that still run on sample data.

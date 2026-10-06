@@ -1,0 +1,18 @@
+[
+  {
+    "name": "Your admin test contact - replace this example",
+    "phone": "+12025550101",
+    "role": "admin",
+    "opted_in": false,
+    "consent_note": "",
+    "test_recipient": true
+  },
+  {
+    "name": "Your customer contact - replace this example",
+    "phone": "+12025550102",
+    "role": "customer",
+    "opted_in": false,
+    "consent_note": "",
+    "test_recipient": false
+  }
+]

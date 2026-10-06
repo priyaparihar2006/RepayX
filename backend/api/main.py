@@ -14,10 +14,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api import routes_analytics, routes_customer, routes_health, routes_query
+from api import routes_analytics, routes_customer, routes_health, routes_query, routes_whatsapp
 from api.errors import register_error_handlers
 from config import API_VERSION, Settings, get_settings
 from services.resources import ResourceRegistry
+from services.whatsapp_service import WhatsAppService, WhatsAppSettings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -39,17 +40,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.resources = ResourceRegistry(settings)
+    app.state.whatsapp = WhatsAppService(WhatsAppSettings())
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_allowed_origins,
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "Authorization"],
     )
     register_error_handlers(app)
 
-    for router in (routes_health.router, routes_customer.router, routes_analytics.router, routes_query.router):
+    for router in (routes_health.router, routes_customer.router, routes_analytics.router, routes_query.router, routes_whatsapp.router):
         app.include_router(router)
 
     return app
