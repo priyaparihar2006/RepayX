@@ -21,8 +21,6 @@ export interface WhatsAppStatus {
   connected: boolean;
   status: 'DISCONNECTED' | 'SCAN_QR_CODE' | 'CONNECTING' | 'CONNECTED';
   qr_code?: string;
-  qr_string?: string;
-  pairing_code?: string;
   qr_expires_in?: number;
   session_info?: WhatsAppSession | null;
   stats: WhatsAppStats;
@@ -152,7 +150,12 @@ export const whatsapp = {
   getTemplates: () => call<{ success: boolean; templates: WhatsAppTemplate[] }>('templates'),
   sendMessage: (payload: { recipient: string; message: string; customer_id?: number; customer_name?: string; template_name?: string }) =>
     call<{ success: boolean; message_id: string; status: string; recipient: string }>('send', payload),
+  getConversation: (params: { customer_id?: number; phone?: string }) => {
+    const q = new URLSearchParams();
+    if (params.customer_id) q.set('customer_id', String(params.customer_id));
+    if (params.phone) q.set('phone', params.phone);
+    return call<{ success: boolean; messages: any[]; count: number }>(`conversation?${q.toString()}`);
+  },
   autoDispatch: (payload: AutoDispatchPayload) => call<AutoDispatchResponse>('auto-dispatch', payload),
   getMessages: (limit = 50) => call<{ success: boolean; messages: WhatsAppHistoryItem[]; count: number }>(`messages?limit=${limit}`),
 };
-

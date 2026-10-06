@@ -26,14 +26,6 @@ class PairRequest(BaseModel):
     device: str = Field(default="WhatsApp Web (Chrome / Windows)")
 
 
-class PairCodeRequest(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    pairing_code: str = Field(default="12345678")
-    phone_number: str = Field(default="+919820154321")
-    user_name: str = Field(default="RepayX Collections Hub")
-    device: str = Field(default="WhatsApp Mobile (Linked Device)")
-
-
 class SendSingleMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
     recipient: str = Field(min_length=8, max_length=20)
@@ -58,54 +50,18 @@ def status(messaging: WhatsAppService = Depends(service)):
     return {"success": True, **messaging.configuration()}
 
 
-@router.get("/qr/generate")
 @router.post("/qr/generate")
 def generate_qr(messaging: WhatsAppService = Depends(service)):
     result = messaging.generate_qr()
     return {"success": True, **result}
 
 
-@router.get("/qr/pair")
 @router.post("/qr/pair")
-def pair_device(
-    phone_number: str | None = None,
-    user_name: str | None = None,
-    device: str | None = None,
-    body: PairRequest | None = None,
-    messaging: WhatsAppService = Depends(service),
-):
-    phone = (body.phone_number if body else None) or phone_number or "+919820154321"
-    name = (body.user_name if body else None) or user_name or "RepayX Collections Hub"
-    dev = (body.device if body else None) or device or "WhatsApp Web (Chrome / Windows)"
-    session = messaging.pair_device(phone_number=phone, user_name=name, device=dev)
+def pair_device(body: PairRequest = PairRequest(), messaging: WhatsAppService = Depends(service)):
+    session = messaging.pair_device(phone_number=body.phone_number, user_name=body.user_name, device=body.device)
     return {"success": True, "session": session, "message": "WhatsApp device paired successfully."}
 
 
-@router.get("/pair-code")
-@router.post("/pair-code")
-def pair_by_code(
-    code: str | None = None,
-    phone_number: str | None = None,
-    body: PairCodeRequest | None = None,
-    messaging: WhatsAppService = Depends(service),
-):
-    c = (body.pairing_code if body else None) or code or ""
-    phone = (body.phone_number if body else None) or phone_number or "+919820154321"
-    session = messaging.pair_by_code(pairing_code=c, phone_number=phone)
-    return {"success": True, "session": session, "message": f"Device linked with phone {phone} successfully."}
-
-
-@router.get("/qr/scan")
-@router.post("/qr/scan")
-def scan_qr_simulation(
-    phone_number: str = Query(default="+919820154321"),
-    messaging: WhatsAppService = Depends(service),
-):
-    session = messaging.pair_device(phone_number=phone_number, device="WhatsApp Scanner (Mobile)")
-    return {"success": True, "session": session, "message": "QR Code scanned and paired successfully."}
-
-
-@router.get("/disconnect")
 @router.post("/disconnect")
 def disconnect(messaging: WhatsAppService = Depends(service)):
     result = messaging.disconnect()
@@ -169,6 +125,16 @@ def auto_dispatch(
 @router.get("/messages")
 def messages(messaging: WhatsAppService = Depends(service)):
     return {"success": True, **messaging.history()}
+
+
+@router.get("/conversation")
+def conversation(
+    customer_id: int | None = Query(default=None),
+    phone: str | None = Query(default=None),
+    messaging: WhatsAppService = Depends(service),
+):
+    msgs = messaging.get_conversation(customer_id=customer_id, phone=phone)
+    return {"success": True, "messages": msgs, "count": len(msgs)}
 
 
 @router.get("/contacts")
