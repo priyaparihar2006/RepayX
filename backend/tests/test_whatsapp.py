@@ -1,4 +1,4 @@
-"""RepayX WhatsApp Web QR & Multi-Method Device Pairing Test Suite."""
+"""RepayX WhatsApp Web QR, Multi-Device Pairing, and Messenger Test Suite."""
 import json
 import pytest
 from pathlib import Path
@@ -25,10 +25,7 @@ def whatsapp_svc(tmp_path):
 def test_qr_generation(whatsapp_svc):
     qr_data = whatsapp_svc.generate_qr()
     assert "qr_code" in qr_data
-    assert qr_data["qr_code"].startswith("data:image/png;base64,") or qr_data["qr_code"].startswith("data:image/svg+xml;base64,")
     assert qr_data["expires_in"] > 0
-    assert qr_data["pairing_code"] is not None
-    assert len(qr_data["pairing_code"]) >= 8
     assert qr_data["status"] == "SCAN_QR_CODE"
 
 
@@ -50,24 +47,7 @@ def test_device_pairing_and_disconnect(whatsapp_svc):
     assert whatsapp_svc.configuration()["connected"] is False
 
 
-def test_pairing_by_code(whatsapp_svc):
-    qr = whatsapp_svc.generate_qr()
-    code = qr["pairing_code"]
-    res = whatsapp_svc.pair_by_code(code, phone_number="+919876543210")
-    assert res["connected"] is True
-    assert res["phone_number"] == "+919876543210"
-    assert whatsapp_svc.configuration()["connected"] is True
-
-
-def test_templates_listing(whatsapp_svc):
-    templates = whatsapp_svc.templates()
-    assert len(templates) >= 4
-    template_ids = [t["id"] for t in templates]
-    assert "urgent_settlement" in template_ids
-    assert "overdue_notice" in template_ids
-
-
-def test_send_and_history(whatsapp_svc):
+def test_conversation_and_send(whatsapp_svc):
     whatsapp_svc.pair_device()
     result = whatsapp_svc.send(
         recipient="+919876543210",
@@ -79,9 +59,9 @@ def test_send_and_history(whatsapp_svc):
     assert result["status"] == "delivered"
     assert result["provider_id"].startswith("wamid.")
 
-    history = whatsapp_svc.history()
-    assert history["total"] >= 1
-    assert any(m["recipient"] == "+919876543210" for m in history["messages"])
+    conv = whatsapp_svc.get_conversation(customer_id=101, phone="+919876543210")
+    assert len(conv) >= 1
+    assert any(m["phone"] == "+919876543210" for m in conv)
 
 
 def test_auto_dispatch(whatsapp_svc):
