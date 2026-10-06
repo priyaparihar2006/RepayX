@@ -26,6 +26,14 @@ class PairRequest(BaseModel):
     device: str = Field(default="WhatsApp Web (Chrome / Windows)")
 
 
+class PairCodeRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    pairing_code: str = Field(default="12345678")
+    phone_number: str = Field(default="+919820154321")
+    user_name: str = Field(default="RepayX Collections Hub")
+    device: str = Field(default="WhatsApp Mobile (Linked Device)")
+
+
 class SendSingleMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
     recipient: str = Field(min_length=8, max_length=20)
@@ -71,6 +79,30 @@ def pair_device(
     dev = (body.device if body else None) or device or "WhatsApp Web (Chrome / Windows)"
     session = messaging.pair_device(phone_number=phone, user_name=name, device=dev)
     return {"success": True, "session": session, "message": "WhatsApp device paired successfully."}
+
+
+@router.get("/pair-code")
+@router.post("/pair-code")
+def pair_by_code(
+    code: str | None = None,
+    phone_number: str | None = None,
+    body: PairCodeRequest | None = None,
+    messaging: WhatsAppService = Depends(service),
+):
+    c = (body.pairing_code if body else None) or code or ""
+    phone = (body.phone_number if body else None) or phone_number or "+919820154321"
+    session = messaging.pair_by_code(pairing_code=c, phone_number=phone)
+    return {"success": True, "session": session, "message": f"Device linked with phone {phone} successfully."}
+
+
+@router.get("/qr/scan")
+@router.post("/qr/scan")
+def scan_qr_simulation(
+    phone_number: str = Query(default="+919820154321"),
+    messaging: WhatsAppService = Depends(service),
+):
+    session = messaging.pair_device(phone_number=phone_number, device="WhatsApp Scanner (Mobile)")
+    return {"success": True, "session": session, "message": "QR Code scanned and paired successfully."}
 
 
 @router.get("/disconnect")

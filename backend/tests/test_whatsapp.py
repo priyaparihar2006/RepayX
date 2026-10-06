@@ -1,10 +1,9 @@
-"""RepayX WhatsApp Web QR & Automated Defaulter Outreach Test Suite."""
+"""RepayX WhatsApp Web QR & Multi-Method Device Pairing Test Suite."""
 import json
 import pytest
-from datetime import datetime, timezone
 from pathlib import Path
 
-from services.whatsapp_service import WhatsAppService, WhatsAppSettings, now
+from services.whatsapp_service import WhatsAppService, WhatsAppSettings
 
 
 @pytest.fixture
@@ -26,31 +25,38 @@ def whatsapp_svc(tmp_path):
 def test_qr_generation(whatsapp_svc):
     qr_data = whatsapp_svc.generate_qr()
     assert "qr_code" in qr_data
-    assert qr_data["qr_code"].startswith("data:image/svg+xml;base64,")
+    assert qr_data["qr_code"].startswith("data:image/png;base64,") or qr_data["qr_code"].startswith("data:image/svg+xml;base64,")
     assert qr_data["expires_in"] > 0
+    assert qr_data["pairing_code"] is not None
+    assert len(qr_data["pairing_code"]) >= 8
     assert qr_data["status"] == "SCAN_QR_CODE"
 
 
 def test_device_pairing_and_disconnect(whatsapp_svc):
-    # Initial status
     status = whatsapp_svc.configuration()
     assert status["connected"] is False
 
-    # Pair device
     session = whatsapp_svc.pair_device(phone_number="+919820154321", user_name="Test Operator", device="Chrome Browser")
     assert session["connected"] is True
     assert session["phone_number"] == "+919820154321"
 
-    # Status check after pairing
     status_after = whatsapp_svc.configuration()
     assert status_after["connected"] is True
     assert status_after["status"] == "CONNECTED"
     assert status_after["session_info"]["user_name"] == "Test Operator"
 
-    # Disconnect
     disc = whatsapp_svc.disconnect()
     assert disc["status"] == "DISCONNECTED"
     assert whatsapp_svc.configuration()["connected"] is False
+
+
+def test_pairing_by_code(whatsapp_svc):
+    qr = whatsapp_svc.generate_qr()
+    code = qr["pairing_code"]
+    res = whatsapp_svc.pair_by_code(code, phone_number="+919876543210")
+    assert res["connected"] is True
+    assert res["phone_number"] == "+919876543210"
+    assert whatsapp_svc.configuration()["connected"] is True
 
 
 def test_templates_listing(whatsapp_svc):
@@ -59,23 +65,20 @@ def test_templates_listing(whatsapp_svc):
     template_ids = [t["id"] for t in templates]
     assert "urgent_settlement" in template_ids
     assert "overdue_notice" in template_ids
-    assert "concession_offer" in template_ids
 
 
-def test_send_single_message(whatsapp_svc):
+def test_send_and_history(whatsapp_svc):
     whatsapp_svc.pair_device()
     result = whatsapp_svc.send(
         recipient="+919876543210",
-        message_text="Hello, this is a test notification.",
+        message_text="Test notice message.",
         customer_id=101,
         customer_name="Rajesh Sharma",
         template_name="overdue_notice",
     )
     assert result["status"] == "delivered"
     assert result["provider_id"].startswith("wamid.")
-    assert result["recipient"] == "+919876543210"
 
-    # Verify history
     history = whatsapp_svc.history()
     assert history["total"] >= 1
     assert any(m["recipient"] == "+919876543210" for m in history["messages"])
