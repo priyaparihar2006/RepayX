@@ -62,6 +62,17 @@ def pair_device(body: PairRequest = PairRequest(), messaging: WhatsAppService = 
     return {"success": True, "session": session, "message": "WhatsApp device paired successfully."}
 
 
+class PairCodeRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    phone: str = Field(default="+919820154321")
+
+
+@router.post("/pair-code")
+def pair_code(body: PairCodeRequest, messaging: WhatsAppService = Depends(service)):
+    result = messaging.pair_by_code(phone=body.phone)
+    return {"success": True, **result}
+
+
 @router.post("/disconnect")
 def disconnect(messaging: WhatsAppService = Depends(service)):
     result = messaging.disconnect()

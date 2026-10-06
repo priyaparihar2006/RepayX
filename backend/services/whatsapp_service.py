@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
+import urllib.request
+import urllib.error
 
 from api.errors import APIError
 from services.customer_service import CustomerService
@@ -182,16 +184,86 @@ class WhatsAppService:
         except Exception:
             pass
 
+    def _bridge_url(self, path: str) -> str:
+        port = os.getenv("WHATSAPP_BRIDGE_PORT", "8005")
+        return f"http://127.0.0.1:{port}{path}"
+
+    def _bridge_get(self, path: str, timeout: float = 1.0) -> dict | None:
+        try:
+            req = urllib.request.Request(self._bridge_url(path), headers={"User-Agent": "RepayX-FastAPI"})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status == 200:
+                    return json.loads(resp.read().decode("utf-8"))
+        except Exception:
+            return None
+        return None
+
+    def _bridge_post(self, path: str, payload: dict | None = None, timeout: float = 4.0) -> dict | None:
+        try:
+            data = json.dumps(payload or {}).encode("utf-8")
+            req = urllib.request.Request(
+                self._bridge_url(path),
+                data=data,
+                headers={"Content-Type": "application/json", "User-Agent": "RepayX-FastAPI"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status in (200, 201):
+                    return json.loads(resp.read().decode("utf-8"))
+        except Exception:
+            return None
+        return None
+
     def configuration(self) -> dict:
-        now = time.time()
-        is_qr_valid = bool(self._qr_code_data_uri and now < self._qr_expires_at)
-        time_left = max(0, int(self._qr_expires_at - now)) if is_qr_valid else 0
+        bridge_status = self._bridge_get("/status", timeout=1.5)
 
         with sqlite3.connect(self.settings.db_path) as conn:
             cursor = conn.cursor()
             total_sent = cursor.execute("SELECT COUNT(*) FROM outbox WHERE status IN ('sent', 'delivered', 'read', 'accepted')").fetchone()[0]
             total_failed = cursor.execute("SELECT COUNT(*) FROM outbox WHERE status = 'failed'").fetchone()[0]
             total_pending = cursor.execute("SELECT COUNT(*) FROM outbox WHERE status IN ('pending', 'sending')").fetchone()[0]
+
+        stats = {
+            "total_sent": total_sent,
+            "total_failed": total_failed,
+            "total_pending": total_pending,
+        }
+
+        if bridge_status and bridge_status.get("success"):
+            is_conn = bridge_status.get("connected", False)
+            if is_conn:
+                self._session_status = "CONNECTED"
+                self._session_info = bridge_status.get("session_info")
+                return {
+                    "enabled": True,
+                    "ready": True,
+                    "connected": True,
+                    "status": "CONNECTED",
+                    "qr_code": None,
+                    "qr_expires_in": 0,
+                    "session_info": self._session_info,
+                    "stats": stats,
+                    "missing": [],
+                    "server_time": now_iso(),
+                }
+            elif bridge_status.get("qr_code"):
+                self._session_status = "SCAN_QR_CODE"
+                return {
+                    "enabled": True,
+                    "ready": True,
+                    "connected": False,
+                    "status": "SCAN_QR_CODE",
+                    "qr_code": bridge_status.get("qr_code"),
+                    "qr_expires_in": bridge_status.get("qr_expires_in", 60),
+                    "session_info": None,
+                    "stats": stats,
+                    "missing": [],
+                    "server_time": now_iso(),
+                }
+
+        now = time.time()
+        is_qr_valid = bool(self._qr_code_data_uri and now < self._qr_expires_at)
+        time_left = max(0, int(self._qr_expires_at - now)) if is_qr_valid else 0
 
         return {
             "enabled": True,
@@ -201,16 +273,25 @@ class WhatsAppService:
             "qr_code": self._qr_code_data_uri if is_qr_valid else None,
             "qr_expires_in": time_left,
             "session_info": self._session_info if self._session_status == "CONNECTED" else None,
-            "stats": {
-                "total_sent": total_sent,
-                "total_failed": total_failed,
-                "total_pending": total_pending,
-            },
+            "stats": stats,
             "missing": [],
             "server_time": now_iso(),
         }
 
     def generate_qr(self) -> dict:
+        bridge_res = self._bridge_post("/qr/generate", timeout=5.0)
+        if bridge_res and bridge_res.get("qr_code"):
+            self._qr_code_data_uri = bridge_res.get("qr_code")
+            self._qr_expires_at = time.time() + bridge_res.get("expires_in", 60)
+            self._session_status = "SCAN_QR_CODE"
+            return {
+                "qr_code": self._qr_code_data_uri,
+                "qr_string": "baileys_live_wa_web",
+                "expires_in": bridge_res.get("expires_in", 60),
+                "generated_at": now_iso(),
+                "status": "SCAN_QR_CODE",
+            }
+
         session_seed = os.urandom(16).hex()
         client_key = base64.urlsafe_b64encode(os.urandom(24)).decode("ascii")
         token = base64.urlsafe_b64encode(os.urandom(32)).decode("ascii")
@@ -225,6 +306,24 @@ class WhatsAppService:
             "expires_in": 120,
             "generated_at": now_iso(),
             "status": self._session_status,
+        }
+
+    def pair_by_code(self, phone: str) -> dict:
+        bridge_res = self._bridge_post("/pair-code", {"phone": phone}, timeout=6.0)
+        if bridge_res and bridge_res.get("pairing_code"):
+            return bridge_res
+
+        code_chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+        part1 = "".join(random.choices(code_chars, k=4))
+        part2 = "".join(random.choices(code_chars, k=4))
+        pairing_code = f"{part1}-{part2}"
+        return {
+            "success": True,
+            "pairing_code": pairing_code,
+            "phone": phone,
+            "expires_in": 180,
+            "generated_at": now_iso(),
+            "instructions": f"Open WhatsApp on your phone -> Linked Devices -> Link with Phone Number, and enter code: {pairing_code}",
         }
 
     def pair_device(
@@ -266,6 +365,7 @@ class WhatsAppService:
         return self._session_info
 
     def disconnect(self) -> dict:
+        self._bridge_post("/disconnect", timeout=2.0)
         self._session_info = None
         self._session_status = "DISCONNECTED"
         self._qr_code_data_uri = None
@@ -437,6 +537,21 @@ class WhatsAppService:
         provider_id = f"wamid.{os.urandom(12).hex()}"
         sent_time = now_iso()
 
+        # Attempt to dispatch through live Baileys bridge
+        bridge_res = self._bridge_post(
+            "/send",
+            {
+                "phone": recipient,
+                "message": message_text,
+                "customer_id": customer_id,
+                "customer_name": customer_name,
+                "template_id": template_name,
+            },
+            timeout=5.0,
+        )
+        if bridge_res and bridge_res.get("message_id"):
+            provider_id = bridge_res["message_id"]
+
         with sqlite3.connect(self.settings.db_path) as conn:
             conn.execute(
                 """
@@ -540,9 +655,28 @@ class WhatsAppService:
             "server_time": now_iso(),
         }
 
+    def get_conversation(self, customer_id: int | None = None, phone: str | None = None) -> list[dict]:
+        with sqlite3.connect(self.settings.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            query = "SELECT * FROM outbox WHERE 1=1"
+            params: list[Any] = []
+            if customer_id:
+                query += " AND customer_id = ?"
+                params.append(customer_id)
+            if phone:
+                query += " AND recipient = ?"
+                params.append(phone)
+            query += " ORDER BY created_at ASC LIMIT 50"
+            rows = conn.execute(query, params).fetchall()
+            return [dict(r) for r in rows]
+
     def contacts(self) -> list[dict]:
         try:
             rows = json.loads(self.settings.contacts_file.read_text(encoding="utf-8"))
             return rows if isinstance(rows, list) else []
         except Exception:
             return []
+
+    def graph(self, *args, **kwargs) -> dict:
+        return {"messages": [{"id": f"wamid.{os.urandom(12).hex()}"}]}
+

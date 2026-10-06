@@ -213,20 +213,45 @@ const WhatsAppDashboard: React.FC = () => {
     return () => controller.abort();
   }, []);
 
-  // Poll QR expiration / status if scanning
+  // Poll QR expiration & real-time connection status to detect mobile QR scans
   useEffect(() => {
-    if (!qrCode || status?.connected) return;
-    const interval = setInterval(() => {
+    if (status?.connected) return;
+
+    const statusInterval = setInterval(async () => {
+      try {
+        const s = await whatsapp.getStatus();
+        if (s) {
+          if (s.connected) {
+            setStatus(s);
+            setQrCode('');
+            setNotice('WhatsApp Connected successfully!');
+            await fetchAllData();
+          } else if (s.qr_code && s.qr_code !== qrCode) {
+            setStatus(s);
+            setQrCode(s.qr_code);
+            setQrExpiresIn(s.qr_expires_in || 60);
+          }
+        }
+      } catch {
+        // quiet poll
+      }
+    }, 2500);
+
+    const countdownInterval = setInterval(() => {
       setQrExpiresIn((prev) => {
         if (prev <= 1) {
           void generateNewQR();
-          return 120;
+          return 60;
         }
         return prev - 1;
       });
     }, 1000);
-    return () => clearInterval(interval);
-  }, [qrCode, status?.connected]);
+
+    return () => {
+      clearInterval(statusInterval);
+      clearInterval(countdownInterval);
+    };
+  }, [status?.connected, qrCode]);
 
   const generateNewQR = async () => {
     setGeneratingQr(true);
