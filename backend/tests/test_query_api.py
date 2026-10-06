@@ -49,6 +49,41 @@ def test_customer_risk_status(client):
     assert "3 installments, 3 paid late (late payment rate 100.00%" in body["result"]
 
 
+@pytest.mark.parametrize("query", [
+    "when is birthday of rahul sharma?",
+    "When is customer 385772's birthday?",
+    "What is the date of birth of customer 385772?",
+    "When was customer 385772 born?",
+])
+def test_birthdays_do_not_return_risk_summary_or_retrieval_matches(client, query):
+    body = ask(client, query)
+    assert body["query_type"] == "unsupported_query"
+    assert "dates of birth are not available" in body["result"]
+    assert "customer" not in body and "customers" not in body
+    assert "High Risk" not in body["result"]
+
+
+def test_demo_name_is_not_mapped_to_scored_customer(client):
+    body = ask(client, "What is the status of Rahul Sharma?")
+    assert body["query_type"] == "unsupported_query"
+    assert "Customer names are not available" in body["result"]
+    assert "customer" not in body and "customers" not in body
+
+
+def test_specific_customer_fields_answer_the_question(client):
+    status = ask(client, "What is the risk status of customer 385772?")
+    income = ask(client, "What is the annual income of customer 385772?")
+    assert income["result"] != status["result"]
+    assert "annual income is" in income["result"]
+    assert "risk score" not in income["result"]
+
+
+def test_unknown_customer_question_does_not_repeat_summary(client):
+    body = ask(client, "What is customer 385772's favourite colour?")
+    assert "cannot answer that question" in body["result"]
+    assert "High Risk" not in body["result"]
+
+
 def test_high_risk_count(client):
     body = ask(client, "How many high-risk customers are there?")
 

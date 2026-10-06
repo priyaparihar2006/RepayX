@@ -7,6 +7,7 @@ import { EmptyState } from '../common/RequestState';
 import { formatAmount, formatNumber, formatPercent, formatRatio, formatScore } from '../../lib/format';
 
 const QUERY_TYPES: Record<QueryType, { label: string; method: string; icon: React.ComponentType<{ className?: string }> }> = {
+  unsupported_query: { label: 'Information unavailable', method: 'The requested information is not available in the scored portfolio', icon: FileSearch },
   customer_query: { label: 'Customer query', method: 'Direct lookup by customer ID', icon: UserSearch },
   aggregate_query: { label: 'Aggregate query', method: 'Calculated over the scored customer data', icon: Calculator },
   retrieval_query: { label: 'Structured retrieval', method: 'Filtered and sorted on repayment and risk fields', icon: ListFilter },

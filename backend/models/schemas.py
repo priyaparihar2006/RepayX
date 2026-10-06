@@ -135,7 +135,7 @@ class CustomerListResponse(BaseModel):
     pagination: Pagination
 
 
-QueryType = Literal["customer_query", "aggregate_query", "retrieval_query", "general_retrieval"]
+QueryType = Literal["customer_query", "aggregate_query", "retrieval_query", "general_retrieval", "unsupported_query"]
 
 
 class QueryCustomer(CustomerSummary):

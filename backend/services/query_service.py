@@ -7,6 +7,7 @@ that were applied (or not) are visible to the user.
 
 from __future__ import annotations
 
+import re
 import numpy as np
 
 from api.errors import ServiceUnavailableError
@@ -59,6 +60,14 @@ class QueryService:
 
     def answer(self, query: str) -> dict:
         routed = route_repayx_query(query, self._profile_values)
+        unavailable = self._unavailable_information(routed)
+        if unavailable:
+            return {
+                "query": routed.query,
+                "query_type": "unsupported_query",
+                "model_version": self._customers.model_version,
+                "result": unavailable,
+            }
         handler = {
             "customer_query": self._customer,
             "aggregate_query": self._aggregate,
@@ -74,12 +83,34 @@ class QueryService:
 
     # --- customer ---------------------------------------------------------
 
+    def _unavailable_information(self, routed: RoutedQuery) -> str | None:
+        # A matching customer or profile word does not establish that the
+        # requested information exists. Never substitute an unrelated summary.
+        if re.search(r"\b(?:birthdays?|birth\s*dates?|dates? of birth|dob|born)\b", routed.query, re.I):
+            return ("Birthdays and dates of birth are not available in the scored portfolio, "
+                    "so I cannot answer that question. I can help with risk scores, financial profiles, "
+                    "and repayment history using a numeric customer ID.")
+        if re.search(r"\b(?:phone|mobile|email|address|contact details)\b", routed.query, re.I):
+            return "Contact details are not available in the scored portfolio. Use a numeric customer ID for risk and repayment questions."
+        if re.search(r"\b(?:polic(?:y|ies)|medical extensions?|disputes?)\b", routed.query, re.I):
+            return "Policy documents and dispute records are not connected to this portfolio query service. I can answer risk and repayment questions from the scored customer data."
+        if not routed.customer_ids and routed.filters.is_empty():
+            named_lookup = re.search(
+                r"\b(?:status|risk|balance|income|history|loan) (?:of|for) ([a-z]+(?: [a-z]+){0,2})[?.!]*$",
+                routed.query, re.I,
+            ) or re.search(r"\b([a-z]+ [a-z]+)['’]s\b", routed.query, re.I)
+            if named_lookup and not re.search(r"\b(?:customers?|borrowers?|clients?|portfolio|loans?|payments?|the|all)\b", named_lookup.group(1), re.I):
+                return ("Customer names are not available in the scored portfolio. Please provide a numeric "
+                        "customer ID from Customers; names shown in the demo screens are sample records, "
+                        "not linked to the scored portfolio.")
+        return None
+
     def _customer(self, routed: RoutedQuery) -> dict:
         found, missing = [], []
         for customer_id in routed.customer_ids:
             detail = self._customers.get(customer_id)
             (found if detail else missing).append(detail or customer_id)
-        sentences = [self._describe_customer(c) for c in found]
+        sentences = [self._answer_customer_question(c, routed.query) for c in found]
         if missing:
             ids = ", ".join(str(i) for i in missing)
             sentences.append(f"Customer {ids} {'was' if len(missing) == 1 else 'were'} not found in the scored portfolio.")
@@ -89,6 +120,35 @@ class QueryService:
             "customers": [self._customers.summaries([c["customer_id"]])[0] for c in found] if len(found) > 1 else None,
             "not_found_ids": missing or None,
         }
+
+    def _answer_customer_question(self, c: dict, query: str) -> str:
+        fields = [
+            (r"\b(?:annual )?income\b(?! type)", "annual_income", "annual income", "amount"),
+            (r"\b(?:credit|loan) amount\b", "credit_amount", "credit amount", "amount"),
+            (r"\bannuity\b", "annuity_amount", "annuity amount", "amount"),
+            (r"\bincome type\b", "income_type", "income type", None),
+            (r"\beducation\b", "education", "education", None),
+            (r"\b(?:family|marital) status\b", "family_status", "family status", None),
+            (r"\b(?:occupation|job)\b", "occupation", "occupation", None),
+            (r"\b(?:unpaid|outstanding)(?: amount| balance)?\b", "total_unpaid_amount", "recorded unpaid installment amount", "amount"),
+            (r"\blate[ -]payment rate\b", "late_payment_rate", "late payment rate", PERCENT),
+            (r"\bpayment ratio\b", "payment_ratio", "payment ratio", "ratio"),
+        ]
+        requested = [(key, label, unit) for pattern, key, label, unit in fields if re.search(pattern, query, re.I)]
+        if requested:
+            answers = []
+            for key, label, unit in requested:
+                value = c.get(key)
+                if value is None:
+                    answers.append(f"Customer {c['customer_id']}: {label} is not available.")
+                else:
+                    displayed = format_value(value, unit) if unit else str(value)
+                    answers.append(f"Customer {c['customer_id']}: {label} is {displayed}.")
+            return " ".join(answers)
+        if re.search(r"\b(?:risk|status|profile|summary|details|history|repayment|installments?|default|compare|tell me about)\b", query, re.I) or re.fullmatch(r"(?:customer\s+)?\d+", query.strip(), re.I):
+            return self._describe_customer(c)
+        return (f"I cannot answer that question about customer {c['customer_id']} from the available fields. "
+                "Ask about risk status, income, credit amount, education, occupation, or repayment history.")
 
     def _describe_customer(self, c: dict) -> str:
         text = (
