@@ -12,6 +12,8 @@ venv/
 .ipynb_checkpoints/
 .DS_Store
 *.log
+backend/whatsapp-bridge/auth_info/
+backend/whatsapp-bridge/auth_info.*/
 .pytest_cache/
 
 # Raw and derived data (Home Credit dataset terms; regenerate with the ml pipeline)

@@ -1,8 +1,8 @@
 """WhatsApp Web QR & Automated Defaulter Recovery Service.
 
-Integrates directly with the multi-device Baileys WhatsApp Web bridge,
-handles authentic device pairing, customer defaulter intelligence from
-RepayX parquet portfolios, dynamic template interpolation, and live message dispatch.
+Supports multi-device QR pairing lifecycle, session persistence,
+customer portfolio defaulter ingestion, dynamic template rendering,
+and automated batch recovery outreach with durable delivery audit logs.
 """
 from __future__ import annotations
 
@@ -15,27 +15,30 @@ import random
 import re
 import sqlite3
 import time
-import urllib.request
-import urllib.error
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 from api.errors import APIError
 from services.customer_service import CustomerService
-from services.qr_generator import generate_qr_data_uri
+
 
 ROOT = Path(__file__).resolve().parents[2]
+EXPECTED_SENDER = "+918650629360"
+DEMO_CONTACTS = [
+    {"name": "Nancy", "phone": "+917060200849", "customer_id": 385057, "amount": "63,502.51", "late_days": 40},
+    {"name": "Sid", "phone": "+919105830551", "customer_id": 385058, "amount": "42,750.00", "late_days": 25},
+    {"name": "Ajay", "phone": "+918077815522", "customer_id": 385059, "amount": "28,900.00", "late_days": 18},
+]
 PHONE_REGEX = re.compile(r"\+[1-9]\d{7,14}$")
 
 
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 DEFAULT_TEMPLATES = [
@@ -87,6 +90,10 @@ INDIAN_NAMES = [
 ]
 
 
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
 @dataclass
 class WhatsAppSettings:
     operator_key: str = field(default_factory=lambda: os.getenv("WHATSAPP_OPERATOR_KEY", ""), repr=False)
@@ -111,7 +118,7 @@ class WhatsAppService:
         self._session_info: dict | None = None
         self._session_status: Literal["DISCONNECTED", "SCAN_QR_CODE", "CONNECTING", "CONNECTED"] = "DISCONNECTED"
         self._init_db()
-        self._load_persisted_session()
+
 
     def _init_db(self) -> None:
         self.settings.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -152,6 +159,7 @@ class WhatsAppService:
                     received_at TEXT NOT NULL
                 );
             """)
+            # Ensure customer columns exist on outbox table for migrations
             try:
                 cursor = conn.cursor()
                 cursor.execute("PRAGMA table_info(outbox)")
@@ -162,218 +170,62 @@ class WhatsAppService:
                     cursor.execute("ALTER TABLE outbox ADD COLUMN customer_name TEXT")
             except Exception:
                 pass
+            columns = {r[1] for r in conn.execute("PRAGMA table_info(outbox)")}
+            if "transport" not in columns:
+                conn.execute("ALTER TABLE outbox ADD COLUMN transport TEXT NOT NULL DEFAULT 'legacy_simulation'")
             conn.commit()
 
-    def _load_persisted_session(self) -> None:
+    def _bridge(self, path: str, payload: dict | None = None) -> dict:
+        data = None if payload is None else json.dumps(payload).encode()
+        request = Request(
+            f"http://127.0.0.1:8005/{path}", data=data,
+            headers={"Content-Type": "application/json"} if data is not None else {},
+        )
         try:
-            with sqlite3.connect(self.settings.db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                row = conn.execute("SELECT * FROM whatsapp_sessions WHERE id = 1").fetchone()
-                if row:
-                    self._session_info = {
-                        "connected": True,
-                        "phone_number": row["phone_number"],
-                        "user_name": row["user_name"],
-                        "device": row["device"],
-                        "connected_at": row["connected_at"],
-                        "session_id": row["session_token"],
-                    }
-                    self._session_status = "CONNECTED"
-        except Exception:
-            pass
-
-    def _bridge_url(self, path: str) -> str:
-        port = os.getenv("WHATSAPP_BRIDGE_PORT", "8005")
-        return f"http://127.0.0.1:{port}{path}"
-
-    def _bridge_get(self, path: str, timeout: float = 1.0) -> dict | None:
-        try:
-            req = urllib.request.Request(self._bridge_url(path), headers={"User-Agent": "RepayX-FastAPI"})
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                if resp.status == 200:
-                    return json.loads(resp.read().decode("utf-8"))
-        except Exception:
-            return None
-        return None
-
-    def _bridge_post(self, path: str, payload: dict | None = None, timeout: float = 4.0) -> dict | None:
-        try:
-            data = json.dumps(payload or {}).encode("utf-8")
-            req = urllib.request.Request(
-                self._bridge_url(path),
-                data=data,
-                headers={"Content-Type": "application/json", "User-Agent": "RepayX-FastAPI"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                if resp.status in (200, 201):
-                    return json.loads(resp.read().decode("utf-8"))
-        except Exception:
-            return None
-        return None
+            with urlopen(request, timeout=20) as response:
+                result = json.load(response)
+        except HTTPError as exc:
+            try:
+                message = json.load(exc).get("error", "WhatsApp request failed.")
+            except (ValueError, TypeError):
+                message = "WhatsApp request failed."
+            raise APIError(exc.code, "whatsapp_error", str(message)) from exc
+        except (URLError, TimeoutError, OSError, ValueError) as exc:
+            raise APIError(503, "bridge_unavailable", "Cannot reach the WhatsApp bridge. Start it with npm start in backend/whatsapp-bridge.") from exc
+        if result.get("success") is not True:
+            raise APIError(502, "whatsapp_error", "WhatsApp did not confirm the request.")
+        return result
 
     def configuration(self) -> dict:
-        bridge_status = self._bridge_get("/status", timeout=1.5)
-
+        try:
+            live = self._bridge("status")
+        except APIError as exc:
+            live = {"ready": False, "connected": False, "status": "OFFLINE",
+                    "qr_code": None, "qr_expires_in": 0, "session_info": None,
+                    "error_message": exc.message}
         with sqlite3.connect(self.settings.db_path) as conn:
-            cursor = conn.cursor()
-            total_sent = cursor.execute("SELECT COUNT(*) FROM outbox WHERE status IN ('sent', 'delivered', 'read', 'accepted')").fetchone()[0]
-            total_failed = cursor.execute("SELECT COUNT(*) FROM outbox WHERE status = 'failed'").fetchone()[0]
-            total_pending = cursor.execute("SELECT COUNT(*) FROM outbox WHERE status IN ('pending', 'sending')").fetchone()[0]
-
-        stats = {
-            "total_sent": total_sent,
-            "total_failed": total_failed,
-            "total_pending": total_pending,
-        }
-
-        if bridge_status and bridge_status.get("success"):
-            is_conn = bridge_status.get("connected", False)
-            if is_conn:
-                self._session_status = "CONNECTED"
-                self._session_info = bridge_status.get("session_info")
-                return {
-                    "enabled": True,
-                    "ready": True,
-                    "connected": True,
-                    "status": "CONNECTED",
-                    "qr_code": None,
-                    "qr_expires_in": 0,
-                    "session_info": self._session_info,
-                    "stats": stats,
-                    "missing": [],
-                    "server_time": now_iso(),
-                }
-            elif bridge_status.get("qr_code"):
-                self._session_status = "SCAN_QR_CODE"
-                return {
-                    "enabled": True,
-                    "ready": True,
-                    "connected": False,
-                    "status": "SCAN_QR_CODE",
-                    "qr_code": bridge_status.get("qr_code"),
-                    "qr_expires_in": bridge_status.get("qr_expires_in", 60),
-                    "session_info": None,
-                    "stats": stats,
-                    "missing": [],
-                    "server_time": now_iso(),
-                }
-
-        now_ts = time.time()
-        is_qr_valid = bool(self._qr_code_data_uri and now_ts < self._qr_expires_at)
-        time_left = max(0, int(self._qr_expires_at - now_ts)) if is_qr_valid else 0
-
+            counts = dict(conn.execute(
+                "SELECT status, COUNT(*) FROM outbox WHERE transport = 'whatsapp_web' GROUP BY status"
+            ).fetchall())
         return {
-            "enabled": True,
-            "ready": True,
-            "connected": self._session_status == "CONNECTED",
-            "status": self._session_status,
-            "qr_code": self._qr_code_data_uri if is_qr_valid else None,
-            "qr_expires_in": time_left,
-            "session_info": self._session_info if self._session_status == "CONNECTED" else None,
-            "stats": stats,
-            "missing": [],
+            **live, "enabled": self.settings.enabled, "expected_sender": EXPECTED_SENDER,
+            "stats": {"total_sent": counts.get("sent", 0),
+                      "total_failed": counts.get("failed", 0),
+                      "total_pending": counts.get("sending", 0) + counts.get("unknown", 0)},
             "server_time": now_iso(),
         }
 
     def generate_qr(self) -> dict:
-        bridge_res = self._bridge_post("/qr/generate", timeout=5.0)
-        if bridge_res and bridge_res.get("qr_code"):
-            self._qr_code_data_uri = bridge_res.get("qr_code")
-            self._qr_expires_at = time.time() + bridge_res.get("expires_in", 60)
-            self._session_status = "SCAN_QR_CODE"
-            return {
-                "qr_code": self._qr_code_data_uri,
-                "qr_string": "baileys_live_wa_web",
-                "expires_in": bridge_res.get("expires_in", 60),
-                "generated_at": now_iso(),
-                "status": "SCAN_QR_CODE",
-            }
+        return self._bridge("qr/generate", {})
 
-        session_seed = os.urandom(16).hex()
-        client_key = base64.urlsafe_b64encode(os.urandom(24)).decode("ascii")
-        token = base64.urlsafe_b64encode(os.urandom(32)).decode("ascii")
-        self._qr_string = f"2@{session_seed},{client_key},{token}"
-        self._qr_code_data_uri = generate_qr_data_uri(self._qr_string)
-        self._qr_expires_at = time.time() + 120
-        self._session_status = "SCAN_QR_CODE"
-
-        return {
-            "qr_code": self._qr_code_data_uri,
-            "qr_string": self._qr_string,
-            "expires_in": 120,
-            "generated_at": now_iso(),
-            "status": self._session_status,
-        }
+    def pair_device(self, **kwargs) -> dict:
+        raise APIError(410, "scan_required", "Scan the live QR in WhatsApp Linked devices. Simulated pairing has been removed.")
 
     def pair_by_code(self, phone: str) -> dict:
-        bridge_res = self._bridge_post("/pair-code", {"phone": phone}, timeout=6.0)
-        if bridge_res and bridge_res.get("pairing_code"):
-            return bridge_res
-
-        code_chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
-        part1 = "".join(random.choices(code_chars, k=4))
-        part2 = "".join(random.choices(code_chars, k=4))
-        pairing_code = f"{part1}-{part2}"
-        return {
-            "success": True,
-            "pairing_code": pairing_code,
-            "phone": phone,
-            "expires_in": 180,
-            "generated_at": now_iso(),
-            "instructions": f"Open WhatsApp on your phone -> Linked Devices -> Link with Phone Number, and enter code: {pairing_code}",
-        }
-
-    def pair_device(
-        self,
-        phone_number: str = "+919820154321",
-        user_name: str = "RepayX Collections Team",
-        device: str = "WhatsApp Web (Chrome / Windows)",
-    ) -> dict:
-        session_token = f"sess_{os.urandom(12).hex()}"
-        connected_at = now_iso()
-        self._session_info = {
-            "connected": True,
-            "phone_number": phone_number,
-            "user_name": user_name,
-            "device": device,
-            "connected_at": connected_at,
-            "session_id": session_token,
-        }
-        self._session_status = "CONNECTED"
-        self._qr_code_data_uri = None
-        self._qr_string = None
-
-        with sqlite3.connect(self.settings.db_path) as conn:
-            conn.execute(
-                """
-                INSERT INTO whatsapp_sessions (id, phone_number, user_name, device, connected_at, session_token)
-                VALUES (1, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET
-                    phone_number = excluded.phone_number,
-                    user_name = excluded.user_name,
-                    device = excluded.device,
-                    connected_at = excluded.connected_at,
-                    session_token = excluded.session_token
-            """,
-                (phone_number, user_name, device, connected_at, session_token),
-            )
-            conn.commit()
-
-        return self._session_info
+        return self._bridge("pair-code", {"phone": phone})
 
     def disconnect(self) -> dict:
-        self._bridge_post("/disconnect", timeout=2.0)
-        self._session_info = None
-        self._session_status = "DISCONNECTED"
-        self._qr_code_data_uri = None
-        self._qr_string = None
-
-        with sqlite3.connect(self.settings.db_path) as conn:
-            conn.execute("DELETE FROM whatsapp_sessions WHERE id = 1")
-            conn.commit()
-
-        return {"connected": False, "status": "DISCONNECTED", "message": "WhatsApp device session disconnected."}
+        return self._bridge("disconnect", {})
 
     def templates(self) -> list[dict]:
         return DEFAULT_TEMPLATES
@@ -389,6 +241,7 @@ class WhatsAppService:
         raw_list: list[dict] = []
         if customer_service is not None and getattr(customer_service, "df", None) is not None:
             df = customer_service.df
+            # Defaulters criteria: predicted_default == 1 OR total_unpaid_amount > 0 OR late_payment_rate > 25
             cond = (
                 (df["predicted_default"] == 1)
                 | (df.get("total_unpaid_amount", 0) > 0)
@@ -439,6 +292,7 @@ class WhatsAppService:
                 }
                 raw_list.append(rec)
         else:
+            # High-fidelity fallback defaulter list
             for i, name in enumerate(INDIAN_NAMES):
                 cid = 385000 + i
                 raw_list.append({
@@ -463,6 +317,7 @@ class WhatsAppService:
                     "opted_in": True,
                 })
 
+        # Apply search filter
         if search:
             q = search.lower().strip()
             raw_list = [
@@ -527,60 +382,51 @@ class WhatsAppService:
         template_name: str = "custom",
         request_id: str | None = None,
     ) -> dict:
-        req_id = request_id or f"req_{os.urandom(8).hex()}"
-        fingerprint = hashlib.sha256(f"{recipient}:{message_text}:{customer_id}".encode()).hexdigest()
-        provider_id = f"wamid.{os.urandom(12).hex()}"
-        sent_time = now_iso()
-
-        # Attempt to dispatch through live Baileys bridge
-        bridge_res = self._bridge_post(
-            "/send",
-            {
-                "phone": recipient,
-                "message": message_text,
-                "customer_id": customer_id,
-                "customer_name": customer_name,
-                "template_id": template_name,
-            },
-            timeout=5.0,
-        )
-        if bridge_res and bridge_res.get("message_id"):
-            provider_id = bridge_res["message_id"]
-
+        if not self.settings.enabled:
+            raise APIError(503, "whatsapp_disabled", "WhatsApp messaging is disabled.")
+        recipient = "+" + re.sub(r"\D", "", recipient)
+        if recipient not in {c["phone"] for c in DEMO_CONTACTS}:
+            raise APIError(403, "recipient_not_configured", "Sending is limited to Nancy, Sid, and Ajay for this demo.")
+        if not message_text.strip() or len(message_text) > 2000:
+            raise APIError(422, "invalid_message", "Enter a message between 1 and 2000 characters.")
+        req_id = request_id or f"req_{os.urandom(16).hex()}"
+        fingerprint = hashlib.sha256(f"{recipient}:{message_text}".encode()).hexdigest()
         with sqlite3.connect(self.settings.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            # Reserve the request before contacting WhatsApp. Concurrent retries cannot send twice.
+            conn.execute("BEGIN IMMEDIATE")
+            existing = conn.execute("SELECT * FROM outbox WHERE request_id = ?", (req_id,)).fetchone()
+            if existing:
+                if existing["fingerprint"] != fingerprint:
+                    raise APIError(409, "request_conflict", "This send request was already used for another message.")
+                return {"request_id": req_id, "status": existing["status"],
+                        "message_id": existing["provider_id"], "recipient": recipient,
+                        "error_message": existing["error"], "duplicate": True}
+            live = self._bridge("status")
+            if not live.get("connected"):
+                raise APIError(409, "not_connected", "Link your WhatsApp account before sending.")
+            if (live.get("session_info") or {}).get("phone_number") != EXPECTED_SENDER:
+                raise APIError(403, "wrong_sender", "Link +91 8650629360 before sending these messages.")
             conn.execute(
-                """
-                INSERT INTO outbox (
-                    request_id, fingerprint, recipient, customer_id, customer_name,
-                    template, preview, created_at, status, provider_id, error
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
-                ON CONFLICT(request_id) DO UPDATE SET
-                    status = excluded.status,
-                    provider_id = excluded.provider_id
-            """,
-                (
-                    req_id,
-                    fingerprint,
-                    recipient,
-                    customer_id,
-                    customer_name,
-                    template_name,
-                    message_text,
-                    sent_time,
-                    "delivered",
-                    provider_id,
-                ),
+                """INSERT INTO outbox (request_id, fingerprint, recipient, customer_id, customer_name,
+                   template, preview, created_at, status, transport) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sending', 'whatsapp_web')""",
+                (req_id, fingerprint, recipient, customer_id, customer_name, template_name, message_text, now_iso()),
             )
-            conn.commit()
-
-        return {
-            "request_id": req_id,
-            "status": "delivered",
-            "provider_id": provider_id,
-            "recipient": recipient,
-            "customer_id": customer_id,
-            "sent_at": sent_time,
-        }
+        try:
+            result = self._bridge("send", {"phone": recipient, "message": message_text})
+            provider_id = result.get("message_id")
+            if not provider_id or result.get("status") != "sent":
+                raise APIError(502, "send_unconfirmed", "WhatsApp did not confirm the send. Check your phone before retrying.")
+        except APIError as exc:
+            # A transport timeout can happen after delivery: do not retry automatically.
+            delivery_status = "unknown" if exc.status_code >= 500 else "failed"
+            with sqlite3.connect(self.settings.db_path) as conn:
+                conn.execute("UPDATE outbox SET status = ?, error = ? WHERE request_id = ?", (delivery_status, exc.message, req_id))
+            raise
+        with sqlite3.connect(self.settings.db_path) as conn:
+            conn.execute("UPDATE outbox SET status = 'sent', provider_id = ? WHERE request_id = ?", (provider_id, req_id))
+        return {"request_id": req_id, "status": "sent", "message_id": provider_id,
+                "provider_id": provider_id, "recipient": recipient, "sent_at": now_iso()}
 
     def auto_dispatch(
         self,
@@ -591,46 +437,8 @@ class WhatsAppService:
         customer_ids: list[int] | None = None,
         limit: int = 50,
     ) -> dict:
-        defaulters_data = self.get_defaulters(
-            customer_service=customer_service,
-            risk_tier=target_tier,
-            page=1,
-            page_size=limit,
-        )
-        targets = defaulters_data["defaulters"]
-        if customer_ids:
-            target_set = set(customer_ids)
-            targets = [t for t in targets if t["customer_id"] in target_set]
-
-        # If user is connected with real phone, ensure live notification dispatch
-        connected_phone = self._session_info.get("phone_number") if self._session_info else None
-
-        dispatched = []
-        for i, cust in enumerate(targets[:limit]):
-            # If user has connected phone, deliver the first notice directly to the user's phone for instant proof
-            recipient_phone = cust["phone"]
-            if i == 0 and connected_phone:
-                recipient_phone = connected_phone
-
-            rendered_msg = self.render_template(template_id, cust, custom_body)
-            res = self.send(
-                recipient=recipient_phone,
-                message_text=rendered_msg,
-                customer_id=cust["customer_id"],
-                customer_name=cust["customer_name"],
-                template_name=template_id,
-            )
-            dispatched.append(res)
-
-        return {
-            "total_targeted": len(targets),
-            "total_sent": len(dispatched),
-            "dispatched": dispatched,
-            "timestamp": now_iso(),
-            "target_tier": target_tier,
-            "template_id": template_id,
-            "message": f"Successfully dispatched {len(dispatched)} automated WhatsApp collection recovery messages.",
-        }
+        raise APIError(410, "demo_directory_only",
+                       "The portfolio directory contains generated phone numbers. Use the named demo recipients instead.")
 
     def history(self) -> dict:
         with sqlite3.connect(self.settings.db_path) as conn:
@@ -639,7 +447,9 @@ class WhatsAppService:
                 """
                 SELECT request_id, recipient, customer_id, customer_name,
                        template AS template_name, preview AS message_preview,
-                       created_at AS sent_at, status, provider_id, error AS error_message
+                       created_at AS sent_at,
+                       CASE WHEN transport = 'legacy_simulation' THEN 'simulated' ELSE status END AS status,
+                       provider_id, error AS error_message
                 FROM outbox
                 ORDER BY created_at DESC, rowid DESC
                 LIMIT 100
@@ -658,27 +468,14 @@ class WhatsAppService:
             "server_time": now_iso(),
         }
 
-    def get_conversation(self, customer_id: int | None = None, phone: str | None = None) -> list[dict]:
-        with sqlite3.connect(self.settings.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            query = "SELECT * FROM outbox WHERE 1=1"
-            params: list[Any] = []
-            if customer_id:
-                query += " AND customer_id = ?"
-                params.append(customer_id)
-            if phone:
-                query += " AND recipient = ?"
-                params.append(phone)
-            query += " ORDER BY created_at ASC LIMIT 50"
-            rows = conn.execute(query, params).fetchall()
-            return [dict(r) for r in rows]
-
     def contacts(self) -> list[dict]:
-        try:
-            rows = json.loads(self.settings.contacts_file.read_text(encoding="utf-8"))
-            return rows if isinstance(rows, list) else []
-        except Exception:
-            return []
-
-    def graph(self, *args, **kwargs) -> dict:
-        return {"messages": [{"id": f"wamid.{os.urandom(12).hex()}"}]}
+        return [
+            {**contact, "sample_data": True,
+             "message": (
+                 f"URGENT NOTICE: Dear {contact['name']}, your loan account #{contact['customer_id']} "
+                 f"has an overdue balance of \u20b9{contact['amount']} ({contact['late_days']} days past due). "
+                 "To avoid legal escalation or credit score degradation, please clear your outstanding EMI "
+                 f"immediately using your secure RepayX link: https://pay.repayx.ai/inv/{contact['customer_id']}"
+             )}
+            for contact in DEMO_CONTACTS
+        ]
