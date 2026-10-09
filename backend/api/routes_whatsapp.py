@@ -64,7 +64,7 @@ def pair_device(body: PairRequest = PairRequest(), messaging: WhatsAppService = 
 
 class PairCodeRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    phone: str = Field(default="+919820154321")
+    phone: str = Field(default="+918650629360")
 
 
 @router.post("/pair-code")

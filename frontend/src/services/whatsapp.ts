@@ -19,7 +19,9 @@ export interface WhatsAppStatus {
   enabled: boolean;
   ready: boolean;
   connected: boolean;
-  status: 'DISCONNECTED' | 'SCAN_QR_CODE' | 'CONNECTING' | 'CONNECTED';
+  status: 'DISCONNECTED' | 'SCAN_QR_CODE' | 'CONNECTING' | 'CONNECTED' | 'OFFLINE' | 'ERROR';
+  error_message?: string | null;
+  expected_sender?: string;
   qr_code?: string;
   qr_expires_in?: number;
   session_info?: WhatsAppSession | null;
@@ -57,7 +59,7 @@ export interface WhatsAppHistoryItem {
   customer_name?: string | null;
   template_name?: string;
   message_preview: string;
-  status: 'sent' | 'delivered' | 'read' | 'failed' | 'pending';
+  status: 'sent' | 'delivered' | 'read' | 'failed' | 'pending' | 'sending' | 'unknown' | 'simulated';
   sent_at: string;
   error_message?: string | null;
 }
@@ -88,6 +90,16 @@ export interface AutoDispatchResponse {
   failed: number;
   target_tier: string;
   total_targets: number;
+  message: string;
+}
+
+export interface DemoContact {
+  name: string;
+  phone: string;
+  customer_id: number;
+  amount: string;
+  late_days: number;
+  sample_data: boolean;
   message: string;
 }
 
@@ -129,6 +141,8 @@ async function call<T>(path: string, body?: unknown, signal?: AbortSignal): Prom
 }
 
 export const whatsapp = {
+  getContacts: () => call<{ success: boolean; contacts: DemoContact[] }>('contacts'),
+  pairByCode: () => call<{ success: boolean; pairing_code: string }>('pair-code', { phone: '+918650629360' }),
   getStatus: (signal?: AbortSignal) => call<WhatsAppStatus>('status', undefined, signal),
   generateQR: () => call<{ success: boolean; qr_code: string; expires_in: number; status: string }>('qr/generate', {}),
   pairDevice: (payload?: { phone_number?: string; user_name?: string }) =>
@@ -144,8 +158,8 @@ export const whatsapp = {
     return call<DefaultersResponse>(`defaulters${queryStr ? `?${queryStr}` : ''}`);
   },
   getTemplates: () => call<{ success: boolean; templates: WhatsAppTemplate[] }>('templates'),
-  sendMessage: (payload: { recipient: string; message: string; customer_id?: number; customer_name?: string; template_name?: string }) =>
-    call<{ success: boolean; message_id: string; status: string; recipient: string }>('send', payload),
+  sendMessage: (payload: { recipient: string; message: string; customer_id?: number; customer_name?: string; template_name?: string; request_id?: string }) =>
+    call<{ success: boolean; message_id: string; status: string; recipient: string; error_message?: string }>('send', payload),
   autoDispatch: (payload: AutoDispatchPayload) => call<AutoDispatchResponse>('auto-dispatch', payload),
   getMessages: (limit = 50) => call<{ success: boolean; messages: WhatsAppHistoryItem[]; count: number }>(`messages?limit=${limit}`),
 };

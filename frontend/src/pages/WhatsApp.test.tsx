@@ -1,209 +1,77 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WhatsAppPage } from './WhatsApp';
-import { installFakeApi } from '../test/fakeApi';
+import { whatsapp } from '../services/whatsapp';
 
-const mockStatusDisconnected = {
-  success: true,
-  enabled: true,
-  ready: true,
-  connected: false,
-  status: 'DISCONNECTED',
-  qr_code: null,
-  qr_expires_in: 0,
-  session_info: null,
-  stats: { total_sent: 12, total_failed: 0, total_pending: 0 },
-  server_time: '2026-10-06T12:00:00Z',
-};
+vi.mock('../services/whatsapp', () => ({ whatsapp: {
+  getStatus: vi.fn(), getContacts: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(),
+  generateQR: vi.fn(), pairByCode: vi.fn(), disconnect: vi.fn(),
+} }));
+const connected = { success: true, enabled: true, ready: true, connected: true, status: 'CONNECTED' as const,
+  session_info: { phone_number: '+918650629360', user_name: 'Demo', device: 'WhatsApp', connected_at: '' },
+  stats: { total_sent: 0, total_failed: 0, total_pending: 0 }, server_time: '' };
+const phones = ['+917060200849', '+919105830551', '+918077815522'];
 
-const mockStatusConnected = {
-  ...mockStatusDisconnected,
-  connected: true,
-  status: 'CONNECTED',
-  session_info: {
-    connected: true,
-    phone_number: '+919820154321',
-    user_name: 'RepayX Collections Team',
-    device: 'WhatsApp Web (Chrome / Windows)',
-    connected_at: '2026-10-06T12:00:00Z',
-    session_id: 'sess123',
-  },
-};
-
-const mockTemplates = [
-  {
-    id: 'urgent_settlement',
-    name: 'Urgent High-Risk Settlement Notice',
-    category: 'Urgent',
-    description: 'High-priority alert for critical risk defaulters',
-    body: 'URGENT: Dear {{customer_name}}, your loan account #{{customer_id}} has ₹{{unpaid_amount}} overdue. Pay here: {{payment_link}}',
-    parameters: ['customer_name', 'customer_id', 'unpaid_amount', 'payment_link'],
-  },
-  {
-    id: 'overdue_notice',
-    name: 'Standard Overdue Payment Notice',
-    category: 'Overdue',
-    description: 'Standard reminder specifying overdue balance',
-    body: 'Dear {{customer_name}}, your EMI of ₹{{unpaid_amount}} for Loan #{{customer_id}} is overdue.',
-    parameters: ['customer_name', 'customer_id', 'unpaid_amount'],
-  },
-];
-
-const mockDefaulters = {
-  success: true,
-  defaulters: [
-    {
-      customer_id: 385772,
-      name: 'Rahul Sharma',
-      phone: '+919820154321',
-      risk_score: 80.1,
-      risk_category: 'High Risk',
-      predicted_default: 1,
-      total_unpaid_amount: 28450.0,
-      avg_days_late: 18.5,
-      late_payment_rate: 85.0,
-      last_sent_status: 'none',
-      recommended_template: 'urgent_settlement',
-    },
-    {
-      customer_id: 385001,
-      name: 'Ananya Verma',
-      phone: '+919811287654',
-      risk_score: 72.4,
-      risk_category: 'High Risk',
-      predicted_default: 1,
-      total_unpaid_amount: 19200.0,
-      avg_days_late: 14.0,
-      late_payment_rate: 60.0,
-      last_sent_status: 'delivered',
-      recommended_template: 'urgent_settlement',
-    },
-  ],
-  total: 2,
-  page: 1,
-  page_size: 15,
-  total_pages: 1,
-  summary: {
-    total_defaulters: 2,
-    high_risk_defaulters: 2,
-    medium_risk_defaulters: 0,
-    total_unpaid_exposure: 47650.0,
-    total_unpaid_formatted: '47,650',
-  },
-};
-
-function setupFakeApi(connected = false) {
-  return installFakeApi({
-    'GET /api/whatsapp/status': { body: connected ? mockStatusConnected : mockStatusDisconnected },
-    'GET /api/whatsapp/templates': { body: { success: true, templates: mockTemplates } },
-    'GET /api/whatsapp/defaulters': { body: mockDefaulters },
-    'GET /api/whatsapp/messages': { body: { success: true, messages: [], incoming: [] } },
-    'POST /api/whatsapp/qr/generate': {
-      body: {
-        success: true,
-        qr_code: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
-        qr_string: '2@test,key,token',
-        expires_in: 120,
-        status: 'SCAN_QR_CODE',
-      },
-    },
-    'POST /api/whatsapp/qr/pair': {
-      body: {
-        success: true,
-        session: mockStatusConnected.session_info,
-        message: 'WhatsApp device paired successfully.',
-      },
-    },
-    'POST /api/whatsapp/disconnect': {
-      body: { success: true, connected: false, message: 'Disconnected' },
-    },
-    'POST /api/whatsapp/auto-dispatch': {
-      body: {
-        success: true,
-        total_targeted: 2,
-        total_sent: 2,
-        dispatched: [
-          { request_id: 'req1', status: 'delivered', recipient: '+919820154321', timestamp: '2026-10-06T12:00:00Z' },
-          { request_id: 'req2', status: 'delivered', recipient: '+919811287654', timestamp: '2026-10-06T12:00:00Z' },
-        ],
-        timestamp: '2026-10-06T12:00:00Z',
-      },
-    },
-    'POST /api/whatsapp/send': {
-      body: { success: true, status: 'delivered', request_id: 'req-single', provider_id: 'wamid.123' },
-    },
-  });
-}
-
-afterEach(() => vi.useRealTimers());
-
-describe('WhatsApp Web QR and Defaulters Outreach Page', () => {
-  it('renders WhatsApp Web QR section, defaulters summary, and defaulter list', async () => {
-    setupFakeApi(false);
-    render(<WhatsAppPage />);
-
-    expect(screen.getByText('WhatsApp Web Defaulter Recovery')).toBeInTheDocument();
-    expect(screen.getByText(/Scan QR Code to Connect WhatsApp/i)).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(screen.getByText('Rahul Sharma')).toBeInTheDocument();
-      expect(screen.getByText('Ananya Verma')).toBeInTheDocument();
-      expect(screen.getByText('₹47,650')).toBeInTheDocument();
-    });
-  });
-
-  it('allows pairing via mobile scan simulation and triggers automated dispatch', async () => {
-    const calls = setupFakeApi(true);
-    render(<WhatsAppPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Rahul Sharma')).toBeInTheDocument();
-    });
-
-    const dispatchButton = screen.getByRole('button', { name: /Start Automated Outreach/i });
-    expect(dispatchButton).toBeInTheDocument();
-
-    await userEvent.click(dispatchButton);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Automated outreach completed/i)).toBeInTheDocument();
-    });
-
-    const postCalls = calls.filter((c) => c.method === 'POST' && c.path === '/api/whatsapp/auto-dispatch');
-    expect(postCalls).toHaveLength(1);
-    expect(postCalls[0].body).toMatchObject({
-      target_tier: 'high',
-      template_id: 'urgent_settlement',
-    });
-  });
-
-  it('allows opening quick send modal for a single defaulter and sending a direct message', async () => {
-    const calls = setupFakeApi(true);
-    render(<WhatsAppPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Rahul Sharma')).toBeInTheDocument();
-    });
-
-    const quickSendButtons = screen.getAllByRole('button', { name: /Send Outreach/i });
-    await userEvent.click(quickSendButtons[0]);
-
-    expect(screen.getByText(/Direct outreach to Rahul Sharma/i)).toBeInTheDocument();
-
-    const sendButton = screen.getByRole('button', { name: /Send Direct Message/i });
-    await userEvent.click(sendButton);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Message delivered to Rahul Sharma/i)).toBeInTheDocument();
-    });
-
-    const postSingleCalls = calls.filter((c) => c.method === 'POST' && c.path === '/api/whatsapp/send');
-    expect(postSingleCalls).toHaveLength(1);
-    expect(postSingleCalls[0].body).toMatchObject({
-      customer_id: 385772,
-      recipient: '+919820154321',
-    });
-  });
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.mocked(whatsapp.getStatus).mockResolvedValue(connected);
+  vi.mocked(whatsapp.getMessages).mockResolvedValue({ success: true, messages: [], count: 0 });
+  vi.mocked(whatsapp.getContacts).mockResolvedValue({ success: true, contacts: ['Nancy', 'Sid', 'Ajay'].map((name, index) => ({
+    name, phone: phones[index], customer_id: 385057 + index, amount: '100', late_days: 10,
+    sample_data: true, message: 'Dear ' + name + ', demo EMI notice.',
+  })) });
+  vi.mocked(whatsapp.sendMessage).mockResolvedValue({ success: true, status: 'sent', message_id: 'provider-id', recipient: phones[0] });
 });
 
+describe('WhatsApp demo outreach', () => {
+  it('handles an older contact response without message text', async () => {
+    vi.mocked(whatsapp.getContacts).mockResolvedValue({ success: true, contacts: [{
+      name: 'Nancy', phone: phones[0], customer_id: 385057, amount: '100', late_days: 10,
+      sample_data: true,
+    } as Awaited<ReturnType<typeof whatsapp.getContacts>>['contacts'][number]] });
+    render(<WhatsAppPage />);
+    expect(await screen.findByRole('textbox', { name: 'Message for Nancy' })).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Send to Nancy' })).toBeDisabled();
+  });
+  it('edits each notice and sends all three exactly once', async () => {
+    const user = userEvent.setup();
+    render(<WhatsAppPage />);
+    const editor = await screen.findByRole('textbox', { name: 'Message for Nancy' });
+    await user.clear(editor);
+    await user.type(editor, 'Edited Nancy EMI notice');
+    await user.click(screen.getByRole('button', { name: 'Send all pending messages (3)' }));
+    await waitFor(() => expect(whatsapp.sendMessage).toHaveBeenCalledTimes(3));
+    expect(vi.mocked(whatsapp.sendMessage).mock.calls.map(([payload]) => payload.recipient)).toEqual(phones);
+    expect(whatsapp.sendMessage).toHaveBeenNthCalledWith(1, expect.objectContaining({ message: 'Edited Nancy EMI notice', customer_name: 'Nancy', request_id: expect.any(String) }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Send all pending messages (0)' })).toBeDisabled());
+  });
+
+  it('requires the expected sender and never sends just by linking', async () => {
+    vi.mocked(whatsapp.getStatus).mockResolvedValue({ ...connected, session_info: { ...connected.session_info, phone_number: '+919999999999' } });
+    render(<WhatsAppPage />);
+    await screen.findByRole('textbox', { name: 'Message for Sid' });
+    expect(screen.getByRole('button', { name: 'Send all pending messages (3)' })).toBeDisabled();
+    expect(whatsapp.sendMessage).not.toHaveBeenCalled();
+    expect(screen.getByText(/This is a different account/)).toBeInTheDocument();
+  });
+
+  it('keeps a failed send visible without reporting success or automatic retries', async () => {
+    vi.mocked(whatsapp.sendMessage).mockRejectedValue(new Error('Bridge timed out'));
+    const user = userEvent.setup();
+    render(<WhatsAppPage />);
+    await user.click(await screen.findByRole('button', { name: 'Send to Ajay' }));
+    await screen.findByText(/Bridge timed out/);
+    expect(screen.getByText('Send status: unknown')).toBeInTheDocument();
+    expect(whatsapp.sendMessage).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Send to Ajay' })).toBeDisabled();
+  });
+
+  it('disables a blank message instead of restoring a default', async () => {
+    const user = userEvent.setup();
+    render(<WhatsAppPage />);
+    await user.clear(await screen.findByRole('textbox', { name: 'Message for Nancy' }));
+    expect(screen.getByRole('button', { name: 'Send to Nancy' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send all pending messages (3)' })).toBeDisabled();
+  });
+});
