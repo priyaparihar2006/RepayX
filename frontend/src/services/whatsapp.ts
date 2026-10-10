@@ -190,7 +190,7 @@ export const whatsapp = {
     return request<any>(`/api/whatsapp/defaulters?${q.toString()}`);
   },
 
-  sendMessage: (payload: { recipient: string; message: string; customer_id?: number; customer_name?: string; template_name?: string }) =>
+  sendMessage: (payload: { recipient: string; message: string; customer_id?: number; customer_name?: string; template_name?: string; request_id?: string }) =>
     request<any>('/api/whatsapp/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

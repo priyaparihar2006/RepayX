@@ -122,6 +122,7 @@ function AppContent() {
   const currentTab = tabForPath(pathname);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
 
   // Demo workflow data (sample data; not connected to the RepayX API)
@@ -140,6 +141,7 @@ function AppContent() {
 
   // Navigation requests from the navbar, drawer, and demo pages (which use sample IDs).
   const handleNavigate = (tab: string, targetId?: string) => {
+    setIsMobileMenuOpen(false);
     if (tab === 'ai-assistant') {
       setIsAiAssistantOpen(true);
     } else if (tab === 'conversations') {
@@ -185,27 +187,39 @@ function AppContent() {
   const { title, breadcrumb } = pageMeta(pathname);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex">
+    <div className="min-h-screen bg-[#F4F6F9] text-[#1E252D] flex">
       <Sidebar
         currentTab={currentTab}
-        onSelectTab={(tab) => (tab === 'ai-assistant' ? setIsAiAssistantOpen(true) : navigate(TAB_PATHS[tab]))}
+        onSelectTab={(tab) => {
+          setIsMobileMenuOpen(false);
+          if (tab === 'ai-assistant') {
+            setIsAiAssistantOpen(true);
+          } else {
+            navigate(TAB_PATHS[tab]);
+          }
+        }}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        isMobileOpen={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
         unreadCount={conversations.filter((c) => c.unread).length}
         pendingEscalationsCount={5}
+        onOpenSendMessage={() => navigate(TAB_PATHS.whatsapp)}
       />
 
       <div
         className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
-          isSidebarCollapsed ? 'ml-20' : 'ml-64'
+          isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'
         }`}
       >
         <Navbar
-          isLiveMessaging={pathname === '/whatsapp'}
           pageTitle={title}
           breadcrumb={breadcrumb}
           onOpenAiAssistant={() => navigate(TAB_PATHS['ai-insights'])}
           onNavigate={handleNavigate}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
           customers={customers}
           loans={loans}
           conversations={conversations}

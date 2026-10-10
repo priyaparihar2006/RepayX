@@ -35,7 +35,9 @@ export const AiInsightsPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">AI Insights & Analytics</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight font-heading">
+              AI Insights & Analytics
+            </h1>
             <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800">
               Demo Metrics
             </span>
@@ -48,15 +50,15 @@ export const AiInsightsPage: React.FC = () => {
 
       {/* AI Performance Metric Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl p-5 border border-purple-200/80 shadow-xs bg-gradient-to-b from-purple-50/30 to-white">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500">Intent Detection Accuracy</span>
-            <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[#516072]/15 text-[#516072] flex items-center justify-center">
               <Sparkles className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-3xl font-bold font-mono text-purple-700 tabular-nums">94%</span>
+            <span className="text-3xl font-bold font-mono text-[#516072] tabular-nums">94%</span>
             <span className="text-xs font-semibold text-emerald-600">+1.2% this week</span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1">Ground truth verified on 2,400+ turns</p>

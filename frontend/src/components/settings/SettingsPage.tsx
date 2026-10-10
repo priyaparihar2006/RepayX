@@ -25,7 +25,9 @@ export const SettingsPage: React.FC = () => {
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">System & AI Recovery Settings</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight font-heading">
+          System & AI Recovery Settings
+        </h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
           Configure outreach triggers, manager-in-the-loop guardrails, and compliance thresholds.
         </p>
@@ -34,8 +36,8 @@ export const SettingsPage: React.FC = () => {
       {/* Cadence Rules */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
         <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-          <Sliders className="w-4 h-4 text-blue-600" />
-          <h2 className="text-sm font-bold text-slate-900">Automated Follow-up Cadence</h2>
+          <Sliders className="w-4 h-4 text-[#516072]" />
+          <h2 className="text-sm font-bold text-slate-900 font-heading">Automated Follow-up Cadence</h2>
         </div>
 
         <div className="space-y-3 text-xs">
@@ -48,7 +50,7 @@ export const SettingsPage: React.FC = () => {
               type="checkbox"
               checked={tMinus2Reminder}
               onChange={(e) => setTMinus2Reminder(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+              className="w-4 h-4 accent-[#516072] rounded cursor-pointer"
             />
           </label>
 
@@ -61,7 +63,7 @@ export const SettingsPage: React.FC = () => {
               type="checkbox"
               checked={t0Reminder}
               onChange={(e) => setT0Reminder(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+              className="w-4 h-4 accent-[#516072] rounded cursor-pointer"
             />
           </label>
 
@@ -74,7 +76,7 @@ export const SettingsPage: React.FC = () => {
               type="checkbox"
               checked={tPlus3Escalation}
               onChange={(e) => setTPlus3Escalation(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+              className="w-4 h-4 accent-[#516072] rounded cursor-pointer"
             />
           </label>
         </div>
@@ -83,8 +85,8 @@ export const SettingsPage: React.FC = () => {
       {/* Manager In The Loop Rules */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
         <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-          <Shield className="w-4 h-4 text-purple-600" />
-          <h2 className="text-sm font-bold text-slate-900">Manager Authorization & Guardrails</h2>
+          <Shield className="w-4 h-4 text-[#516072]" />
+          <h2 className="text-sm font-bold text-slate-900 font-heading">Manager Authorization & Guardrails</h2>
         </div>
 
         <div className="space-y-3 text-xs">
@@ -97,7 +99,7 @@ export const SettingsPage: React.FC = () => {
               type="checkbox"
               checked={managerApprovalDisputes}
               onChange={(e) => setManagerApprovalDisputes(e.target.checked)}
-              className="w-4 h-4 text-purple-600 rounded cursor-pointer"
+              className="w-4 h-4 accent-[#516072] rounded cursor-pointer"
             />
           </label>
 
@@ -110,14 +112,14 @@ export const SettingsPage: React.FC = () => {
               type="checkbox"
               checked={managerApprovalHardship}
               onChange={(e) => setManagerApprovalHardship(e.target.checked)}
-              className="w-4 h-4 text-purple-600 rounded cursor-pointer"
+              className="w-4 h-4 accent-[#516072] rounded cursor-pointer"
             />
           </label>
 
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
             <div className="flex items-center justify-between mb-1.5">
               <span className="font-semibold text-slate-800">RAG Semantic Similarity Cutoff</span>
-              <span className="font-mono font-bold text-purple-700">{confidenceThreshold}%</span>
+              <span className="font-mono font-bold text-[#516072]">{confidenceThreshold}%</span>
             </div>
             <p className="text-slate-500 text-[11px] mb-2">
               If chunk confidence is below this cutoff, route to manager review without auto-replying.
@@ -128,7 +130,7 @@ export const SettingsPage: React.FC = () => {
               max="95"
               value={confidenceThreshold}
               onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
-              className="w-full cursor-pointer accent-purple-600"
+              className="w-full cursor-pointer accent-[#516072]"
             />
           </div>
         </div>
@@ -138,7 +140,7 @@ export const SettingsPage: React.FC = () => {
       <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
         <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
           <Bell className="w-4 h-4 text-emerald-600" />
-          <h2 className="text-sm font-bold text-slate-900">Regulatory Contact Windows (RBI Guidelines)</h2>
+          <h2 className="text-sm font-bold text-slate-900 font-heading">Regulatory Contact Windows (RBI Guidelines)</h2>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -166,7 +168,7 @@ export const SettingsPage: React.FC = () => {
       <div className="flex justify-end">
         <button
           onClick={handleSave}
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs cursor-pointer transition-all"
+          className="px-5 py-2.5 bg-[#516072] hover:bg-[#43505F] text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs cursor-pointer transition-all"
         >
           <Save className="w-4 h-4" />
           <span>Save Changes</span>

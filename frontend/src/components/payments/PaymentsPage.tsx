@@ -62,7 +62,7 @@ export const PaymentsPage: React.FC = () => {
         <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500">Payments Today</span>
-            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-[#516072]/15 text-[#516072] flex items-center justify-center">
               <CreditCard className="w-3.5 h-3.5" />
             </div>
           </div>
@@ -131,7 +131,7 @@ export const PaymentsPage: React.FC = () => {
             placeholder="Search reference, customer, loan..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#516072]"
           />
         </div>
       </div>

@@ -49,11 +49,11 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
   const [followupChannel, setFollowupChannel] = useState<'WhatsApp' | 'SMS'>('WhatsApp');
   const [followupTemplate, setFollowupTemplate] = useState('reminder');
   const [followupMessageText, setFollowupMessageText] = useState(
-    `Dear ${customer.name}, gentle reminder from RepayX that your scheduled EMI of ₹${
+    `Dear ${customer.name}, gentle reminder from LoanFlow that your scheduled EMI of ₹${
       loan?.emi.toLocaleString('en-IN') || '8,500'
     } for loan ${loan?.id || 'LN1001'} was due on ${
       loan?.dueDate || '25 Sep 2026'
-    }. Please click here to make your payment: https://pay.repayx.internal/${loan?.id || 'LN1001'}`
+    }. Please click here to make your payment: https://pay.loanflow.internal/${loan?.id || 'LN1001'}`
   );
 
   const handleSendFollowupSubmit = () => {
@@ -189,7 +189,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={() => setIsSendFollowupModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+            className="px-3.5 py-2 rounded-xl bg-[#516072] hover:bg-[#43505F] text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
           >
             <Send className="w-3.5 h-3.5" />
             <span>Send Follow-up</span>
@@ -462,7 +462,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                 const loanId = loan ? loan.id : 'LN1001';
                 if (tpl === 'reminder') {
                   setFollowupMessageText(
-                    `Dear ${customer.name}, gentle reminder that your scheduled EMI of ${outstanding} for loan ${loanId} is due. Please click here to make payment: https://pay.repayx.internal/${loanId}`
+                    `Dear ${customer.name}, gentle reminder that your scheduled EMI of ${outstanding} for loan ${loanId} is due. Please click here to make payment: https://pay.loanflow.internal/${loanId}`
                   );
                 } else if (tpl === 'overdue') {
                   setFollowupMessageText(
@@ -470,7 +470,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                   );
                 } else if (tpl === 'delay') {
                   setFollowupMessageText(
-                    `Hello ${customer.name}, we have noted your timeline. When your salary credits, please use this verified UPI link: https://pay.repayx.internal/upi/${loanId}`
+                    `Hello ${customer.name}, we have noted your timeline. When your salary credits, please use this verified UPI link: https://pay.loanflow.internal/upi/${loanId}`
                   );
                 }
               }}
@@ -488,13 +488,13 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
               rows={4}
               value={followupMessageText}
               onChange={(e) => setFollowupMessageText(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#516072] leading-relaxed"
             />
           </div>
 
-          <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl text-purple-900 text-[11px] flex items-center justify-between">
+          <div className="p-3 bg-[#516072]/10 border border-[#516072]/20 rounded-xl text-[#252E38] text-[11px] flex items-center justify-between">
             <span>Authorizing Executive: <strong>Priya Parihar</strong></span>
-            <span className="text-[10px] font-mono text-purple-700">Digital Audit Trail</span>
+            <span className="text-[10px] font-mono text-[#516072]">Digital Audit Trail</span>
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-slate-100">
@@ -504,7 +504,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                 setIsSendFollowupModalOpen(false);
                 onOpenConversation();
               }}
-              className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
+              className="text-xs text-[#516072] hover:text-[#3B4856] font-semibold cursor-pointer"
             >
               Open Full Chat Screen →
             </button>
@@ -513,14 +513,14 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsSendFollowupModalOpen(false)}
-                className="px-3.5 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold"
+                className="px-3.5 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSendFollowupSubmit}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 shadow-xs"
+                className="px-4 py-2 rounded-xl bg-[#516072] hover:bg-[#43505F] text-white font-semibold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>Dispatch Follow-up</span>
