@@ -34,10 +34,10 @@ export const WorkflowBanner: React.FC = () => {
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs mb-6 overflow-hidden">
-      <div className="px-5 py-3.5 flex items-center justify-between bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white">
+      <div className="px-5 py-3.5 flex items-center justify-between bg-gradient-to-r from-[#242C36] via-[#354352] to-[#516072] text-white">
         <div className="flex items-center gap-2.5">
           <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-300 font-heading">
             Intelligent Recovery Architecture
           </span>
           <span className="text-slate-400 text-xs hidden sm:inline">·</span>
@@ -66,7 +66,7 @@ export const WorkflowBanner: React.FC = () => {
                   <div
                     className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
                       step.highlight
-                        ? 'bg-purple-100 text-purple-700 ring-2 ring-purple-400/50 shadow-xs'
+                        ? 'bg-[#516072]/15 text-[#516072] ring-2 ring-[#516072]/40 shadow-xs'
                         : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
                     }`}
                   >

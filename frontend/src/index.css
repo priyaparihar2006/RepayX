@@ -1,12 +1,30 @@
 @import "tailwindcss";
 
+:root {
+  --color-slate-steel: #516072;
+  --color-slate-steel-hover: #414D5C;
+  --color-slate-steel-dark: #252E38;
+  --color-slate-steel-light: #F0F4F8;
+  --color-slate-steel-border: #D7DEE7;
+}
+
 @layer base {
   html, body {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'DM Sans', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #F4F6F9;
+    color: #1E252D;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, .font-heading, .font-display {
+    font-family: 'Lexend', 'DM Sans', sans-serif;
+    letter-spacing: -0.015em;
   }
 }
 
-.tabular-nums {
+.font-num, .tabular-nums {
+  font-family: 'JetBrains Mono', monospace;
   font-variant-numeric: tabular-nums;
 }
 

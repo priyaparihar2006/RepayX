@@ -1,28 +1,30 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   LayoutDashboard,
   Users,
-  CreditCard,
   CalendarClock,
   MessageSquare,
-  Bot,
+  Sparkles,
   BookOpen,
-  LineChart,
   ShieldAlert,
-  FileCheck2,
+  CreditCard,
   Settings,
   ChevronLeft,
   ChevronRight,
   TrendingUp,
+  X,
+  FileSpreadsheet,
+  Send,
   PieChart,
   Wallet,
-  Presentation,
+  LineChart,
 } from 'lucide-react';
 import { MANAGER_PROFILE } from '../../data/mockData';
 
 export type NavTab =
   | 'overview'
   | 'customers'
+  | 'whatsapp'
   | 'risk-analytics'
   | 'repayment-analytics'
   | 'demo-overview'
@@ -41,6 +43,7 @@ export type NavTab =
 interface NavItem {
   id: NavTab;
   label: string;
+  sublabel?: string;
   icon: React.ComponentType<{ className?: string }>;
   isAi?: boolean;
   badge?: number;
@@ -57,8 +60,11 @@ interface SidebarProps {
   onSelectTab: (tab: NavTab) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  isMobileOpen?: boolean;
+  onCloseMobile?: () => void;
   unreadCount?: number;
   pendingEscalationsCount?: number;
+  onOpenSendMessage?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -66,192 +72,381 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   isCollapsed,
   onToggleCollapse,
+  isMobileOpen = false,
+  onCloseMobile,
   unreadCount = 2,
   pendingEscalationsCount = 5,
+  onOpenSendMessage,
 }) => {
+  // Keyboard shortcuts: Escape to close mobile, Ctrl+B / Cmd+B / Ctrl+\ to toggle collapse
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isMobileOpen && onCloseMobile) {
+        onCloseMobile();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === '\\')) {
+        e.preventDefault();
+        onToggleCollapse();
+      }
+    };
+
+    const handleResize = () => {
+      if (window.innerWidth >= 768 && isMobileOpen && onCloseMobile) {
+        onCloseMobile();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isMobileOpen, onCloseMobile, onToggleCollapse]);
+
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (isMobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileOpen]);
+
   const navSections: NavSection[] = [
     {
       group: 'RISK INTELLIGENCE',
       items: [
-        { id: 'overview' as NavTab, label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'customers' as NavTab, label: 'Customers', icon: Users },
-        { id: 'risk-analytics' as NavTab, label: 'Risk Analytics', icon: PieChart },
-        { id: 'repayment-analytics' as NavTab, label: 'Repayment Analytics', icon: Wallet },
-        { id: 'ai-insights' as NavTab, label: 'AI Insights', icon: LineChart, isAi: true },
+        {
+          id: 'overview',
+          label: 'Risk Dashboard',
+          sublabel: 'Default Risk & Scored',
+          icon: LayoutDashboard,
+        },
+        {
+          id: 'customers',
+          label: 'Customer Portfolio',
+          sublabel: 'Scored Defaulters',
+          icon: Users,
+        },
+        {
+          id: 'risk-analytics',
+          label: 'Risk Analytics',
+          sublabel: 'Segments & Rates',
+          icon: PieChart,
+        },
+        {
+          id: 'repayment-analytics',
+          label: 'Repayment Analytics',
+          sublabel: 'Underpayment & DPD',
+          icon: Wallet,
+        },
+        {
+          id: 'ai-insights',
+          label: 'AI Insights',
+          sublabel: 'Hybrid Natural Query',
+          icon: LineChart,
+          isAi: true,
+        },
       ],
     },
     {
-      // Recovery workflow pages that still run on sample data.
-      group: 'DEMO WORKFLOW',
+      group: 'AUTONOMOUS OUTREACH',
       items: [
-        { id: 'demo-overview' as NavTab, label: 'Recovery Overview', icon: Presentation },
-        { id: 'demo-insights' as NavTab, label: 'Recovery Funnel', icon: TrendingUp },
-        { id: 'loans' as NavTab, label: 'Loans', icon: CreditCard },
-        { id: 'follow-ups' as NavTab, label: 'Follow-ups', icon: CalendarClock },
         {
-          id: 'conversations' as NavTab,
-          label: 'Conversations',
+          id: 'whatsapp',
+          label: 'WhatsApp Outreach',
+          sublabel: 'NLP, CSV & Schedules',
+          icon: MessageSquare,
+          badgeColor: 'bg-emerald-600',
+        },
+        {
+          id: 'conversations',
+          label: 'Omnichannel Messages',
+          sublabel: 'WA, SMS & Email',
           icon: MessageSquare,
           badge: unreadCount > 0 ? unreadCount : undefined,
+          badgeColor: 'bg-[#516072]',
         },
-        { id: 'ai-assistant' as NavTab, label: 'AI Assistant', icon: Bot, isAi: true },
-        { id: 'rag-knowledge' as NavTab, label: 'Knowledge Base', icon: BookOpen, isAi: true },
-        { id: 'payments' as NavTab, label: 'Payments', icon: FileCheck2 },
         {
-          id: 'escalations' as NavTab,
-          label: 'Escalations',
-          icon: ShieldAlert,
-          badge: pendingEscalationsCount > 0 ? pendingEscalationsCount : undefined,
-          badgeColor: 'bg-rose-500',
+          id: 'follow-ups',
+          label: 'Reminders Queue',
+          sublabel: 'Scheduled Execution',
+          icon: CalendarClock,
         },
-        { id: 'reports' as NavTab, label: 'Reports', icon: TrendingUp },
       ],
     },
     {
-      group: 'SYSTEM',
-      items: [{ id: 'settings' as NavTab, label: 'Settings', icon: Settings }],
+      group: 'LOAN LEDGER & OPS',
+      items: [
+        {
+          id: 'loans',
+          label: 'Loan Accounts',
+          sublabel: 'Active Portfolio',
+          icon: CreditCard,
+        },
+        {
+          id: 'payments',
+          label: 'Payments Ledger',
+          sublabel: 'Receipts & Proofs',
+          icon: CreditCard,
+        },
+        {
+          id: 'escalations',
+          label: 'Escalations',
+          sublabel: 'Supervisor Reviews',
+          icon: ShieldAlert,
+          badge: pendingEscalationsCount > 0 ? pendingEscalationsCount : undefined,
+          badgeColor: 'bg-amber-600',
+        },
+        {
+          id: 'rag-knowledge',
+          label: 'Policy Knowledge Hub',
+          sublabel: 'RAG Retrieval Engine',
+          icon: BookOpen,
+          isAi: true,
+        },
+        {
+          id: 'reports',
+          label: 'Audit Reports',
+          sublabel: 'Delinquency Ledgers',
+          icon: FileSpreadsheet,
+        },
+        {
+          id: 'settings',
+          label: 'Configuration',
+          sublabel: 'Thresholds & API Keys',
+          icon: Settings,
+        },
+      ],
     },
   ];
 
-  return (
-    <aside
-      className={`fixed top-0 left-0 bottom-0 z-30 flex flex-col bg-slate-900 border-r border-slate-800 text-slate-300 transition-all duration-300 select-none ${
-        isCollapsed ? 'w-20' : 'w-64'
-      }`}
-    >
-      {/* Brand Header */}
-      <div className="h-16 px-4 flex items-center justify-between border-b border-slate-800 shrink-0">
-        {!isCollapsed ? (
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-md shadow-blue-900/30">
-              <TrendingUp className="w-5 h-5 text-white" />
+  const renderContent = (inMobile = false) => {
+    const collapsed = inMobile ? false : isCollapsed;
+
+    return (
+      <div className="flex flex-col h-full bg-[#242C36] text-slate-200 select-none border-r border-[#34404E]">
+        {/* Brand Header */}
+        <div className="h-16 px-4 flex items-center justify-between border-b border-[#34404E] shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-[#516072] text-white flex items-center justify-center font-bold font-heading shadow-md shadow-[#516072]/30 shrink-0">
+              RX
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-base text-white tracking-tight">RepayX</span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-400/30 tracking-wide">
-                  AI
-                </span>
+            {!collapsed && (
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-white text-base tracking-tight font-heading">
+                    RepayX
+                  </span>
+                  <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-[#516072]/40 text-[#D8E1EC] border border-[#516072]/50">
+                    AI
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400 truncate leading-none mt-0.5 font-medium">
+                  Recovery Engine
+                </p>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium">Recovery Management</p>
-            </div>
+            )}
           </div>
-        ) : (
-          <div className="mx-auto w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-md shadow-blue-900/30">
-            <TrendingUp className="w-5 h-5 text-white" />
+
+          {/* Close button inside mobile slideover */}
+          {inMobile && onCloseMobile && (
+            <button
+              onClick={onCloseMobile}
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-[#34404E] cursor-pointer transition-colors"
+              title="Close drawer"
+              aria-label="Close drawer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* Desktop collapse/close button in header */}
+          {!inMobile && (
+            <button
+              onClick={onToggleCollapse}
+              className="hidden md:flex p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-[#34404E] cursor-pointer transition-colors"
+              title={collapsed ? 'Expand sidebar (Ctrl+B)' : 'Close sidebar (Ctrl+B)'}
+              aria-label={collapsed ? 'Expand sidebar' : 'Close sidebar'}
+            >
+              {collapsed ? (
+                <ChevronRight className="w-4 h-4" />
+              ) : (
+                <ChevronLeft className="w-4 h-4" />
+              )}
+            </button>
+          )}
+        </div>
+
+        {/* Quick Outbound Message Action Button in Sidebar */}
+        {!collapsed && (
+          <div className="p-3 border-b border-[#34404E] shrink-0">
+            <button
+              onClick={() => {
+                if (onOpenSendMessage) onOpenSendMessage();
+                else onSelectTab('whatsapp');
+                if (inMobile && onCloseMobile) onCloseMobile();
+              }}
+              className="w-full py-2.5 px-3 bg-[#516072] hover:bg-[#414D5C] active:scale-[0.98] text-white rounded-xl text-xs font-bold font-heading shadow-md shadow-[#516072]/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Send New Message</span>
+            </button>
           </div>
         )}
 
-        <button
-          onClick={onToggleCollapse}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
-      </div>
+        {/* Navigation Links Scroll Container */}
+        <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-4">
+          {navSections.map((section) => (
+            <div key={section.group} className="space-y-1">
+              {!collapsed && (
+                <div className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  {section.group}
+                </div>
+              )}
 
-      {/* Navigation List */}
-      <div className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
-        {navSections.map((section) => (
-          <div key={section.group}>
-            {!isCollapsed && (
-              <h4 className="px-3 text-[10px] font-semibold tracking-wider text-slate-400 uppercase mb-2">
-                {section.group}
-              </h4>
-            )}
-            <ul className="space-y-1">
               {section.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentTab === item.id;
+
                 return (
-                  <li key={item.id}>
+                  <div key={item.id} className="relative group">
                     <button
-                      onClick={() => onSelectTab(item.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all group relative cursor-pointer ${
+                      onClick={() => {
+                        onSelectTab(item.id);
+                        if (inMobile && onCloseMobile) onCloseMobile();
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                         isActive
-                          ? 'bg-blue-600 text-white shadow-sm shadow-blue-900/40 font-semibold'
-                          : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
-                      }`}
-                      title={isCollapsed ? item.label : undefined}
+                          ? 'bg-[#516072] text-white shadow-sm shadow-[#516072]/30'
+                          : 'text-slate-300 hover:bg-[#34404E] hover:text-white'
+                      } ${collapsed ? 'justify-center px-2' : ''}`}
                     >
-                      <Icon
-                        className={`w-4 h-4 shrink-0 transition-transform ${
-                          isActive
-                            ? 'text-white'
-                            : item.isAi
-                            ? 'text-purple-400 group-hover:text-purple-300'
-                            : 'text-slate-400 group-hover:text-slate-200'
-                        }`}
-                      />
-
-                      {!isCollapsed && (
-                        <span className="flex-1 text-left truncate">{item.label}</span>
-                      )}
-
-                      {!isCollapsed && item.badge !== undefined && (
-                        <span
-                          className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full text-white ${
-                            item.badgeColor || 'bg-blue-500'
+                      <div className="relative shrink-0">
+                        <Icon
+                          className={`w-4 h-4 ${
+                            isActive
+                              ? 'text-white'
+                              : item.isAi
+                              ? 'text-purple-300 group-hover:text-purple-200'
+                              : 'text-slate-400 group-hover:text-white'
                           }`}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
+                        />
+                        {/* Dot indicator if collapsed has badge */}
+                        {collapsed && item.badge !== undefined && (
+                          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-[#242C36]" />
+                        )}
+                      </div>
 
-                      {/* Tooltip in collapsed mode */}
-                      {isCollapsed && (
-                        <div className="absolute left-full ml-2 px-2.5 py-1 bg-slate-950 text-white text-xs rounded-md shadow-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">
-                          {item.label}
+                      {!collapsed && (
+                        <div className="flex-1 text-left min-w-0 flex items-center justify-between">
+                          <span className="truncate">{item.label}</span>
+                          {item.badge !== undefined && (
+                            <span
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white ${
+                                item.badgeColor || 'bg-[#516072]'
+                              }`}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
                         </div>
                       )}
                     </button>
-                  </li>
+
+                    {/* Floating Tooltip for Collapsed Desktop Mode */}
+                    {collapsed && (
+                      <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2.5 py-1 bg-slate-900 text-white text-xs font-bold rounded-lg shadow-xl whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 flex items-center gap-2">
+                        <span>{item.label}</span>
+                        {item.badge !== undefined && (
+                          <span className="text-[10px] bg-[#516072] px-1.5 py-0.2 rounded-full">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-            </ul>
-          </div>
-        ))}
-      </div>
-
-      {/* User Manager Profile Section */}
-      <div className="p-3 border-t border-slate-800 bg-slate-900/90 shrink-0">
-        <div
-          className={`flex items-center gap-3 p-2 rounded-xl bg-slate-800/40 hover:bg-slate-800 transition-colors ${
-            isCollapsed ? 'justify-center' : ''
-          }`}
-        >
-          <div className="relative shrink-0">
-            <img
-              src={MANAGER_PROFILE.avatar}
-              alt={MANAGER_PROFILE.name}
-              referrerPolicy="no-referrer"
-              className="w-9 h-9 rounded-full object-cover ring-2 ring-blue-500/30"
-              onError={(e) => {
-                // Fallback avatar container if image error
-                (e.currentTarget as HTMLElement).style.display = 'none';
-              }}
-            />
-            {/* Fallback avatar initials */}
-            <div className="w-9 h-9 rounded-full bg-blue-700 text-white font-bold flex items-center justify-center text-xs ring-2 ring-blue-500/30 -z-10 absolute inset-0">
-              PP
             </div>
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-slate-900" />
-          </div>
+          ))}
+        </div>
 
-          {!isCollapsed && (
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-white truncate">
-                  {MANAGER_PROFILE.name}
-                </p>
-                <span className="text-[10px] text-emerald-400 font-medium">Online</span>
+        {/* Manager Profile & Collapse Footer */}
+        <div className="p-3 border-t border-[#34404E] bg-[#1C232B] flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative shrink-0">
+              <img
+                src={MANAGER_PROFILE.avatar}
+                alt={MANAGER_PROFILE.name}
+                referrerPolicy="no-referrer"
+                className="w-9 h-9 rounded-full object-cover ring-2 ring-[#516072]/50"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
+              />
+              <div className="w-9 h-9 rounded-full bg-[#516072] text-white font-bold flex items-center justify-center text-xs -z-10 absolute inset-0">
+                PP
               </div>
-              <p className="text-[11px] text-slate-400 truncate">{MANAGER_PROFILE.role}</p>
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-[#1C232B]" />
             </div>
+
+            {!collapsed && (
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-bold text-white font-heading truncate">
+                  {MANAGER_PROFILE.name}
+                </div>
+                <div className="text-[10px] text-slate-400 truncate leading-none mt-0.5">
+                  {MANAGER_PROFILE.role}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {!inMobile && !collapsed && (
+            <button
+              onClick={onToggleCollapse}
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-[#34404E] cursor-pointer transition-colors"
+              title="Collapse sidebar (Ctrl+B)"
+              aria-label="Collapse sidebar"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
           )}
         </div>
       </div>
-    </aside>
+    );
+  };
+
+  return (
+    <>
+      {/* 1. Desktop Fixed Sidebar */}
+      <aside
+        className={`hidden md:block fixed top-0 left-0 bottom-0 z-30 transition-all duration-300 ${
+          isCollapsed ? 'w-20' : 'w-64'
+        }`}
+      >
+        {renderContent(false)}
+      </aside>
+
+      {/* 2. Mobile Responsive Slide-Over Drawer */}
+      {isMobileOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          {/* Backdrop overlay */}
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-in fade-in"
+            onClick={onCloseMobile}
+          />
+          {/* Drawer content */}
+          <div className="relative w-72 max-w-[85vw] h-full shadow-2xl animate-in slide-in-from-left duration-200">
+            {renderContent(true)}
+          </div>
+        </div>
+      )}
+    </>
   );
 };

@@ -51,7 +51,10 @@ export interface ChatMessage {
   sender: 'ai' | 'customer' | 'manager' | 'system';
   text: string;
   timestamp: string;
-  status?: 'sent' | 'delivered' | 'read';
+  status?: 'sent' | 'delivered' | 'read' | 'received' | 'failed';
+  channel?: 'WhatsApp' | 'SMS' | 'Email';
+  subject?: string;
+  error?: string;
   isApprovedByManager?: boolean;
   intentBadge?: AIIntent;
 }
@@ -85,12 +88,18 @@ export interface Conversation {
   customerId: string;
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
   customerAvatar: string;
   lastMessageTime: string;
   unread: boolean;
   messages: ChatMessage[];
   aiAnalysis: AIAnalysis;
   channel: 'WhatsApp' | 'SMS' | 'Call' | 'Email';
+  aiEnabled?: boolean;
+  humanHandoff?: boolean;
+  handoffReason?: string;
+  optOuts?: Record<string, boolean>;
+  identities?: Array<{ channel: string; identifier: string; verified?: boolean; is_primary?: boolean }>;
 }
 
 export interface FollowUpItem {

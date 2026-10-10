@@ -38,11 +38,13 @@ const DashboardPage = lazy(() => import('./pages/Dashboard').then((m) => ({ defa
 const RiskAnalyticsPage = lazy(() => import('./pages/RiskAnalytics').then((m) => ({ default: m.RiskAnalyticsPage })));
 const RepaymentAnalyticsPage = lazy(() => import('./pages/RepaymentAnalytics').then((m) => ({ default: m.RepaymentAnalyticsPage })));
 const CustomerDetailsPage = lazy(() => import('./pages/CustomerDetails').then((m) => ({ default: m.CustomerDetailsPage })));
+const WhatsAppPage = lazy(() => import('./pages/WhatsApp').then((m) => ({ default: m.WhatsAppPage })));
 
 // URL for each sidebar tab. 'ai-assistant' opens the drawer instead of a page.
 const TAB_PATHS: Record<Exclude<NavTab, 'ai-assistant'>, string> = {
   overview: '/',
   customers: '/customers',
+  whatsapp: '/whatsapp',
   'risk-analytics': '/analytics/risk',
   'repayment-analytics': '/analytics/repayment',
   'demo-overview': '/demo/overview',
@@ -73,6 +75,8 @@ function pageMeta(pathname: string): { title: string; breadcrumb: string } {
       return pathname === '/' ? { title: 'Risk Dashboard', breadcrumb: 'Dashboard' } : { title: 'Page not found', breadcrumb: 'RepayX' };
     case 'customers':
       return { title: 'Customer Risk Portfolio', breadcrumb: 'Customers' };
+    case 'whatsapp':
+      return { title: 'WhatsApp Messages', breadcrumb: 'Messaging / WhatsApp' };
     case 'risk-analytics':
       return { title: 'Risk Analytics', breadcrumb: 'Analytics / Risk' };
     case 'repayment-analytics':
@@ -118,6 +122,7 @@ function AppContent() {
   const currentTab = tabForPath(pathname);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
 
   // Demo workflow data (sample data; not connected to the RepayX API)
@@ -136,6 +141,7 @@ function AppContent() {
 
   // Navigation requests from the navbar, drawer, and demo pages (which use sample IDs).
   const handleNavigate = (tab: string, targetId?: string) => {
+    setIsMobileMenuOpen(false);
     if (tab === 'ai-assistant') {
       setIsAiAssistantOpen(true);
     } else if (tab === 'conversations') {
@@ -181,19 +187,29 @@ function AppContent() {
   const { title, breadcrumb } = pageMeta(pathname);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex">
+    <div className="min-h-screen bg-[#F4F6F9] text-[#1E252D] flex">
       <Sidebar
         currentTab={currentTab}
-        onSelectTab={(tab) => (tab === 'ai-assistant' ? setIsAiAssistantOpen(true) : navigate(TAB_PATHS[tab]))}
+        onSelectTab={(tab) => {
+          setIsMobileMenuOpen(false);
+          if (tab === 'ai-assistant') {
+            setIsAiAssistantOpen(true);
+          } else {
+            navigate(TAB_PATHS[tab]);
+          }
+        }}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        isMobileOpen={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
         unreadCount={conversations.filter((c) => c.unread).length}
         pendingEscalationsCount={5}
+        onOpenSendMessage={() => navigate(TAB_PATHS.whatsapp)}
       />
 
       <div
         className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
-          isSidebarCollapsed ? 'ml-20' : 'ml-64'
+          isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'
         }`}
       >
         <Navbar
@@ -201,6 +217,9 @@ function AppContent() {
           breadcrumb={breadcrumb}
           onOpenAiAssistant={() => navigate(TAB_PATHS['ai-insights'])}
           onNavigate={handleNavigate}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
           customers={customers}
           loans={loans}
           conversations={conversations}
@@ -215,6 +234,7 @@ function AppContent() {
             <Route path="/analytics/repayment" element={<RepaymentAnalyticsPage />} />
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/customers/:customerId" element={<CustomerDetailsPage />} />
+            <Route path="/whatsapp" element={<WhatsAppPage />} />
 
             {/* Demo workflow pages (sample data) */}
             <Route

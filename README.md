@@ -36,6 +36,8 @@ Also: [Testing](#testing) · [Security and data privacy](#security-and-data-priv
 
 ## 1. Project overview
 
+For the optional Meta Cloud API messaging screen, see the [WhatsApp setup guide](docs/WHATSAPP.md). Sender setup is required before real messages can be sent.
+
 RepayX combines four things in one application:
 
 - **Default-risk prediction.** A logistic-regression model trained on the Home Credit Default Risk data estimates each customer's probability of default. The probability becomes a 0–100 risk score and a Low / Medium / High risk category.

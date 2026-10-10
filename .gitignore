@@ -12,12 +12,21 @@ venv/
 .ipynb_checkpoints/
 .DS_Store
 *.log
+backend/whatsapp-bridge/auth_info/
+backend/whatsapp-bridge/auth_info.*/
+loan-history-site/.sites-checkout/
+loan-history-demo.tar.gz
 .pytest_cache/
 
 # Raw and derived data (Home Credit dataset terms; regenerate with the ml pipeline)
 datasets/**
 !datasets/.gitkeep
 backend/data/*.parquet
+backend/data/whatsapp_contacts.json
+backend/data/whatsapp.sqlite3*
 models/holdout_customer_ids.npy
 backend/rag/*
 !backend/rag/.gitkeep
+backend/data/*.env
+extracted_loanflow/
+*.zip

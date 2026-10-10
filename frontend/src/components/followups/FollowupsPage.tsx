@@ -79,7 +79,7 @@ export const FollowupsPage: React.FC<FollowupsPageProps> = ({
         <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500">Today's Follow-ups</span>
-            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-[#516072]/15 text-[#516072] flex items-center justify-center">
               <CalendarClock className="w-3.5 h-3.5" />
             </div>
           </div>
@@ -148,7 +148,7 @@ export const FollowupsPage: React.FC<FollowupsPageProps> = ({
             placeholder="Search follow-ups..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#516072]"
           />
         </div>
       </div>
@@ -218,7 +218,7 @@ export const FollowupsPage: React.FC<FollowupsPageProps> = ({
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => onOpenConversation()}
-                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                        className="p-1.5 text-slate-400 hover:text-[#516072] hover:bg-[#516072]/10 rounded-lg transition-colors cursor-pointer"
                         title="Open Conversation"
                       >
                         <MessageSquare className="w-3.5 h-3.5" />
@@ -299,7 +299,7 @@ export const FollowupsPage: React.FC<FollowupsPageProps> = ({
             </button>
             <button
               onClick={handleRescheduleSubmit}
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+              className="px-4 py-2 rounded-xl bg-[#516072] hover:bg-[#43505F] text-white font-semibold cursor-pointer shadow-xs transition-colors"
             >
               Confirm Reschedule
             </button>
