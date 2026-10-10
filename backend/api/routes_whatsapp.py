@@ -163,13 +163,52 @@ def ai_auto_outreach(
 
 
 @router.post("/webhook/incoming")
-def incoming_webhook(body: IncomingMessageWebhook, messaging: WhatsAppService = Depends(service)):
+def incoming_webhook(body: IncomingMessageWebhook, request: Request, messaging: WhatsAppService = Depends(service)):
+    # Sync with omnichannel architecture
+    if hasattr(request.app.state, "omnichannel"):
+        try:
+            omni_res = request.app.state.omnichannel.handle_inbound_message(
+                channel="WhatsApp",
+                sender=body.phone,
+                content=body.message,
+                provider_message_id=body.jid,
+            )
+            if omni_res.get("ai_replied") and omni_res.get("reply_text"):
+                return {
+                    "success": True,
+                    "auto_reply": True,
+                    "reply": omni_res["reply_text"],
+                    "reply_text": omni_res["reply_text"],
+                    "intent": omni_res.get("intent"),
+                    "human_handoff": omni_res.get("human_handoff"),
+                }
+        except Exception as exc:
+            pass
     result = messaging.handle_incoming_ai_chat(phone=body.phone, message_text=body.message)
     return result
 
 
 @router.post("/ai-chat-reply")
-def ai_chat_reply(body: IncomingMessageWebhook, messaging: WhatsAppService = Depends(service)):
+def ai_chat_reply(body: IncomingMessageWebhook, request: Request, messaging: WhatsAppService = Depends(service)):
+    if hasattr(request.app.state, "omnichannel"):
+        try:
+            omni_res = request.app.state.omnichannel.handle_inbound_message(
+                channel="WhatsApp",
+                sender=body.phone,
+                content=body.message,
+                provider_message_id=body.jid,
+            )
+            if omni_res.get("ai_replied") and omni_res.get("reply_text"):
+                return {
+                    "success": True,
+                    "auto_reply": True,
+                    "reply": omni_res["reply_text"],
+                    "reply_text": omni_res["reply_text"],
+                    "intent": omni_res.get("intent"),
+                    "human_handoff": omni_res.get("human_handoff"),
+                }
+        except Exception:
+            pass
     result = messaging.handle_incoming_ai_chat(phone=body.phone, message_text=body.message)
     return result
 
