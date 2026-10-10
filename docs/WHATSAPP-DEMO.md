@@ -26,8 +26,17 @@ The page polls the real connection every two seconds. It never simulates pairing
 The demo recipients are Nancy (+91 7060200849), Sid (+91 9105830551), and
 Ajay (+91 8077815522). Their separate sample loan notices can be edited before
 using the individual send buttons or **Send all pending messages**. Loan IDs,
-amounts, and days overdue are sample data. The payment URLs are demo message text;
-this project does not implement the payment website.
+amounts, and days overdue are sample data. Notices include a public statement link;
+the loan summary and full payment history open on that page instead of appearing
+in the message. The sample loans have no interest or additional charges. Totals
+are calculated from payment records in integer paise.
+
+Public demo: https://repayx-loan-history-demo.aglow-map-2577.chatgpt.site
+Append `/?loan=385057`, `/?loan=385058`, or `/?loan=385059` for Nancy, Sid, or Ajay.
+The published pages contain sample loan data only, with no phone numbers or WhatsApp
+credentials. They are static snapshots; changing sample records requires rebuilding
+with `backend/.venv/Scripts/python.exe backend/scripts/build_loan_history_site.py`
+and republishing the same Site. `LOAN_HISTORY_BASE_URL` can override the message origin.
 
 Both the backend and bridge restrict sends to these recipients and verify the linked
 sender. Linking alone does not send anything. A confirmed provider response is

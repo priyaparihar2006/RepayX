@@ -7,6 +7,11 @@ import { whatsapp } from '../services/whatsapp';
 vi.mock('../services/whatsapp', () => ({ whatsapp: {
   getStatus: vi.fn(), getContacts: vi.fn(), getMessages: vi.fn(), sendMessage: vi.fn(),
   generateQR: vi.fn(), pairByCode: vi.fn(), disconnect: vi.fn(),
+  getLoanEmiData: vi.fn().mockResolvedValue({ success: true, users: [], total: 0, page: 1, total_pages: 1, summary: {} }),
+  uploadDefaultersFile: vi.fn(), dispatchExtracted: vi.fn(), triggerAiAutoOutreach: vi.fn(),
+  previewScheduledCsv: vi.fn(), confirmSchedule: vi.fn(),
+  getScheduledList: vi.fn().mockResolvedValue({ success: true, total: 0, page: 1, page_size: 50, total_pages: 1, stats: {}, schedules: [] }),
+  updateScheduleTime: vi.fn(),
 } }));
 const connected = { success: true, enabled: true, ready: true, connected: true, status: 'CONNECTED' as const,
   session_info: { phone_number: '+918650629360', user_name: 'Demo', device: 'WhatsApp', connected_at: '' },
@@ -21,6 +26,8 @@ beforeEach(() => {
     name, phone: phones[index], customer_id: 385057 + index, amount: '100', late_days: 10,
     sample_data: true, message: 'Dear ' + name + ', demo EMI notice.',
   })) });
+  vi.mocked(whatsapp.getLoanEmiData).mockResolvedValue({ success: true, users: [], total: 0, page: 1, total_pages: 1, page_size: 10, summary: { total_users: 0, total_loan_amount: 0, total_emi_paid: 0, total_emi_left_to_repay: 0, high_risk_users: 0, medium_risk_users: 0 } });
+  vi.mocked(whatsapp.getScheduledList).mockResolvedValue({ success: true, total: 0, page: 1, page_size: 50, total_pages: 1, stats: { total_imported: 0, valid_records: 0, invalid_records: 0, scheduled_messages: 0, unscheduled_customers: 0, missed_schedules: 0, messages_sent: 0, messages_failed: 0 }, schedules: [] });
   vi.mocked(whatsapp.sendMessage).mockResolvedValue({ success: true, status: 'sent', message_id: 'provider-id', recipient: phones[0] });
 });
 
@@ -73,5 +80,44 @@ describe('WhatsApp demo outreach', () => {
     await user.clear(await screen.findByRole('textbox', { name: 'Message for Nancy' }));
     expect(screen.getByRole('button', { name: 'Send to Nancy' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Send all pending messages (3)' })).toBeDisabled();
+  });
+
+  it('renders scheduled records and confirms schedule on explicit user action', async () => {
+    const user = userEvent.setup();
+    const scheduledMock = [
+      {
+        schedule_id: 'sched_1', customer_id: 'RX-TEST-1001', customer_name: 'Nans',
+        phone_number: '+919058802116', unpaid_amount: 12500, risk_category: 'HIGH',
+        payment_status: 'UNPAID', scheduled_message_time: '10:45', timezone: 'Asia/Kolkata',
+        scheduled_message_at: '2026-10-10T10:45:00+05:30', schedule_status: 'SCHEDULED' as const,
+        is_valid: true, message_text: 'Notice',
+      },
+      {
+        schedule_id: 'sched_3', customer_id: 'RX-TEST-1003', customer_name: 'Siddharth',
+        phone_number: '+919105830551', unpaid_amount: 6200, risk_category: 'MEDIUM',
+        payment_status: 'UNPAID', scheduled_message_time: null, timezone: 'Asia/Kolkata',
+        scheduled_message_at: null, schedule_status: 'UNSCHEDULED' as const,
+        is_valid: true, message_text: 'Notice',
+      },
+    ];
+    vi.mocked(whatsapp.getScheduledList).mockResolvedValue({
+      success: true, total: 2, page: 1, page_size: 50, total_pages: 1,
+      stats: { total_imported: 2, valid_records: 2, invalid_records: 0, scheduled_messages: 1, unscheduled_customers: 1, missed_schedules: 0, messages_sent: 0, messages_failed: 0 },
+      schedules: scheduledMock,
+    });
+    vi.mocked(whatsapp.confirmSchedule).mockResolvedValue({
+      success: true, saved_count: 2, skipped_sent_count: 0,
+      stats: { total_imported: 2, valid_records: 2, invalid_records: 0, scheduled_messages: 1, unscheduled_customers: 1, missed_schedules: 0, messages_sent: 0, messages_failed: 0 },
+    });
+
+    render(<WhatsAppPage />);
+    expect(await screen.findByText('Nans')).toBeInTheDocument();
+    expect(screen.getByText('Siddharth')).toBeInTheDocument();
+    expect(screen.getByText('🟢 Scheduled')).toBeInTheDocument();
+    expect(screen.getByText('⚪ Unscheduled')).toBeInTheDocument();
+
+    const confirmBtn = screen.getByRole('button', { name: /Schedule/i });
+    await user.click(confirmBtn);
+    expect(whatsapp.confirmSchedule).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ customer_name: 'Nans' })]), 'default');
   });
 });

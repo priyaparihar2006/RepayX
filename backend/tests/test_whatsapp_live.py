@@ -93,3 +93,17 @@ def test_api_routes_use_live_service(client, live):
     assert client.post("/api/whatsapp/qr/pair", json={}).status_code == 410
     assert client.post("/api/whatsapp/auto-dispatch", json={}).status_code == 410
     assert client.post("/api/whatsapp/send", json={"recipient": "+917060200849", "message": "demo"}).status_code == 409
+
+
+def test_loan_history_totals_reconcile_and_replace_payment_link(live):
+    for contact in live.contacts():
+        loan = contact["loan_history"]
+        assert sum(amount for _, amount in loan["payments"]) == loan["paid_paise"]
+        assert loan["paid_paise"] + loan["remaining_paise"] == loan["total_paise"]
+        assert f"{loan['remaining_paise'] / 100:,.2f}" == contact["amount"]
+        assert contact["loan_history_url"] in contact["message"]
+        assert contact["loan_history_url"].endswith(f"/?loan={contact['customer_id']}")
+        assert "Total paid so far:" not in contact["message"]
+        assert "FULL PAYMENT HISTORY" not in contact["message"]
+        assert "pay.repayx.ai" not in contact["message"]
+        assert len(contact["message"]) <= 2000
