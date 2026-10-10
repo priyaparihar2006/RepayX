@@ -313,7 +313,11 @@ export function WhatsAppPage() {
       void Promise.resolve(whatsapp.getScheduledList())
         .then((res) => {
           if (!cancelled && res?.schedules && res.schedules.length > 0) {
-            setScheduledRecords(res.schedules);
+            const normalized = res.schedules.map((item) => ({
+              ...item,
+              schedule_status: (item.schedule_status || item.status || 'UNSCHEDULED') as any,
+            }));
+            setScheduledRecords(normalized);
             setSchedulingSummary(res.stats);
             setScheduleConfirmed(true);
           }
@@ -926,6 +930,8 @@ export function WhatsAppPage() {
                         ? 'bg-blue-100 text-blue-800 border-blue-200'
                         : r.schedule_status === 'MISSED_SCHEDULE'
                         ? 'bg-amber-100 text-amber-800 border-amber-200'
+                        : r.schedule_status === 'PAUSED'
+                        ? 'bg-purple-100 text-purple-800 border-purple-200'
                         : r.schedule_status === 'INVALID_TIME' || r.schedule_status === 'FAILED'
                         ? 'bg-rose-100 text-rose-800 border-rose-200'
                         : 'bg-slate-100 text-slate-700 border-slate-200';

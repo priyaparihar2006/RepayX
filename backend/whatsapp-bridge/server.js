@@ -119,13 +119,12 @@ async function createBridge(deps = {}) {
             state = 'DISCONNECTED';
             error = 'Session logged out. Generate a new QR to link again.';
             if (fs.existsSync(authDir)) fs.renameSync(authDir, authDir + '.logged-out-' + Date.now());
-          } else if (code === baileys.DisconnectReason.restartRequired || reconnects++ < 5) {
-            state = 'CONNECTING';
-            reconnectTimer = setTimeout(() => void connect(),
-              code === baileys.DisconnectReason.restartRequired ? 250 : Math.min(reconnects * 2000, 10000));
           } else {
-            state = 'ERROR';
-            error = 'WhatsApp connection failed. Check your network and generate a new QR.';
+            // Keep reconnecting with exponential backoff capped at 15s instead of giving up permanently
+            state = 'CONNECTING';
+            error = 'Reconnecting to WhatsApp...';
+            const delay = code === baileys.DisconnectReason.restartRequired ? 250 : Math.min(Math.max(reconnects++, 1) * 3000, 15000);
+            reconnectTimer = setTimeout(() => void connect(), delay);
           }
         }
       });
@@ -133,11 +132,17 @@ async function createBridge(deps = {}) {
       state = 'ERROR';
       error = 'Unable to initialize WhatsApp. Check the bridge logs and network.';
       console.error('[WhatsApp] Initialization failed:', err.message);
+      reconnectTimer = setTimeout(() => void connect(), 5000);
     } finally { initializing = false; }
   }
 
   app.get('/health', (_req, res) => res.json({ status: 'ok', connected: snapshot().connected }));
-  app.get('/status', (_req, res) => res.json(snapshot()));
+  app.get('/status', (_req, res) => {
+    if (!socket && !initializing && state !== 'CONNECTED' && fs.existsSync(authDir)) {
+      void connect();
+    }
+    res.json(snapshot());
+  });
   app.post('/qr/generate', async (_req, res) => {
     if (!socket) { reconnects = 0; await connect(); }
     res.json({ ...snapshot(), expires_in: snapshot().qr_expires_in });

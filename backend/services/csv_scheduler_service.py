@@ -540,7 +540,11 @@ class CSVSchedulerService:
                 LIMIT ? OFFSET ?
             """
             cursor.execute(query, params + [page_size, offset])
-            rows = [dict(r) for r in cursor.fetchall()]
+            rows = []
+            for r in cursor.fetchall():
+                row_dict = dict(r)
+                row_dict["schedule_status"] = row_dict.get("status") or "UNSCHEDULED"
+                rows.append(row_dict)
 
         stats = self.get_schedule_stats(campaign_id)
 
@@ -620,10 +624,12 @@ class CSVSchedulerService:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
+            # When WhatsApp is connected, candidate jobs include pending SCHEDULED and recoverable PAUSED jobs
+            status_clause = "status IN ('SCHEDULED', 'PAUSED')" if wa_connected else "status = 'SCHEDULED'"
             cursor.execute(
-                """
+                f"""
                 SELECT * FROM scheduled_messages
-                WHERE status = 'SCHEDULED' AND scheduled_message_at IS NOT NULL
+                WHERE {status_clause} AND scheduled_message_at IS NOT NULL
                 """
             )
             candidate_rows = [dict(r) for r in cursor.fetchall()]
@@ -703,19 +709,27 @@ class CSVSchedulerService:
                 prov_id = res.get("provider_id") or res.get("message_id") or "sent"
                 now_iso = datetime.now(ZoneInfo("UTC")).isoformat()
 
-                self._update_job_status(
-                    sched_id,
-                    "SENT",
-                    sent_at=now_iso,
-                    provider_id=prov_id,
-                    error=None,
-                )
-                dispatched.append({
-                    "schedule_id": sched_id,
-                    "customer_name": job.get("customer_name"),
-                    "phone": phone,
-                    "provider_id": prov_id,
-                })
+                if res.get("status") == "failed":
+                    err_msg = res.get("error") or "WhatsApp send returned failure"
+                    self._update_job_status(
+                        sched_id,
+                        "FAILED",
+                        error=err_msg,
+                    )
+                else:
+                    self._update_job_status(
+                        sched_id,
+                        "SENT",
+                        sent_at=now_iso,
+                        provider_id=prov_id,
+                        error=None,
+                    )
+                    dispatched.append({
+                        "schedule_id": sched_id,
+                        "customer_name": job.get("customer_name"),
+                        "phone": phone,
+                        "provider_id": prov_id,
+                    })
             except Exception as exc:
                 self._update_job_status(
                     sched_id,
