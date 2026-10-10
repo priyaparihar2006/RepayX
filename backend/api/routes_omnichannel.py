@@ -8,6 +8,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
+from automation.auth import Principal, require
 from services.omnichannel_models import ChannelType, utc_now_iso
 from services.omnichannel_service import OmnichannelService
 
@@ -153,12 +154,16 @@ def create_outbound_conversation(
     return {"success": True, "conversation_id": conv["id"], **res}
 
 
-# ---------------- Webhook Endpoints ----------------
+# ---------------- Manual inbound logging ----------------
+# These record a customer message a manager received outside a provider webhook.
+# They are unsigned, so they require an operator API key. Signed provider webhooks
+# live at /api/webhooks/* (routes_webhooks.py).
 
 
-@router.post("/webhooks/whatsapp")
+@router.post("/omnichannel/inbound/whatsapp")
 def webhook_whatsapp(
     payload: InboundWebhookPayload,
+    _: Principal = require("operator"),
     service: OmnichannelService = Depends(get_omnichannel_service),
 ):
     sender = payload.phone or payload.sender or payload.from_address or ""
@@ -176,9 +181,10 @@ def webhook_whatsapp(
     return res
 
 
-@router.post("/webhooks/email")
+@router.post("/omnichannel/inbound/email")
 def webhook_email(
     payload: InboundWebhookPayload,
+    _: Principal = require("operator"),
     service: OmnichannelService = Depends(get_omnichannel_service),
 ):
     sender = payload.from_address or payload.sender or ""
@@ -198,9 +204,10 @@ def webhook_email(
     return res
 
 
-@router.post("/webhooks/sms")
+@router.post("/omnichannel/inbound/sms")
 def webhook_sms(
     payload: InboundWebhookPayload,
+    _: Principal = require("operator"),
     service: OmnichannelService = Depends(get_omnichannel_service),
 ):
     sender = payload.phone or payload.sender or payload.from_address or ""
