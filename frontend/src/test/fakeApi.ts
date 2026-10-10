@@ -21,7 +21,7 @@ type Handler = (call: RecordedCall) => FakeResponse | Promise<FakeResponse>;
 export function installFakeApi(handlers: Record<string, Handler | FakeResponse>): RecordedCall[] {
   const calls: RecordedCall[] = [];
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = new URL(String(input));
+    const url = new URL(String(input), 'http://api.test');
     const call: RecordedCall = {
       method: init?.method ?? 'GET',
       path: url.pathname,
