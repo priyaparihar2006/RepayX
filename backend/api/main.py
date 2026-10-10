@@ -14,9 +14,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api import routes_analytics, routes_customer, routes_health, routes_query, routes_whatsapp
+from api import routes_analytics, routes_customer, routes_health, routes_omnichannel, routes_query, routes_whatsapp
 from api.errors import register_error_handlers
 from config import API_VERSION, Settings, get_settings
+from services.omnichannel_service import OmnichannelService
 from services.resources import ResourceRegistry
 from services.whatsapp_service import WhatsAppService, WhatsAppSettings
 
@@ -41,6 +42,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.resources = ResourceRegistry(settings)
     app.state.whatsapp = WhatsAppService(WhatsAppSettings())
+    app.state.omnichannel = OmnichannelService()
 
     app.add_middleware(
         CORSMiddleware,
@@ -51,7 +53,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     register_error_handlers(app)
 
-    for router in (routes_health.router, routes_customer.router, routes_analytics.router, routes_query.router, routes_whatsapp.router):
+    for router in (
+        routes_health.router,
+        routes_customer.router,
+        routes_analytics.router,
+        routes_query.router,
+        routes_whatsapp.router,
+        routes_omnichannel.router,
+    ):
         app.include_router(router)
 
     return app
