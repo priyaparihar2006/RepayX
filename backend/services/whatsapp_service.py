@@ -213,6 +213,10 @@ class WhatsAppService:
             "server_time": now_iso(),
         }
 
+    def status(self) -> dict:
+        """Alias for configuration returning live bridge status, connection state, and message stats."""
+        return self.configuration()
+
     def generate_qr(self) -> dict:
         return self._bridge("qr/generate", {})
 
