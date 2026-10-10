@@ -1,43 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Sparkles,
-  BookOpen,
   Send,
   Calendar,
   Clock,
   CheckCircle2,
   AlertTriangle,
   User,
-  Shield,
   Phone,
   Paperclip,
   CheckCheck,
   Edit3,
   ExternalLink,
   ChevronRight,
-  Filter,
+  ChevronLeft,
   Search,
   MessageSquare,
   ArrowRight,
   ShieldCheck,
   X,
   CreditCard,
-  Building,
   Plus,
-  Mail,
-  MessageCircle,
-  Bot,
-  Play,
-  Pause,
-  UserCheck,
-  AlertCircle,
-  RefreshCw,
-  Ban,
-  AtSign,
+  HelpCircle,
 } from 'lucide-react';
-import { Conversation, Customer, Loan, ChatMessage } from '../../types';
-import { Modal } from '../common/Modal';
+import { Conversation, Customer, Loan } from '../../types';
 import { useToast } from '../common/Toast';
+import { SendMessageModal } from '../common/SendMessageModal';
+import { HowToUseModal } from '../common/HowToUseModal';
 
 interface ConversationViewProps {
   conversations: Conversation[];
@@ -56,8 +45,6 @@ interface ConversationViewProps {
   onNavigateToCustomer: (customerId: string) => void;
 }
 
-const API_BASE = 'http://127.0.0.1:8000';
-
 export const ConversationView: React.FC<ConversationViewProps> = ({
   conversations,
   activeConversationId,
@@ -70,38 +57,29 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
   const { addToast } = useToast();
 
   const [conversationList, setConversationList] = useState<Conversation[]>(conversations);
-  const [selectedChannelFilter, setSelectedChannelFilter] = useState<'all' | 'WhatsApp' | 'Email' | 'SMS'>('all');
-  const [filterIntent, setFilterIntent] = useState<string>('all');
-  const [searchInbox, setSearchInbox] = useState('');
-  const [isLoadingApi, setIsLoadingApi] = useState(false);
-
-  // Composer reply state
   const [chatInputText, setChatInputText] = useState('');
-  const [replyChannel, setReplyChannel] = useState<'WhatsApp' | 'Email' | 'SMS'>('WhatsApp');
-  const [emailSubject, setEmailSubject] = useState('');
-  const [isSendingReply, setIsSendingReply] = useState(false);
+  const [searchInbox, setSearchInbox] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'unread' | 'overdue' | 'promises'>('all');
+  const [activeChannel, setActiveChannel] = useState<'WhatsApp' | 'SMS'>('WhatsApp');
+  const [showRightDetails, setShowRightDetails] = useState(true);
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
 
-  // Outbound New Message Modal state
-  const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
-  const [newMsgCustomerId, setNewMsgCustomerId] = useState(customers[0]?.id || 'CUS001');
-  const [newMsgChannel, setNewMsgChannel] = useState<'WhatsApp' | 'SMS' | 'Email'>('WhatsApp');
-  const [newMsgTemplate, setNewMsgTemplate] = useState('reminder');
-  const [newMsgSubject, setNewMsgSubject] = useState('Payment Reminder');
-  const [newMsgCustomText, setNewMsgCustomText] = useState('');
+  // Modals
+  const [isSendMessageModalOpen, setIsSendMessageModalOpen] = useState(false);
+  const [isHowToUseModalOpen, setIsHowToUseModalOpen] = useState(false);
 
-  // Selected conversation
+  // Active conversation
   const currentConv =
     conversationList.find((c) => c.id === activeConversationId) || conversationList[0];
   const currentCustomer = customers.find((c) => c.id === currentConv?.customerId);
   const currentLoan = loans.find((l) => l.id === currentConv?.loanId);
 
-  // Suggested response edit state
-  const [isEditingAiResponse, setIsEditingAiResponse] = useState(false);
-  const [editedResponseText, setEditedResponseText] = useState(
+  // Suggested response state
+  const [suggestedText, setSuggestedText] = useState(
     currentConv?.aiAnalysis?.aiSuggestedResponse || ''
   );
 
-  // Follow-up scheduling form state
+  // Followup scheduling state
   const [scheduleDate, setScheduleDate] = useState(
     currentConv?.aiAnalysis?.suggestedFollowupDate || '2026-09-30'
   );
@@ -111,202 +89,74 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
   const [scheduleReason, setScheduleReason] = useState(
     currentConv?.aiAnalysis?.reason || 'Payment Delay Follow-up'
   );
-  const [scheduleAttempt, setScheduleAttempt] = useState(
-    currentConv?.aiAnalysis?.attemptCount || 2
-  );
-  const [isFollowupScheduled, setIsFollowupScheduled] = useState(false);
 
-  // RAG Source modal state
-  const [isRagModalOpen, setIsRagModalOpen] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch live conversations from FastAPI backend on mount
+  // Scroll to bottom when messages change
   useEffect(() => {
-    let isMounted = true;
-    const fetchLiveConversations = async () => {
-      setIsLoadingApi(true);
-      try {
-        const res = await fetch(`${API_BASE}/api/conversations`);
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted && data.conversations && data.conversations.length > 0) {
-            setConversationList(data.conversations);
-          }
-        }
-      } catch (err) {
-        // Backend offline or local dev, fallback gracefully to props
-      } finally {
-        if (isMounted) setIsLoadingApi(false);
-      }
-    };
-    fetchLiveConversations();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [currentConv?.messages?.length, activeConversationId]);
 
   // Sync state when active conversation changes
   useEffect(() => {
     if (currentConv) {
-      setEditedResponseText(currentConv.aiAnalysis?.aiSuggestedResponse || '');
+      setSuggestedText(currentConv.aiAnalysis?.aiSuggestedResponse || '');
       setScheduleDate(currentConv.aiAnalysis?.suggestedFollowupDate || '2026-09-30');
       setScheduleTime(currentConv.aiAnalysis?.suggestedFollowupTime || '10:00 AM');
-      setScheduleReason(currentConv.aiAnalysis?.reason || 'Payment Follow-up');
-      setScheduleAttempt(currentConv.aiAnalysis?.attemptCount || 1);
-      setIsFollowupScheduled(false);
-      setReplyChannel((currentConv.channel as 'WhatsApp' | 'Email' | 'SMS') || 'WhatsApp');
-      setEmailSubject(`Re: RepayX Loan Recovery Notice #${currentConv.loanId}`);
+      setScheduleReason(currentConv.aiAnalysis?.reason || 'Payment Delay Follow-up');
     }
   }, [currentConv?.id]);
 
-  // AI Copilot Toggle Handler
-  const handleToggleAiCopilot = async () => {
-    if (!currentConv) return;
-    const newAiState = !currentConv.aiEnabled;
-    try {
-      await fetch(`${API_BASE}/api/conversations/${currentConv.id}/ai-toggle`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ai_enabled: newAiState }),
-      });
-    } catch {}
-
-    setConversationList((prev) =>
-      prev.map((c) => (c.id === currentConv.id ? { ...c, aiEnabled: newAiState } : c))
-    );
-
-    addToast({
-      type: newAiState ? 'success' : 'info',
-      title: newAiState ? 'AI Copilot Activated' : 'AI Copilot Paused',
-      message: newAiState
-        ? `Autonomous AI recovery responses enabled for ${currentConv.customerName}.`
-        : `AI responses paused. Manual manager intervention required.`,
-    });
-  };
-
-  // Human Handoff Toggle Handler
-  const handleToggleHumanHandoff = async () => {
-    if (!currentConv) return;
-    const newHandoffState = !currentConv.humanHandoff;
-    try {
-      await fetch(`${API_BASE}/api/conversations/${currentConv.id}/ai-toggle`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ai_enabled: !newHandoffState,
-          human_handoff: newHandoffState,
-          reason: newHandoffState ? 'manager_intervention' : null,
-        }),
-      });
-    } catch {}
-
-    setConversationList((prev) =>
-      prev.map((c) =>
-        c.id === currentConv.id
-          ? {
-              ...c,
-              humanHandoff: newHandoffState,
-              aiEnabled: !newHandoffState,
-              handoffReason: newHandoffState ? 'manager_intervention' : undefined,
-            }
-          : c
-      )
-    );
-
-    addToast({
-      type: newHandoffState ? 'warning' : 'success',
-      title: newHandoffState ? 'Assigned to Human Counselor' : 'Handoff Resolved',
-      message: newHandoffState
-        ? `Conversation flagged for manual collection manager handling.`
-        : `Account cleared. AI copilot resumed.`,
-    });
-  };
-
-  // Manual chat send through selected channel
-  const handleSendManualMessage = async () => {
+  // Handle manual message send from bottom composer
+  const handleSendManualMessage = () => {
     if (!chatInputText.trim() || !currentConv) return;
-    setIsSendingReply(true);
 
-    const textToSend = chatInputText.trim();
-    const targetChannel = replyChannel;
-    const targetSubject = targetChannel === 'Email' ? emailSubject : undefined;
-
-    const newMsg: ChatMessage = {
+    const newMsg = {
       id: `M-${Date.now()}`,
-      sender: 'manager',
-      text: textToSend,
+      sender: 'manager' as const,
+      text: chatInputText.trim(),
       timestamp: 'Today, Just now',
       isApprovedByManager: true,
-      status: 'sent',
-      channel: targetChannel,
-      subject: targetSubject,
+      status: 'sent' as const,
     };
 
-    // Update UI immediately (optimistic UI)
     setConversationList((prev) =>
       prev.map((c) => {
         if (c.id === currentConv.id) {
           return {
             ...c,
-            lastMessageTime: 'Just now',
-            channel: targetChannel,
+            channel: activeChannel,
             messages: [...c.messages, newMsg],
           };
         }
         return c;
       })
     );
+
     setChatInputText('');
-
-    // Dispatch via backend API
-    try {
-      const res = await fetch(`${API_BASE}/api/conversations/${currentConv.id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channel: targetChannel,
-          content: textToSend,
-          subject: targetSubject,
-          manager_name: 'Priya Parihar (Manager)',
-        }),
-      });
-      const data = await res.json();
-      if (!data.success && data.opted_out) {
-        addToast({
-          type: 'error',
-          title: 'Recipient Opted Out',
-          message: data.error || `Recipient opted out of ${targetChannel}.`,
-        });
-        setIsSendingReply(false);
-        return;
-      }
-    } catch {
-      // Backend offline fallback
-    }
-
-    setIsSendingReply(false);
     addToast({
       type: 'success',
-      title: `Message Dispatched via ${targetChannel}`,
-      message: `Sent to ${currentConv.customerName} (${
-        targetChannel === 'Email' ? currentConv.customerEmail : currentConv.customerPhone
-      })`,
+      title: `Message Sent via ${activeChannel}`,
+      message: `Delivered to ${currentConv.customerName} (${currentConv.customerPhone})`,
     });
   };
 
-  // Approve & send AI suggested response
-  const handleApproveAiResponse = async () => {
-    if (!currentConv) return;
-    const textToSend = editedResponseText.trim();
-    const targetChannel = (currentConv.channel as 'WhatsApp' | 'Email' | 'SMS') || 'WhatsApp';
+  // Quick 1-tap chip insertion
+  const handleInsertQuickChip = (text: string) => {
+    setChatInputText(text);
+  };
 
-    const newMessage: ChatMessage = {
+  // Approve & send AI suggested response directly
+  const handleSendAiSuggestedDirectly = () => {
+    if (!currentConv || !suggestedText) return;
+
+    const newMsg = {
       id: `M-${Date.now()}`,
-      sender: 'ai',
-      text: textToSend,
+      sender: 'ai' as const,
+      text: suggestedText,
       timestamp: 'Today, Just now',
       isApprovedByManager: true,
-      status: 'sent',
-      channel: targetChannel,
+      status: 'sent' as const,
     };
 
     setConversationList((prev) =>
@@ -314,1101 +164,666 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
         if (c.id === currentConv.id) {
           return {
             ...c,
-            lastMessageTime: 'Just now',
-            messages: [...c.messages, newMessage],
+            messages: [...c.messages, newMsg],
           };
         }
         return c;
       })
     );
 
-    // Call API
-    try {
-      await fetch(`${API_BASE}/api/conversations/${currentConv.id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channel: targetChannel,
-          content: textToSend,
-          manager_name: 'Priya Parihar (Manager Approved)',
-        }),
-      });
-    } catch {}
-
-    setIsEditingAiResponse(false);
     addToast({
       type: 'success',
-      title: 'AI Response Approved & Dispatched',
-      message: `Message sent to ${currentConv.customerName} via ${targetChannel}.`,
+      title: 'AI Response Approved & Sent',
+      message: `Dispatched to ${currentConv.customerName} via ${currentConv.channel}`,
     });
   };
 
-  // Draft dynamic AI response into composer
-  const handleGenerateAiResponse = () => {
-    const draft = `Hello ${currentConv?.customerName}, this is RepayX Collections. Regarding Loan #${currentConv?.loanId}, your outstanding balance is ₹${
-      currentLoan?.emi.toLocaleString('en-IN') || '8,500'
-    }. Please click here to settle immediately: https://pay.repayx.ai/inv/${currentConv?.customerId}`;
-    setChatInputText(draft);
+  // Schedule follow-up
+  const handleConfirmFollowup = () => {
+    if (!currentConv) return;
+    onScheduleFollowup({
+      customerId: currentConv.customerId,
+      customerName: currentConv.customerName,
+      loanId: currentConv.loanId,
+      scheduledAt: scheduleDate,
+      scheduledTime: scheduleTime,
+      aiReason: scheduleReason,
+    });
+
     addToast({
-      type: 'info',
-      title: 'Policy Draft Inserted',
-      message: 'Grounding text inserted into the composer.',
+      type: 'success',
+      title: 'Follow-up Scheduled',
+      message: `Reminder set for ${currentConv.customerName} on ${scheduleDate} at ${scheduleTime}.`,
     });
   };
 
-  // Template helper for Outbound New Message modal
-  const getTemplateText = (tpl: string, c: Customer, l?: Loan) => {
-    const loanId = l?.id || 'LN1001';
-    const outstanding = `₹${(l?.totalLoanAmount ? l.totalLoanAmount - l.emiPaid : 25000).toLocaleString('en-IN')}`;
-    const dueDate = l?.nextDueDate || '25-Sep-2026';
-
-    switch (tpl) {
-      case 'reminder':
-        return `Hello ${c.name}, gentle reminder from RepayX that your scheduled EMI for loan ${loanId} was due on ${dueDate}. Kindly complete payment today using this secure link: https://pay.repayx.ai/inv/${c.id}`;
-      case 'overdue':
-        return `Urgent Notice: Dear ${c.name}, your loan ${loanId} has an outstanding balance of ${outstanding}. Please clear dues to prevent regulatory credit bureau (CIBIL) score downgrade.`;
-      case 'delay_ack':
-        return `Hello ${c.name}, this is Priya Parihar from RepayX. We have acknowledged your payment timeline. Here is your direct UPI payment link to clear when ready: https://pay.repayx.ai/upi/${loanId}`;
-      case 'link':
-        return `Dear ${c.name}, please find your official Bharat QR / UPI quick repayment link for loan ${loanId} (${outstanding}): https://pay.repayx.ai/pay?id=${loanId}`;
-      default:
-        return '';
-    }
-  };
-
-  const handleOpenNewMessageModal = () => {
-    const cust = currentCustomer || customers[0];
-    const loan = loans.find((l) => l.customerId === cust.id);
-    setNewMsgCustomerId(cust.id);
-    setNewMsgTemplate('reminder');
-    setNewMsgCustomText(getTemplateText('reminder', cust, loan));
-    setNewMsgSubject(`RepayX Loan Payment Reminder - #${loan?.id || 'LN1001'}`);
-    setIsNewMessageModalOpen(true);
-  };
-
-  const handleSendOutboundNewMessage = async () => {
-    if (!newMsgCustomText.trim()) return;
-    const cust = customers.find((c) => c.id === newMsgCustomerId) || customers[0];
-    const loan = loans.find((l) => l.customerId === cust.id);
-
-    const newMsg: ChatMessage = {
+  // Handle outbound message sent from modal
+  const handleOutboundMessageCreated = (data: {
+    customerId: string;
+    customerName: string;
+    channel: 'WhatsApp' | 'SMS';
+    messageText: string;
+  }) => {
+    const existing = conversationList.find((c) => c.customerId === data.customerId);
+    const newMsg = {
       id: `M-${Date.now()}`,
-      sender: 'manager',
-      text: newMsgCustomText.trim(),
+      sender: 'manager' as const,
+      text: data.messageText,
       timestamp: 'Today, Just now',
       isApprovedByManager: true,
-      status: 'sent',
-      channel: newMsgChannel,
-      subject: newMsgChannel === 'Email' ? newMsgSubject : undefined,
+      status: 'sent' as const,
     };
 
-    const existingConv = conversationList.find((c) => c.customerId === cust.id);
-    if (existingConv) {
+    if (existing) {
       setConversationList((prev) =>
-        prev.map((c) =>
-          c.id === existingConv.id
-            ? { ...c, channel: newMsgChannel, lastMessageTime: 'Just now', messages: [...c.messages, newMsg] }
-            : c
-        )
+        prev.map((c) => (c.id === existing.id ? { ...c, messages: [...c.messages, newMsg] } : c))
       );
-      onSelectConversation(existingConv.id);
-      try {
-        await fetch(`${API_BASE}/api/conversations/${existingConv.id}/messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            channel: newMsgChannel,
-            content: newMsgCustomText.trim(),
-            subject: newMsgChannel === 'Email' ? newMsgSubject : undefined,
-          }),
-        });
-      } catch {}
+      onSelectConversation(existing.id);
+      setMobileView('chat');
     } else {
+      const custLoan = loans.find((l) => l.customerId === data.customerId);
       const newConv: Conversation = {
         id: `CONV-${Date.now()}`,
-        loanId: loan?.id || 'LN1001',
-        customerId: cust.id,
-        customerName: cust.name,
-        customerPhone: cust.phone,
-        customerEmail: `${cust.name.toLowerCase().replace(' ', '.')}@example.com`,
-        customerAvatar: cust.avatar,
+        loanId: custLoan?.id || 'LN1001',
+        customerId: data.customerId,
+        customerName: data.customerName,
+        customerPhone: customers.find((c) => c.id === data.customerId)?.phone || '+91 98765 00000',
+        customerAvatar: customers.find((c) => c.id === data.customerId)?.avatar || '',
         lastMessageTime: 'Just now',
         unread: false,
-        channel: newMsgChannel,
-        aiEnabled: true,
-        humanHandoff: false,
+        channel: data.channel,
         messages: [newMsg],
         aiAnalysis: {
           detectedIntent: 'PAYMENT_PROMISE',
-          reason: 'Outbound Manager Initiated Contact',
+          reason: 'Manager Outreach',
           paymentPromise: false,
-          promisedTimeline: 'Awaiting reply',
-          recommendedAction: 'Wait for response',
+          promisedTimeline: 'Awaiting response',
+          recommendedAction: 'Wait for customer reply',
           confidence: 90,
           ragContext: {
-            policyTitle: 'Omnichannel Collections SOP',
-            relevantSection: 'Manager initiated direct follow-up.',
-            sourceFile: 'omnichannel_policy.pdf',
-            chunkId: 'CHUNK-SOP-001',
+            policyTitle: 'Outreach SOP',
+            relevantSection: 'Manager sent outbound reminder.',
+            sourceFile: 'recovery_sop.pdf',
+            chunkId: 'CHUNK-NEW',
             relevanceScore: 90,
           },
-          aiSuggestedResponse: `Follow-up sent to ${cust.name}`,
+          aiSuggestedResponse: `Follow up tomorrow with ${data.customerName}`,
           requiresManagerApproval: false,
           attemptCount: 1,
         },
       };
       setConversationList([newConv, ...conversationList]);
       onSelectConversation(newConv.id);
-      try {
-        await fetch(`${API_BASE}/api/conversations/new`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customer_id: cust.id,
-            channel: newMsgChannel,
-            content: newMsgCustomText.trim(),
-            subject: newMsgChannel === 'Email' ? newMsgSubject : undefined,
-          }),
-        });
-      } catch {}
+      setMobileView('chat');
     }
-
-    setIsNewMessageModalOpen(false);
-    addToast({
-      type: 'success',
-      title: 'Follow-up Dispatched',
-      message: `Message sent to ${cust.name} via ${newMsgChannel}.`,
-    });
   };
 
-  // Filter conversations by channel, search, and intent
+  // Filter conversations
   const filteredConversations = conversationList.filter((conv) => {
-    const matchesChannel =
-      selectedChannelFilter === 'all' || conv.channel.toLowerCase() === selectedChannelFilter.toLowerCase();
-
-    const matchesSearch =
+    const matchSearch =
       conv.customerName.toLowerCase().includes(searchInbox.toLowerCase()) ||
-      conv.loanId.toLowerCase().includes(searchInbox.toLowerCase()) ||
-      conv.aiAnalysis.detectedIntent.toLowerCase().includes(searchInbox.toLowerCase());
+      conv.customerPhone.includes(searchInbox) ||
+      conv.loanId.toLowerCase().includes(searchInbox.toLowerCase());
 
-    const matchesIntent =
-      filterIntent === 'all' || conv.aiAnalysis.detectedIntent === filterIntent;
+    if (!matchSearch) return false;
 
-    return matchesChannel && matchesSearch && matchesIntent;
+    if (filterType === 'unread') return conv.unread;
+    if (filterType === 'overdue') {
+      const l = loans.find((item) => item.id === conv.loanId);
+      return l && l.daysOverdue > 0;
+    }
+    if (filterType === 'promises') {
+      return (
+        conv.aiAnalysis?.detectedIntent === 'PAYMENT_PROMISE' ||
+        conv.aiAnalysis?.detectedIntent === 'PAYMENT_DELAY'
+      );
+    }
+    return true;
   });
 
-  // Channel message counts
-  const channelCounts = {
-    all: conversationList.length,
-    WhatsApp: conversationList.filter((c) => c.channel.toLowerCase() === 'whatsapp').length,
-    Email: conversationList.filter((c) => c.channel.toLowerCase() === 'email').length,
-    SMS: conversationList.filter((c) => c.channel.toLowerCase() === 'sms').length,
-  };
-
-  // Character counter for SMS
-  const smsCharCount = chatInputText.length;
-  const smsSegments = smsCharCount <= 160 ? 1 : Math.ceil(smsCharCount / 153);
-
   return (
-    <div className="h-[calc(100vh-7.5rem)] flex flex-col lg:flex-row gap-4 max-w-7xl mx-auto overflow-hidden">
-      {/* ============================================================ */}
-      {/* LEFT COLUMN: Unified Omnichannel Inbox (w-84)                */}
-      {/* ============================================================ */}
-      <div className="lg:w-84 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col shrink-0 overflow-hidden">
-        {/* Inbox Header & Channel Filter Tabs */}
-        <div className="p-3.5 border-b border-slate-100 bg-slate-50/70">
-          <div className="flex items-center justify-between mb-2.5">
-            <div className="flex items-center gap-1.5">
-              <h2 className="text-sm font-bold text-slate-900 tracking-tight">Recovery Inbox</h2>
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
-                Omnichannel
-              </span>
-            </div>
-
-            <button
-              onClick={handleOpenNewMessageModal}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs transition-all cursor-pointer"
-              title="Compose outbound follow-up message"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New</span>
-            </button>
+    <div className="h-[calc(100vh-6.5rem)] flex flex-col bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      {/* Top Action Ribbon */}
+      <div className="px-4 py-3 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-[#516072] text-white flex items-center justify-center font-bold">
+            <MessageSquare className="w-4 h-4" />
           </div>
-
-          {/* Omnichannel Channel Tabs */}
-          <div className="grid grid-cols-4 gap-1 p-1 bg-slate-200/60 rounded-xl mb-2 text-xs font-semibold">
-            <button
-              onClick={() => setSelectedChannelFilter('all')}
-              className={`py-1 rounded-lg text-center transition-all cursor-pointer ${
-                selectedChannelFilter === 'all'
-                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              All ({channelCounts.all})
-            </button>
-            <button
-              onClick={() => setSelectedChannelFilter('WhatsApp')}
-              className={`flex items-center justify-center gap-1 py-1 rounded-lg transition-all cursor-pointer ${
-                selectedChannelFilter === 'WhatsApp'
-                  ? 'bg-emerald-600 text-white shadow-2xs font-bold'
-                  : 'text-emerald-700 hover:bg-emerald-50'
-              }`}
-              title="WhatsApp Messages"
-            >
-              <MessageCircle className="w-3 h-3" />
-              <span>WA ({channelCounts.WhatsApp})</span>
-            </button>
-            <button
-              onClick={() => setSelectedChannelFilter('Email')}
-              className={`flex items-center justify-center gap-1 py-1 rounded-lg transition-all cursor-pointer ${
-                selectedChannelFilter === 'Email'
-                  ? 'bg-blue-600 text-white shadow-2xs font-bold'
-                  : 'text-blue-700 hover:bg-blue-50'
-              }`}
-              title="Email Messages"
-            >
-              <Mail className="w-3 h-3" />
-              <span>Email ({channelCounts.Email})</span>
-            </button>
-            <button
-              onClick={() => setSelectedChannelFilter('SMS')}
-              className={`flex items-center justify-center gap-1 py-1 rounded-lg transition-all cursor-pointer ${
-                selectedChannelFilter === 'SMS'
-                  ? 'bg-purple-600 text-white shadow-2xs font-bold'
-                  : 'text-purple-700 hover:bg-purple-50'
-              }`}
-              title="SMS Messages"
-            >
-              <MessageSquare className="w-3 h-3" />
-              <span>SMS ({channelCounts.SMS})</span>
-            </button>
-          </div>
-
-          {/* Search box */}
-          <div className="relative mb-2">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search borrower, loan, or text..."
-              value={searchInbox}
-              onChange={(e) => setSearchInbox(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Intent Filter Pills */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px] scrollbar-none">
-            {[
-              { id: 'all', label: 'All Intents' },
-              { id: 'PAYMENT_DELAY', label: 'Delay' },
-              { id: 'PAYMENT_PROMISE', label: 'Promise' },
-              { id: 'FINANCIAL_HARDSHIP', label: 'Hardship' },
-              { id: 'DISPUTE_OR_COMPLAINT', label: 'Dispute' },
-              { id: 'BALANCE_INQUIRY', label: 'Balance' },
-              { id: 'OPT_OUT', label: 'Opt-Out' },
-            ].map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFilterIntent(f.id)}
-                className={`px-2 py-0.5 rounded-md whitespace-nowrap font-medium transition-colors cursor-pointer ${
-                  filterIntent === f.id
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 font-heading">
+              Customer Messaging & WhatsApp Hub
+            </h2>
+            <p className="text-[11px] text-slate-500 hidden sm:block">
+              Send messages directly from your end, view replies, and approve AI suggested answers.
+            </p>
           </div>
         </div>
 
-        {/* Conversation List Items */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-          {filteredConversations.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-400">
-              No conversations found for selected filter.
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsHowToUseModalOpen(true)}
+            className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-[#516072]" />
+            <span className="hidden sm:inline">How to use</span>
+          </button>
+
+          <button
+            onClick={() => setIsSendMessageModalOpen(true)}
+            className="px-3.5 py-1.5 text-xs font-semibold text-white bg-[#516072] hover:bg-[#43505F] rounded-xl transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Send New Message</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main 3-Column Work Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* COLUMN 1: Conversation List */}
+        <div
+          className={`w-full md:w-80 lg:w-84 border-r border-slate-200 flex flex-col bg-slate-50/50 shrink-0 ${
+            mobileView === 'chat' ? 'hidden md:flex' : 'flex'
+          }`}
+        >
+          {/* Search & Filters */}
+          <div className="p-3 border-b border-slate-200 space-y-2">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search borrower by name, phone..."
+                value={searchInbox}
+                onChange={(e) => setSearchInbox(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#516072]"
+              />
             </div>
-          ) : (
-            filteredConversations.map((conv) => {
+
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-1 p-0.5 bg-slate-200/70 rounded-lg text-[11px] font-medium text-slate-600">
+              <button
+                onClick={() => setFilterType('all')}
+                className={`flex-1 py-1 text-center rounded-md transition-colors cursor-pointer ${
+                  filterType === 'all' ? 'bg-white text-slate-900 font-bold shadow-xs' : 'hover:text-slate-900'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setFilterType('overdue')}
+                className={`flex-1 py-1 text-center rounded-md transition-colors cursor-pointer ${
+                  filterType === 'overdue' ? 'bg-white text-rose-700 font-bold shadow-xs' : 'hover:text-slate-900'
+                }`}
+              >
+                Overdue
+              </button>
+              <button
+                onClick={() => setFilterType('promises')}
+                className={`flex-1 py-1 text-center rounded-md transition-colors cursor-pointer ${
+                  filterType === 'promises' ? 'bg-white text-amber-700 font-bold shadow-xs' : 'hover:text-slate-900'
+                }`}
+              >
+                Promises
+              </button>
+              <button
+                onClick={() => setFilterType('unread')}
+                className={`flex-1 py-1 text-center rounded-md transition-colors cursor-pointer ${
+                  filterType === 'unread' ? 'bg-white text-[#516072] font-bold shadow-xs' : 'hover:text-slate-900'
+                }`}
+              >
+                Unread
+              </button>
+            </div>
+          </div>
+
+          {/* Conversation Cards List */}
+          <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+            {filteredConversations.map((conv) => {
               const isSelected = conv.id === currentConv?.id;
               const lastMsg = conv.messages[conv.messages.length - 1];
-              const intent = conv.aiAnalysis?.detectedIntent || 'GENERAL_QUERY';
-              const channelType = conv.channel.toLowerCase();
+              const matchLoan = loans.find((l) => l.id === conv.loanId);
 
               return (
                 <div
                   key={conv.id}
-                  onClick={() => onSelectConversation(conv.id)}
-                  className={`p-3.5 cursor-pointer transition-all ${
+                  onClick={() => {
+                    onSelectConversation(conv.id);
+                    setMobileView('chat');
+                  }}
+                  className={`p-3.5 transition-colors cursor-pointer flex items-start gap-3 ${
                     isSelected
-                      ? 'bg-blue-50/80 border-l-4 border-l-blue-600'
-                      : 'hover:bg-slate-50/80'
+                      ? 'bg-[#516072]/10 border-l-4 border-[#516072]'
+                      : 'hover:bg-slate-100/70 bg-white'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-1 mb-1">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-xs text-slate-700 shrink-0 overflow-hidden">
-                        {conv.customerAvatar ? (
-                          <img
-                            src={conv.customerAvatar}
-                            alt={conv.customerName}
-                            referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLElement).style.display = 'none';
-                            }}
-                          />
-                        ) : (
-                          conv.customerName.charAt(0)
-                        )}
+                  <div className="relative shrink-0">
+                    {conv.customerAvatar ? (
+                      <img
+                        src={conv.customerAvatar}
+                        alt={conv.customerName}
+                        className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs">
+                        {conv.customerName.charAt(0)}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-xs font-bold text-slate-900 leading-tight">
-                            {conv.customerName}
-                          </p>
-                          {conv.humanHandoff && (
-                            <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                              ⚠️ Handoff
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-slate-400 font-mono">{conv.loanId}</span>
-                      </div>
+                    )}
+                    {conv.unread && (
+                      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-[#516072] rounded-full border-2 border-white" />
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <h4 className="text-xs font-bold text-slate-900 truncate">
+                        {conv.customerName}
+                      </h4>
+                      <span className="text-[10px] text-slate-400 shrink-0">
+                        {conv.lastMessageTime}
+                      </span>
                     </div>
 
-                    <span className="text-[10px] text-slate-400 shrink-0 font-medium">
-                      {conv.lastMessageTime}
-                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[10px] font-semibold text-slate-500">
+                        ₹{matchLoan ? matchLoan.outstanding.toLocaleString('en-IN') : '8,500'}
+                      </span>
+                      <span className="text-slate-300">·</span>
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                          matchLoan && matchLoan.daysOverdue > 0
+                            ? 'bg-rose-100 text-rose-700'
+                            : 'bg-emerald-100 text-emerald-700'
+                        }`}
+                      >
+                        {matchLoan && matchLoan.daysOverdue > 0
+                          ? `${matchLoan.daysOverdue}D Late`
+                          : 'Due Today'}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-600 truncate mt-1">
+                      {lastMsg ? lastMsg.text : 'No messages yet'}
+                    </p>
                   </div>
-
-                  {/* Channel & Intent Badges */}
-                  <div className="flex items-center justify-between mt-2">
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
-                        intent === 'PAYMENT_PROMISE'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : intent === 'PAYMENT_DELAY'
-                          ? 'bg-amber-50 text-amber-700 border-amber-200'
-                          : intent === 'FINANCIAL_HARDSHIP' || intent === 'FINANCIAL_DIFFICULTY'
-                          ? 'bg-rose-50 text-rose-700 border-rose-200'
-                          : intent === 'DISPUTE_OR_COMPLAINT' || intent === 'PAYMENT_DISPUTE'
-                          ? 'bg-purple-50 text-purple-700 border-purple-200'
-                          : intent === 'OPT_OUT'
-                          ? 'bg-red-50 text-red-700 border-red-200'
-                          : 'bg-slate-100 text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      {intent.replace(/_/g, ' ')}
-                    </span>
-
-                    {/* Channel Indicator Badge */}
-                    <span
-                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-                        channelType === 'whatsapp'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : channelType === 'email'
-                          ? 'bg-blue-50 text-blue-700 border-blue-200'
-                          : 'bg-purple-50 text-purple-700 border-purple-200'
-                      }`}
-                    >
-                      {channelType === 'whatsapp' && <MessageCircle className="w-2.5 h-2.5 text-emerald-600" />}
-                      {channelType === 'email' && <Mail className="w-2.5 h-2.5 text-blue-600" />}
-                      {channelType === 'sms' && <MessageSquare className="w-2.5 h-2.5 text-purple-600" />}
-                      <span>{conv.channel}</span>
-                    </span>
-                  </div>
-
-                  {/* Message Preview Snippet */}
-                  <p className="text-[11px] text-slate-600 truncate mt-1.5 font-normal">
-                    {lastMsg?.text || 'No message'}
-                  </p>
                 </div>
               );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* ============================================================ */}
-      {/* CENTER COLUMN: Unified Interactive Chat Timeline (flex-1)   */}
-      {/* ============================================================ */}
-      <div className="flex-1 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col min-w-0 overflow-hidden">
-        {/* Chat Header: Customer & Omnichannel Controls */}
-        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
-              {currentConv?.customerAvatar ? (
-                <img
-                  src={currentConv.customerAvatar}
-                  alt={currentConv.customerName}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                currentConv?.customerName.charAt(0)
-              )}
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-900">{currentConv?.customerName}</h3>
-                <span className="text-[11px] font-mono text-slate-500 font-semibold">
-                  {currentConv?.loanId}
-                </span>
-
-                {/* Active channel badge */}
-                <span
-                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
-                    currentConv?.channel.toLowerCase() === 'whatsapp'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : currentConv?.channel.toLowerCase() === 'email'
-                      ? 'bg-blue-50 text-blue-700 border-blue-200'
-                      : 'bg-purple-50 text-purple-700 border-purple-200'
-                  }`}
-                >
-                  {currentConv?.channel.toLowerCase() === 'whatsapp' && <MessageCircle className="w-3 h-3 text-emerald-600" />}
-                  {currentConv?.channel.toLowerCase() === 'email' && <Mail className="w-3 h-3 text-blue-600" />}
-                  {currentConv?.channel.toLowerCase() === 'sms' && <MessageSquare className="w-3 h-3 text-purple-600" />}
-                  <span>{currentConv?.channel} Active</span>
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                {currentConv?.customerPhone} · {currentConv?.customerEmail || 'email on file'}
-              </p>
-            </div>
-          </div>
-
-          {/* AI Copilot & Handoff Action Controls */}
-          <div className="flex items-center gap-2">
-            {/* AI Copilot Active / Paused Pill */}
-            <button
-              onClick={handleToggleAiCopilot}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                currentConv?.aiEnabled
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
-                  : 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
-              }`}
-              title="Click to toggle AI copilot auto-reply"
-            >
-              {currentConv?.aiEnabled ? (
-                <>
-                  <Bot className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
-                  <span>AI Copilot: Active</span>
-                </>
-              ) : (
-                <>
-                  <Pause className="w-3.5 h-3.5 text-amber-600" />
-                  <span>AI Copilot: Paused</span>
-                </>
-              )}
-            </button>
-
-            {/* Human Handoff Button */}
-            <button
-              onClick={handleToggleHumanHandoff}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                currentConv?.humanHandoff
-                  ? 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
-                  : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-              }`}
-            >
-              {currentConv?.humanHandoff ? (
-                <>
-                  <UserCheck className="w-3.5 h-3.5 text-rose-600" />
-                  <span>Resolve Handoff</span>
-                </>
-              ) : (
-                <>
-                  <ShieldCheck className="w-3.5 h-3.5 text-slate-600" />
-                  <span>Take Over</span>
-                </>
-              )}
-            </button>
+            })}
           </div>
         </div>
 
-        {/* Human Handoff Banner (if flagged) */}
-        {currentConv?.humanHandoff && (
-          <div className="px-4 py-2 bg-rose-50 border-b border-rose-200 flex items-center justify-between text-xs text-rose-800">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>
-                <strong>Needs Human Intervention:</strong> {currentConv.handoffReason || 'Borrower requested human counselor assistance / reported hardship.'}
-              </span>
-            </div>
-            <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-200/80 text-rose-900 px-2 py-0.5 rounded-full">
-              Priya Parihar Assigned
-            </span>
-          </div>
-        )}
-
-        {/* Message Stream */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/40">
-          {currentConv?.messages.map((msg) => {
-            const isAI = msg.sender === 'ai';
-            const isManager = msg.sender === 'manager';
-            const isCustomer = msg.sender === 'customer';
-            const msgChannel = (msg.channel || currentConv.channel || 'WhatsApp').toLowerCase();
-
-            return (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${
-                  isCustomer ? 'items-start' : 'items-end'
-                } max-w-[85%] ${isCustomer ? 'mr-auto' : 'ml-auto'}`}
+        {/* COLUMN 2: Chat Transcript & Composer */}
+        <div
+          className={`flex-1 flex flex-col bg-white min-w-0 ${
+            mobileView === 'list' ? 'hidden md:flex' : 'flex'
+          }`}
+        >
+          {/* Chat Header */}
+          <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-3 bg-white">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                onClick={() => setMobileView('list')}
+                className="md:hidden p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg cursor-pointer"
               >
-                {/* Sender badge, channel icon & timestamp */}
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mb-1 px-1">
-                  {isAI && (
-                    <span className="flex items-center gap-1 font-semibold text-purple-600">
-                      <Sparkles className="w-3 h-3" /> RepayX AI Copilot
-                    </span>
-                  )}
-                  {isManager && (
-                    <span className="flex items-center gap-1 font-semibold text-blue-600">
-                      <ShieldCheck className="w-3 h-3" /> Priya Parihar (Manager)
-                    </span>
-                  )}
-                  {isCustomer && (
-                    <span className="font-semibold text-slate-700">
-                      {currentConv.customerName}
-                    </span>
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+
+              <div className="relative shrink-0">
+                {currentConv?.customerAvatar ? (
+                  <img
+                    src={currentConv.customerAvatar}
+                    alt={currentConv.customerName}
+                    className="w-9 h-9 rounded-full object-cover border border-slate-200"
+                  />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs">
+                    {currentConv?.customerName?.charAt(0) || 'C'}
+                  </div>
+                )}
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900 truncate">
+                    {currentConv?.customerName}
+                  </h3>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    WhatsApp Connected
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 flex items-center gap-2">
+                  <span>{currentConv?.customerPhone}</span>
+                  <span>·</span>
+                  <span>Loan {currentConv?.loanId}</span>
+                  <span>·</span>
+                  <span className="font-semibold text-rose-600">
+                    ₹{currentLoan?.outstanding.toLocaleString('en-IN')} Due
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowRightDetails(!showRightDetails)}
+                className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl text-xs font-semibold border border-slate-200 hidden lg:flex items-center gap-1.5 cursor-pointer"
+                title="Toggle Borrower Details"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>{showRightDetails ? 'Hide Info' : 'Show Info'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Messages Feed */}
+          <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/40">
+            {currentConv?.messages.map((msg) => {
+              const isMe = msg.sender === 'manager' || msg.sender === 'ai';
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex items-end gap-2.5 ${isMe ? 'justify-end' : 'justify-start'}`}
+                >
+                  {!isMe && (
+                    <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center shrink-0">
+                      {currentConv.customerName.charAt(0)}
+                    </div>
                   )}
 
-                  {/* Message Channel Badge */}
-                  <span
-                    className={`flex items-center gap-1 px-1.5 py-0.2 rounded-full font-bold text-[9px] border ${
-                      msgChannel === 'whatsapp'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : msgChannel === 'email'
-                        ? 'bg-blue-50 text-blue-700 border-blue-200'
-                        : 'bg-purple-50 text-purple-700 border-purple-200'
+                  <div
+                    className={`max-w-[85%] sm:max-w-md rounded-2xl px-4 py-2.5 shadow-xs text-xs sm:text-sm ${
+                      isMe
+                        ? 'bg-[#516072] text-white rounded-br-xs'
+                        : 'bg-white border border-slate-200/90 text-slate-900 rounded-bl-xs'
                     }`}
                   >
-                    {msgChannel === 'whatsapp' && <MessageCircle className="w-2.5 h-2.5 text-emerald-600" />}
-                    {msgChannel === 'email' && <Mail className="w-2.5 h-2.5 text-blue-600" />}
-                    {msgChannel === 'sms' && <MessageSquare className="w-2.5 h-2.5 text-purple-600" />}
-                    <span className="capitalize">{msgChannel}</span>
-                  </span>
-
-                  <span>·</span>
-                  <span>{msg.timestamp}</span>
-                </div>
-
-                {/* Bubble Container */}
-                <div
-                  className={`p-3.5 rounded-2xl text-xs leading-relaxed shadow-2xs ${
-                    isCustomer
-                      ? 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs'
-                      : isAI
-                      ? 'bg-slate-900 text-white rounded-tr-xs'
-                      : 'bg-blue-600 text-white rounded-tr-xs'
-                  }`}
-                >
-                  {/* Email Subject line if present */}
-                  {msg.subject && (
-                    <div className="mb-2 pb-1.5 border-b border-white/20 text-[11px] font-semibold text-blue-100 flex items-center gap-1">
-                      <Mail className="w-3 h-3" />
-                      <span>{msg.subject}</span>
-                    </div>
-                  )}
-
-                  <p className="whitespace-pre-line">{msg.text}</p>
-
-                  {/* Manager approval stamp if applicable */}
-                  {msg.isApprovedByManager && (
-                    <div
-                      className={`mt-2 pt-1.5 border-t text-[10px] flex items-center justify-between ${
-                        isAI ? 'border-slate-800 text-slate-400' : 'border-blue-500 text-blue-100'
-                      }`}
-                    >
-                      <span className="flex items-center gap-1">
-                        <CheckCheck className="w-3 h-3 text-emerald-400" />
-                        <span>Manager Reviewed & Authorized</span>
+                    <div className="flex items-center justify-between gap-3 text-[10px] mb-1 opacity-80">
+                      <span className="font-semibold">
+                        {isMe ? (msg.sender === 'ai' ? 'LoanFlow AI' : 'Priya (Manager)') : currentConv.customerName}
                       </span>
-                      <span>Priya Parihar</span>
+                      <span>{msg.timestamp}</span>
                     </div>
-                  )}
+
+                    <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+
+                    {isMe && (
+                      <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-slate-200">
+                        <span>Delivered via {currentConv.channel}</span>
+                        <CheckCheck className="w-3 h-3" />
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* ============================================================ */}
-        {/* COMPOSER: Omnichannel Outbound Reply Area                    */}
-        {/* ============================================================ */}
-        <div className="p-3.5 border-t border-slate-100 bg-white">
-          {/* Channel Selector for Outbound Reply */}
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-500 font-semibold">Reply via:</span>
-              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-xs font-semibold">
-                <button
-                  onClick={() => setReplyChannel('WhatsApp')}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md transition-all cursor-pointer ${
-                    replyChannel === 'WhatsApp'
-                      ? 'bg-emerald-600 text-white shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <MessageCircle className="w-3 h-3" />
-                  <span>WhatsApp</span>
-                </button>
-                <button
-                  onClick={() => setReplyChannel('Email')}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md transition-all cursor-pointer ${
-                    replyChannel === 'Email'
-                      ? 'bg-blue-600 text-white shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Mail className="w-3 h-3" />
-                  <span>Email</span>
-                </button>
-                <button
-                  onClick={() => setReplyChannel('SMS')}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md transition-all cursor-pointer ${
-                    replyChannel === 'SMS'
-                      ? 'bg-purple-600 text-white shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <MessageSquare className="w-3 h-3" />
-                  <span>SMS</span>
-                </button>
-              </div>
-
-              {/* SMS Segment counter */}
-              {replyChannel === 'SMS' && (
-                <span className="text-[10px] text-purple-700 font-mono bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
-                  {smsCharCount} / 160 chars ({smsSegments} SMS)
-                </span>
-              )}
-            </div>
-
-            {/* Quick Draft AI Policy Response */}
-            <button
-              onClick={handleGenerateAiResponse}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold border border-indigo-200 transition-colors cursor-pointer"
-            >
-              <Sparkles className="w-3 h-3" />
-              <span>Draft Policy Reply</span>
-            </button>
+              );
+            })}
+            <div ref={messagesEndRef} />
           </div>
 
-          {/* Email Subject line if Email channel is selected */}
-          {replyChannel === 'Email' && (
-            <div className="mb-2">
-              <input
-                type="text"
-                placeholder="Email Subject..."
-                value={emailSubject}
-                onChange={(e) => setEmailSubject(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
+          {/* AI Suggested Response Banner (If available) */}
+          {suggestedText && (
+            <div className="px-4 py-3 bg-purple-50/80 border-t border-purple-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <div className="w-6 h-6 rounded-md bg-purple-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold text-purple-900 flex items-center gap-1.5">
+                    <span>AI Suggested Reply</span>
+                    <span className="text-[10px] bg-purple-200/70 text-purple-800 px-1.5 py-0.2 rounded font-semibold">
+                      Policy Approved
+                    </span>
+                  </div>
+                  <p className="text-xs text-purple-800 truncate mt-0.5">{suggestedText}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setChatInputText(suggestedText)}
+                  className="flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold text-purple-800 bg-white hover:bg-purple-100 border border-purple-200 rounded-lg cursor-pointer transition-colors"
+                >
+                  Edit in Box
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendAiSuggestedDirectly}
+                  className="flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-xs cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Send className="w-3 h-3" />
+                  Send Now
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Quick Reply Chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 mb-2 scrollbar-none text-[11px]">
-            <span className="text-slate-400 font-medium shrink-0">Quick reply:</span>
-            <button
-              onClick={() =>
-                setChatInputText(
-                  `Hello ${currentConv?.customerName}, gentle reminder that your EMI of ₹${
-                    currentLoan?.emi.toLocaleString('en-IN') || '8,500'
-                  } is due. Please click here to complete payment: https://pay.repayx.ai/inv/${
-                    currentConv?.customerId
-                  }`
-                )
-              }
-              className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition-colors whitespace-nowrap cursor-pointer"
-            >
-              📌 Soft EMI Reminder
-            </button>
-            <button
-              onClick={() =>
-                setChatInputText(
-                  `Hello ${currentConv?.customerName}, here is your verified UPI payment link for instant loan clearance: https://pay.repayx.ai/inv/${
-                    currentConv?.customerId
-                  }`
-                )
-              }
-              className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition-colors whitespace-nowrap cursor-pointer"
-            >
-              🔗 Send Payment Link
-            </button>
-            <button
-              onClick={() =>
-                setChatInputText(
-                  `Dear ${currentConv?.customerName}, RepayX can offer you a special late fee waiver if you settle your overdue principal today: https://pay.repayx.ai/inv/${currentConv?.customerId}`
-                )
-              }
-              className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition-colors whitespace-nowrap cursor-pointer"
-            >
-              🎉 Concession Offer
-            </button>
-          </div>
-
-          {/* Text Input & Send */}
-          <div className="flex items-end gap-2">
-            <textarea
-              rows={2}
-              value={chatInputText}
-              onChange={(e) => setChatInputText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendManualMessage();
+          {/* Message Composer Area */}
+          <div className="p-3 sm:p-4 border-t border-slate-200 bg-white space-y-2.5">
+            {/* Quick 1-tap chip templates */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+              <span className="text-[11px] font-bold text-slate-400 shrink-0">1-Tap:</span>
+              <button
+                type="button"
+                onClick={() =>
+                  handleInsertQuickChip(
+                    `Dear ${currentConv?.customerName}, here is your verified UPI repayment link: https://pay.loanflow.internal/upi/${currentConv?.loanId}. Pay with Google Pay/PhonePe.`
+                  )
                 }
-              }}
-              placeholder={`Write authorized reply to ${currentConv?.customerName} via ${replyChannel}...`}
-              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
-            />
+                className="px-2.5 py-1 bg-slate-100 hover:bg-[#516072]/15 hover:text-[#252E38] text-slate-700 rounded-lg border border-slate-200 text-xs shrink-0 cursor-pointer transition-colors font-medium"
+              >
+                💳 UPI Pay Link
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleInsertQuickChip(
+                    `Hello ${currentConv?.customerName}, could you please let us know when your salary will be credited so we can update your loan repayment date?`
+                  )
+                }
+                className="px-2.5 py-1 bg-slate-100 hover:bg-[#516072]/15 hover:text-[#252E38] text-slate-700 rounded-lg border border-slate-200 text-xs shrink-0 cursor-pointer transition-colors font-medium"
+              >
+                📅 Ask Salary Date
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleInsertQuickChip(
+                    `Hello ${currentConv?.customerName}, we have noted your delay request and approved a 5-day extension until 30 September without penalty.`
+                  )
+                }
+                className="px-2.5 py-1 bg-slate-100 hover:bg-[#516072]/15 hover:text-[#252E38] text-slate-700 rounded-lg border border-slate-200 text-xs shrink-0 cursor-pointer transition-colors font-medium"
+              >
+                ⏳ 5-Day Extension
+              </button>
+            </div>
 
-            <button
-              onClick={handleSendManualMessage}
-              disabled={!chatInputText.trim() || isSendingReply}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer h-10"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>Send</span>
-            </button>
+            {/* Input bar + Send button */}
+            <div className="flex items-end gap-2">
+              <div className="flex-1 bg-slate-50 border border-slate-300 rounded-xl focus-within:ring-2 focus-within:ring-[#516072] focus-within:bg-white transition-all">
+                <textarea
+                  value={chatInputText}
+                  onChange={(e) => setChatInputText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendManualMessage();
+                    }
+                  }}
+                  rows={2}
+                  placeholder={`Type your message to ${currentConv?.customerName}... (Press Enter to send)`}
+                  className="w-full px-3.5 py-2.5 bg-transparent border-0 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none resize-none leading-relaxed"
+                />
+
+                <div className="px-3 py-1.5 border-t border-slate-200/60 flex items-center justify-between text-xs text-slate-500">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] font-semibold text-slate-600">Send via:</span>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="channel"
+                        checked={activeChannel === 'WhatsApp'}
+                        onChange={() => setActiveChannel('WhatsApp')}
+                        className="accent-[#516072]"
+                      />
+                      <span className="text-[11px] font-medium text-emerald-700">WhatsApp</span>
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="channel"
+                        checked={activeChannel === 'SMS'}
+                        onChange={() => setActiveChannel('SMS')}
+                        className="accent-[#516072]"
+                      />
+                      <span className="text-[11px] font-medium text-slate-600">SMS</span>
+                    </label>
+                  </div>
+                  <span className="text-[10px] text-slate-400 hidden sm:inline">
+                    Enter ↵ to send
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSendManualMessage}
+                disabled={!chatInputText.trim()}
+                className="h-11 px-4 sm:px-5 bg-[#516072] hover:bg-[#414E5E] disabled:opacity-40 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors shrink-0"
+              >
+                <Send className="w-4 h-4" />
+                <span className="hidden sm:inline">Send</span>
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* COLUMN 3: Right Context Drawer */}
+        {showRightDetails && currentCustomer && currentLoan && (
+          <div className="hidden lg:flex w-76 xl:w-80 border-l border-slate-200 bg-slate-50/40 p-4 flex-col overflow-y-auto space-y-4 shrink-0">
+            {/* Customer Summary Card */}
+            <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Borrower Card
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    currentLoan.daysOverdue > 0
+                      ? 'bg-rose-100 text-rose-700'
+                      : 'bg-emerald-100 text-emerald-700'
+                  }`}
+                >
+                  {currentLoan.daysOverdue > 0
+                    ? `${currentLoan.daysOverdue} Days Overdue`
+                    : 'Due Today'}
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-slate-900">{currentCustomer.name}</h4>
+                <p className="text-xs text-slate-500">Phone: {currentCustomer.phone}</p>
+                <p className="text-xs text-slate-500">Loan ID: {currentLoan.id}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                <div className="p-2 bg-slate-50 rounded-lg">
+                  <div className="text-[10px] text-slate-400 font-semibold uppercase">Total Loan</div>
+                  <div className="text-xs font-bold text-slate-900 mt-0.5">
+                    ₹{currentLoan.principal.toLocaleString('en-IN')}
+                  </div>
+                </div>
+                <div className="p-2 bg-rose-50/70 rounded-lg border border-rose-100">
+                  <div className="text-[10px] text-rose-700 font-semibold uppercase">Outstanding</div>
+                  <div className="text-xs font-bold text-rose-700 mt-0.5">
+                    ₹{currentLoan.outstanding.toLocaleString('en-IN')}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => onNavigateToCustomer(currentCustomer.id)}
+                className="w-full py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <span>View Full Ledger</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* AI Intent & Reason */}
+            <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-[#516072]">
+                <Sparkles className="w-3.5 h-3.5 text-[#516072]" />
+                <span>AI Intent Analysis</span>
+              </div>
+              <div className="p-2.5 bg-[#516072]/10 rounded-lg border border-[#516072]/20">
+                <div className="text-[11px] font-bold text-[#2A3440]">
+                  {currentConv?.aiAnalysis?.detectedIntent || 'PAYMENT_DELAY'}
+                </div>
+                <p className="text-[11px] text-[#3F4D5C] mt-1 leading-relaxed">
+                  {currentConv?.aiAnalysis?.reason || 'Customer stated delay in salary credit.'}
+                </p>
+              </div>
+            </div>
+
+            {/* 1-Click Follow-up Scheduler */}
+            <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                <Calendar className="w-3.5 h-3.5 text-[#516072]" />
+                <span>Set Follow-up Reminder</span>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase">Date</label>
+                  <input
+                    type="date"
+                    value={scheduleDate}
+                    onChange={(e) => setScheduleDate(e.target.value)}
+                    className="w-full mt-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#516072]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase">Time</label>
+                  <input
+                    type="text"
+                    value={scheduleTime}
+                    onChange={(e) => setScheduleTime(e.target.value)}
+                    placeholder="10:00 AM"
+                    className="w-full mt-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#516072]"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleConfirmFollowup}
+                className="w-full py-2 bg-[#516072] hover:bg-[#414E5E] text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                Schedule Reminder
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ============================================================ */}
-      {/* RIGHT COLUMN: Borrower Details, Channel Identities & RAG    */}
-      {/* ============================================================ */}
-      <div className="lg:w-84 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col shrink-0 overflow-y-auto divide-y divide-slate-100 p-4 space-y-4">
-        {/* Borrower Risk Profile Card */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Borrower Profile
-            </h4>
-            <button
-              onClick={() => onNavigateToCustomer(currentConv?.customerId || 'CUS001')}
-              className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-0.5"
-            >
-              <span>View Dossier</span>
-              <ExternalLink className="w-3 h-3" />
-            </button>
-          </div>
+      {/* Outbound Send Message Modal */}
+      <SendMessageModal
+        isOpen={isSendMessageModalOpen}
+        onClose={() => setIsSendMessageModalOpen(false)}
+        customers={customers}
+        loans={loans}
+        preselectedCustomerId={currentCustomer?.id}
+        onSendMessageSuccess={handleOutboundMessageCreated}
+      />
 
-          <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">Total Loan:</span>
-              <span className="font-bold text-slate-900">
-                ₹{currentLoan?.totalLoanAmount?.toLocaleString('en-IN') || '1,00,000'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">EMI Repaid:</span>
-              <span className="font-semibold text-emerald-600">
-                ₹{currentLoan?.emiPaid?.toLocaleString('en-IN') || '36,497'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">Overdue Balance:</span>
-              <span className="font-bold text-rose-600">
-                ₹{((currentLoan?.totalLoanAmount || 100000) - (currentLoan?.emiPaid || 36497)).toLocaleString('en-IN')}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">Days Past Due:</span>
-              <span className="font-semibold text-amber-700 font-mono">
-                {currentLoan?.daysPastDue || 25} days
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Omnichannel Identities & Opt-Out Status Card */}
-        <div className="pt-4">
-          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
-            Connected Channels
-          </h4>
-          <div className="space-y-1.5">
-            {/* WhatsApp Identity */}
-            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-              <div className="flex items-center gap-2">
-                <MessageCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <div>
-                  <p className="font-bold text-slate-800">WhatsApp</p>
-                  <p className="text-[10px] text-slate-400 font-mono">{currentConv?.customerPhone}</p>
-                </div>
-              </div>
-              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-700">
-                Active
-              </span>
-            </div>
-
-            {/* Email Identity */}
-            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-              <div className="flex items-center gap-2">
-                <Mail className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <div>
-                  <p className="font-bold text-slate-800">Email</p>
-                  <p className="text-[10px] text-slate-400">{currentConv?.customerEmail || 'email on file'}</p>
-                </div>
-              </div>
-              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-blue-100 text-blue-700">
-                Active
-              </span>
-            </div>
-
-            {/* SMS Identity */}
-            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                <div>
-                  <p className="font-bold text-slate-800">SMS</p>
-                  <p className="text-[10px] text-slate-400 font-mono">{currentConv?.customerPhone}</p>
-                </div>
-              </div>
-              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-700">
-                Active
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* AI Intent & Commitment Summary */}
-        <div className="pt-4">
-          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
-            AI Intent & Insights
-          </h4>
-          <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
-            <div>
-              <span className="text-[10px] text-slate-400 uppercase font-semibold">Detected Intent</span>
-              <p className="text-xs font-bold text-slate-900">
-                {currentConv?.aiAnalysis?.detectedIntent?.replace(/_/g, ' ') || 'General Query'}
-              </p>
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-400 uppercase font-semibold">Repayment Commitment</span>
-              <p className="text-xs font-semibold text-emerald-700">
-                {currentConv?.aiAnalysis?.paymentPromise
-                  ? `Promised by: ${currentConv.aiAnalysis.promisedTimeline}`
-                  : 'No active commitment'}
-              </p>
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-400 uppercase font-semibold">Recommended Action</span>
-              <p className="text-xs text-slate-700">
-                {currentConv?.aiAnalysis?.recommendedAction || 'Follow-up per standard recovery schedule'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* RAG Policy Grounding & SOP Citation */}
-        <div className="pt-4">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              RAG Policy Grounding
-            </h4>
-            <button
-              onClick={() => setIsRagModalOpen(true)}
-              className="text-[11px] font-semibold text-purple-600 hover:text-purple-700 flex items-center gap-0.5"
-            >
-              <span>Inspect Chunk</span>
-              <BookOpen className="w-3 h-3" />
-            </button>
-          </div>
-
-          <div className="bg-purple-50/60 rounded-xl p-3 border border-purple-100 text-xs">
-            <div className="flex items-center justify-between text-purple-900 font-bold mb-1">
-              <span>{currentConv?.aiAnalysis?.ragContext?.policyTitle || 'Collections Policy'}</span>
-              <span className="text-[10px] bg-purple-200 text-purple-800 px-1.5 py-0.2 rounded-full">
-                {currentConv?.aiAnalysis?.ragContext?.relevanceScore || 94}% Match
-              </span>
-            </div>
-            <p className="text-[11px] text-purple-800 line-clamp-3 leading-relaxed">
-              "{currentConv?.aiAnalysis?.ragContext?.relevantSection || 'Standard debt collection communication guidelines under RBI Fair Practices Code.'}"
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ============================================================ */}
-      {/* MODAL: Outbound New Message (Compose)                        */}
-      {/* ============================================================ */}
-      <Modal
-        isOpen={isNewMessageModalOpen}
-        onClose={() => setIsNewMessageModalOpen(false)}
-        title="Compose Outbound Recovery Follow-up"
-      >
-        <div className="space-y-4">
-          {/* Target Customer */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Select Borrower</label>
-            <select
-              value={newMsgCustomerId}
-              onChange={(e) => {
-                const cId = e.target.value;
-                setNewMsgCustomerId(cId);
-                const cust = customers.find((c) => c.id === cId) || customers[0];
-                const loan = loans.find((l) => l.customerId === cId);
-                setNewMsgCustomText(getTemplateText(newMsgTemplate, cust, loan));
-              }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-800"
-            >
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.id} · {c.phone})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Outbound Channel Selection */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Delivery Channel</label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setNewMsgChannel('WhatsApp')}
-                className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                  newMsgChannel === 'WhatsApp'
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                <span>WhatsApp</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setNewMsgChannel('Email')}
-                className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                  newMsgChannel === 'Email'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                <Mail className="w-3.5 h-3.5" />
-                <span>Email</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setNewMsgChannel('SMS')}
-                className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                  newMsgChannel === 'SMS'
-                    ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>SMS</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Email Subject if Email chosen */}
-          {newMsgChannel === 'Email' && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Subject</label>
-              <input
-                type="text"
-                value={newMsgSubject}
-                onChange={(e) => setNewMsgSubject(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-800"
-              />
-            </div>
-          )}
-
-          {/* Template Selection */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Template Preset</label>
-            <select
-              value={newMsgTemplate}
-              onChange={(e) => {
-                const tpl = e.target.value;
-                setNewMsgTemplate(tpl);
-                const cust = customers.find((c) => c.id === newMsgCustomerId) || customers[0];
-                const loan = loans.find((l) => l.customerId === cust.id);
-                setNewMsgCustomText(getTemplateText(tpl, cust, loan));
-              }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-800"
-            >
-              <option value="reminder">Standard Soft EMI Reminder</option>
-              <option value="overdue">High-Priority Overdue CIBIL Warning</option>
-              <option value="delay_ack">Acknowledged Salary Delay UPI Notice</option>
-              <option value="link">Bharat QR / UPI Direct Pay Link</option>
-            </select>
-          </div>
-
-          {/* Message Content */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Message Body</label>
-            <textarea
-              rows={4}
-              value={newMsgCustomText}
-              onChange={(e) => setNewMsgCustomText(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 resize-none"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={() => setIsNewMessageModalOpen(false)}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSendOutboundNewMessage}
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs"
-            >
-              Authorize & Dispatch
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* ============================================================ */}
-      {/* MODAL: RAG Policy Inspector                                  */}
-      {/* ============================================================ */}
-      <Modal
-        isOpen={isRagModalOpen}
-        onClose={() => setIsRagModalOpen(false)}
-        title="RAG Knowledge Base Policy Citation"
-      >
-        <div className="space-y-4 text-xs">
-          <div className="p-3 bg-purple-50 rounded-xl border border-purple-200">
-            <p className="font-bold text-purple-900 mb-1">
-              Document: {currentConv?.aiAnalysis?.ragContext?.sourceFile || 'omnichannel_policy.pdf'}
-            </p>
-            <p className="text-purple-700 font-mono text-[11px]">
-              Chunk ID: {currentConv?.aiAnalysis?.ragContext?.chunkId || 'CHUNK-OMNI-001'} (Confidence:{' '}
-              {currentConv?.aiAnalysis?.ragContext?.relevanceScore || 95}%)
-            </p>
-          </div>
-
-          <div>
-            <h5 className="font-bold text-slate-800 mb-1">Relevant Policy Section:</h5>
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-700 leading-relaxed whitespace-pre-line font-serif">
-              {currentConv?.aiAnalysis?.ragContext?.relevantSection ||
-                'All recovery communications over WhatsApp, Email, and SMS must adhere to the Fair Recovery Code, maintaining empathetic tone, avoiding harassment, respecting opt-outs, and offering RBI approved loan restructuring.'}
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-2">
-            <button
-              onClick={() => setIsRagModalOpen(false)}
-              className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </Modal>
+      {/* How to use quick guide modal */}
+      <HowToUseModal
+        isOpen={isHowToUseModalOpen}
+        onClose={() => setIsHowToUseModalOpen(false)}
+        onOpenSendMessage={() => setIsSendMessageModalOpen(true)}
+        onNavigateToMessages={() => {}}
+      />
     </div>
   );
 };
