@@ -343,3 +343,4 @@ def test_scenario_17_channel_isolation(temp_omni_service: OmnichannelService):
     # Both channels function independently
     assert wa_res["channel"] == "WhatsApp"
     assert sms_res["channel"] == "SMS"
+
