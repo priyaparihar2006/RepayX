@@ -158,3 +158,4 @@ CREATE INDEX IF NOT EXISTS idx_msg_conv_id ON omnichannel_messages(conversation_
 CREATE INDEX IF NOT EXISTS idx_ident_identifier ON customer_channel_identities(identifier);
 CREATE INDEX IF NOT EXISTS idx_optouts_chan_ident ON channel_opt_outs(channel, identifier);
 """
+
