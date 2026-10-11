@@ -18,6 +18,7 @@ import {
   PieChart,
   Wallet,
   LineChart,
+  BellRing,
 } from 'lucide-react';
 import { MANAGER_PROFILE } from '../../data/mockData';
 
@@ -25,6 +26,7 @@ export type NavTab =
   | 'overview'
   | 'customers'
   | 'whatsapp'
+  | 'automation'
   | 'risk-analytics'
   | 'repayment-analytics'
   | 'demo-overview'
@@ -156,6 +158,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       group: 'AUTONOMOUS OUTREACH',
       items: [
+        {
+          id: 'automation',
+          label: 'EMI Reminder Automation',
+          sublabel: 'Imports, Schedules & Delivery',
+          icon: BellRing,
+          badgeColor: 'bg-emerald-600',
+        },
         {
           id: 'whatsapp',
           label: 'WhatsApp Outreach',

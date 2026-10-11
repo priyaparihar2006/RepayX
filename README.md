@@ -349,6 +349,17 @@ pytest             # backend tests
 
 Settings come from environment variables (listed in `.env.example`; the backend does not read the `.env` file itself): `API_HOST`, `API_PORT`, and `CORS_ALLOWED_ORIGINS` (defaults: `http://localhost:3000` and `http://127.0.0.1:3000`). Optional artifact path overrides are listed there too. Check `GET /api/health`: `status: ok` means the model, customer data, and index all loaded and validated. Missing pieces show as `missing` or `invalid`, and only the features that need them return `503`.
 
+### EMI reminder automation
+
+Automated reminders need a second long-running process alongside the API:
+
+```bash
+cd backend
+python worker.py   # claims due reminder jobs and sends them; keep it running
+```
+
+Set `AUTOMATION_API_KEYS` in `.env`, then open `/automation` in the dashboard to import CSVs, review schedules, and track delivery. It starts in `AUTOMATION_MODE=sandbox`, where nothing is sent. Architecture, CSV format, provider setup, and deployment are in [docs/AUTOMATION.md](docs/AUTOMATION.md).
+
 ## 15. Dataset information
 
 **Home Credit Default Risk** (Kaggle competition data; not redistributed in this repository):
