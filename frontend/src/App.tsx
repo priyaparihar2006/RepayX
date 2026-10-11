@@ -39,12 +39,14 @@ const RiskAnalyticsPage = lazy(() => import('./pages/RiskAnalytics').then((m) =>
 const RepaymentAnalyticsPage = lazy(() => import('./pages/RepaymentAnalytics').then((m) => ({ default: m.RepaymentAnalyticsPage })));
 const CustomerDetailsPage = lazy(() => import('./pages/CustomerDetails').then((m) => ({ default: m.CustomerDetailsPage })));
 const WhatsAppPage = lazy(() => import('./pages/WhatsApp').then((m) => ({ default: m.WhatsAppPage })));
+const AutomationPage = lazy(() => import('./pages/Automation').then((m) => ({ default: m.AutomationPage })));
 
 // URL for each sidebar tab. 'ai-assistant' opens the drawer instead of a page.
 const TAB_PATHS: Record<Exclude<NavTab, 'ai-assistant'>, string> = {
   overview: '/',
   customers: '/customers',
   whatsapp: '/whatsapp',
+  automation: '/automation',
   'risk-analytics': '/analytics/risk',
   'repayment-analytics': '/analytics/repayment',
   'demo-overview': '/demo/overview',
@@ -77,6 +79,8 @@ function pageMeta(pathname: string): { title: string; breadcrumb: string } {
       return { title: 'Customer Risk Portfolio', breadcrumb: 'Customers' };
     case 'whatsapp':
       return { title: 'WhatsApp Messages', breadcrumb: 'Messaging / WhatsApp' };
+    case 'automation':
+      return { title: 'EMI Reminder Automation', breadcrumb: 'Messaging / Reminder Automation' };
     case 'risk-analytics':
       return { title: 'Risk Analytics', breadcrumb: 'Analytics / Risk' };
     case 'repayment-analytics':
@@ -235,6 +239,7 @@ function AppContent() {
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/customers/:customerId" element={<CustomerDetailsPage />} />
             <Route path="/whatsapp" element={<WhatsAppPage />} />
+            <Route path="/automation" element={<AutomationPage />} />
 
             {/* Demo workflow pages (sample data) */}
             <Route

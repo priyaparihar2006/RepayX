@@ -17,7 +17,9 @@ REPO_ROOT = BACKEND_DIR.parent
 
 
 def _env(name: str, default: str = "") -> str:
-    return os.getenv(name, default).strip()
+    """Blank values (common in copied .env files) fall back to the default."""
+    value = (os.getenv(name) or "").strip()
+    return value or default
 
 
 def _env_bool(name: str, default: bool) -> bool:
