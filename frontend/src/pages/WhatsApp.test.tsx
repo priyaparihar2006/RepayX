@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WhatsAppPage } from './WhatsApp';
@@ -32,6 +32,27 @@ beforeEach(() => {
 });
 
 describe('WhatsApp demo outreach', () => {
+  it('keeps duplicate preview IDs distinct and edits only the selected row', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const rows = ['First invalid row', 'Second invalid row'].map((customer_name, index) => ({
+      schedule_id: 'sched_None_default', customer_id: null, customer_name,
+      row_number: index + 1, scheduled_message_time: null, schedule_status: 'UNSCHEDULED',
+      is_valid: false, validation_errors: ['customer_id is required'],
+    }));
+    vi.mocked(whatsapp.getScheduledList).mockResolvedValue({
+      success: true, schedules: rows, stats: {}, total: 2, page: 1, page_size: 50, total_pages: 1,
+    } as any);
+    vi.mocked(whatsapp.updateScheduleTime).mockResolvedValue({ success: true } as any);
+    try {
+      render(<WhatsAppPage />);
+      const first = (await screen.findByText('First invalid row')).closest('tr')!;
+      const second = screen.getByText('Second invalid row').closest('tr')!;
+      fireEvent.change(first.querySelector('input[type=time]')!, { target: { value: '16:00' } });
+      expect(first.querySelector('input')).toHaveValue('16:00');
+      expect(second.querySelector('input')).toHaveValue('');
+      expect(errors.mock.calls.some(args => String(args[0]).includes('same key'))).toBe(false);
+    } finally { errors.mockRestore(); }
+  });
   it('handles an older contact response without message text', async () => {
     vi.mocked(whatsapp.getContacts).mockResolvedValue({ success: true, contacts: [{
       name: 'Nancy', phone: phones[0], customer_id: 385057, amount: '100', late_days: 10,

@@ -35,11 +35,12 @@ class AutomationService:
     # ------------------------------------------------------------------ worker loop
 
     def tick(self, now: datetime | None = None) -> dict:
+        real_time = now is None
         now = now or utcnow()
         error = None
         result: dict = {}
         try:
-            result = self.dispatcher.run_once(now)
+            result = self.dispatcher.run_once(now, real_time=real_time)
         except Exception as exc:  # keep the loop alive; surface the error in health
             logger.exception("Scheduler tick failed")
             error = type(exc).__name__

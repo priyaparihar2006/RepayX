@@ -49,6 +49,29 @@ def temp_db(tmp_path: Path) -> Path:
     return tmp_path / "test_whatsapp.sqlite3"
 
 
+def test_missing_customer_preview_rows_have_unique_ids_and_are_not_saved(scheduler):
+    content = ('customer_id,customer_name,phone_number,unpaid_amount\n'
+               ',First,+12025550123,100\n'
+               ',Second,+12025550124,200\n')
+    result = scheduler.parse_csv_content(content)
+    records = result['records']
+    assert len({r['schedule_id'] for r in records}) == 2
+    assert all(not r['is_valid'] for r in records)
+    scheduler.save_confirmed_schedules(records)
+    with sqlite3.connect(scheduler.db_path) as conn:
+        assert conn.execute('SELECT COUNT(*) FROM scheduled_messages').fetchone()[0] == 0
+
+
+def test_legacy_whatsapp_service_never_calls_bridge_in_sandbox(monkeypatch):
+    from api.errors import APIError
+    monkeypatch.setenv('AUTOMATION_MODE', 'sandbox')
+    service = object.__new__(WhatsAppService)
+    service._bridge = MagicMock()
+    with pytest.raises(APIError, match='Sandbox mode'):
+        service.send('+12025550123', 'Sandbox check')
+    service._bridge.assert_not_called()
+
+
 @pytest.fixture
 def scheduler(temp_db: Path) -> CSVSchedulerService:
     return CSVSchedulerService(db_path=temp_db)

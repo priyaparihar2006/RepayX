@@ -113,7 +113,8 @@ class WhatsAppService:
         """Background thread executing scheduled customer WhatsApp jobs."""
         while self._scheduler_running:
             try:
-                self.scheduler.process_due_jobs(self)
+                if os.getenv("AUTOMATION_MODE", "sandbox").strip().lower() == "live":
+                    self.scheduler.process_due_jobs(self)
             except Exception:
                 pass
             time.sleep(5)
@@ -364,6 +365,8 @@ class WhatsAppService:
         template_name: str = "custom",
         request_id: str | None = None,
     ) -> dict:
+        if os.getenv("AUTOMATION_MODE", "sandbox").strip().lower() != "live":
+            raise APIError(403, "sandbox_mode", "Sandbox mode: live WhatsApp sending is disabled.")
         req_id = request_id or f"req_{os.urandom(8).hex()}"
         fingerprint = hashlib.sha256(f"{recipient}:{message_text}:{customer_id}".encode()).hexdigest()
         provider_id = f"wamid.{os.urandom(12).hex()}"

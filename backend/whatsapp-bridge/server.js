@@ -10,6 +10,7 @@ async function createBridge(deps = {}) {
   const baileys = deps.baileys || await import('@whiskeysockets/baileys');
   const authDir = deps.authDir || path.join(__dirname, 'auth_info');
   const app = express();
+  const liveSending = (deps.mode || process.env.AUTOMATION_MODE || 'sandbox').trim().toLowerCase() === 'live';
   app.use((req, res, next) => req.headers.origin
     ? res.status(403).json({ success: false, error: 'Use the RepayX API.' }) : next());
   app.use(express.json({ limit: '64kb' }));
@@ -76,7 +77,7 @@ async function createBridge(deps = {}) {
               }),
             });
             const data = await res.json();
-            if (data?.auto_reply && data?.reply_text) {
+            if (liveSending && data?.auto_reply && data?.reply_text) {
               console.log(`[WhatsApp] AI Auto-Reply to +${senderPhone}: "${data.reply_text.substring(0, 60)}..."`);
               await current.sendMessage(remoteJid, { text: data.reply_text });
             }
@@ -163,6 +164,7 @@ async function createBridge(deps = {}) {
   });
 
   app.post('/send', async (req, res) => {
+    if (!liveSending) return res.status(403).json({ success: false, error: 'Sandbox mode: live WhatsApp sending is disabled.' });
     let phone = String(req.body.phone || req.body.recipient || '').replace(/\D/g, '');
     const message = req.body.message || req.body.text;
     if (phone.length === 10) phone = '91' + phone;

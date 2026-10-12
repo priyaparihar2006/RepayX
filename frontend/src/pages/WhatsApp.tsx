@@ -168,7 +168,7 @@ export function WhatsAppPage() {
   const handleUpdateTime = async (record: ScheduledRecord, newTime: string) => {
     const trimmed = newTime.trim();
     const updated = scheduledRecords.map((r) => {
-      if (r.schedule_id === record.schedule_id || r.customer_id === record.customer_id) {
+      if (r === record) {
         const timeVal = trimmed || null;
         let newStatus: ScheduledRecord['schedule_status'] = 'UNSCHEDULED';
         let newSchedAt: string | null = null;
@@ -266,10 +266,11 @@ export function WhatsAppPage() {
       try {
         const value = await whatsapp.getStatus(controller.signal);
         if (!cancelled) acceptStatus(value);
-      } catch {
+      } catch (err) {
         if (!cancelled) {
           setStatus(null);
           setQrDeadline(0);
+          setError(messageOf(err));
         }
       } finally {
         if (!cancelled) pollTimer = setTimeout(() => void poll(), 2000);
@@ -952,7 +953,7 @@ export function WhatsAppPage() {
                         : '⚪ Unscheduled';
 
                     return (
-                      <tr key={r.schedule_id || `${r.customer_id}-${index}`} className="hover:bg-slate-50/70 transition">
+                      <tr key={`${r.schedule_id || 'preview'}:${r.row_number ?? index}`} className="hover:bg-slate-50/70 transition">
                         <td className="p-3">
                           <div className="font-bold text-slate-900">{r.customer_name}</div>
                           <div className="text-[11px] text-slate-400 font-mono">

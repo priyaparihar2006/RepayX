@@ -198,7 +198,8 @@ def _reopen_for_fallback(conn: sqlite3.Connection, job_id: str, now: datetime) -
     if job is None or job["status"] != "completed":
         return
     setting = conn.execute("SELECT value_json FROM automation_settings WHERE key = 'reminder_policy'").fetchone()
-    if setting and '"channel_strategy":"all"' in setting["value_json"].replace(" ", ""):
+    if job["channel_strategy"] == "all" or (not job["channel_strategy"] and setting
+            and '"channel_strategy":"all"' in setting["value_json"].replace(" ", "")):
         conn.execute("UPDATE reminder_jobs SET status = 'partially_completed', updated_at = ? WHERE id = ?",
                      (iso(now), job_id))
         return

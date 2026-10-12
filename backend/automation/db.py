@@ -13,7 +13,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -279,10 +279,18 @@ def init_db(db_path: Path) -> None:
     try:
         conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript(SCHEMA_SQL)
+        # Additive, transactional migration; safe when API and worker start together.
+        conn.execute("BEGIN IMMEDIATE")
+        for table, column in (("emis", "reminder_datetime_utc"), ("emis", "channel_strategy"),
+                              ("reminder_jobs", "channel_strategy")):
+            columns = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+            if column not in columns:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
         conn.execute(
             "INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, datetime('now'))",
             (SCHEMA_VERSION,),
         )
+        conn.execute("COMMIT")
     finally:
         conn.close()
 

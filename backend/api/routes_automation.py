@@ -66,6 +66,7 @@ def _emi_public(row) -> dict:
         "payment_status_updated_at": row["payment_status_updated_at"],
         "payment_claim_pending": bool(row["payment_claim_pending"]),
         "reminder_date": row["reminder_date"], "reminder_time": row["reminder_time"],
+        "reminder_datetime_utc": row["reminder_datetime_utc"], "channel_strategy": row["channel_strategy"],
     }
 
 
@@ -76,21 +77,43 @@ def _job_public(row, deliveries: list | None = None) -> dict:
         "last_error", "created_at", "updated_at", "completed_at")}
     data["manual_override"] = bool(row["manual_override"])
     data["channels"] = json.loads(row["channels_json"])
+    data["channel_strategy"] = row["channel_strategy"]
     try:
         local = parse_iso(row["scheduled_at_utc"]).astimezone(ZoneInfo(row["timezone"]))
-        data["scheduled_at_local"] = local.strftime("%Y-%m-%d %H:%M")
+        data["scheduled_at_local"] = local.strftime(
+            "%Y-%m-%d %H:%M:%S" if row["reminder_key"].startswith("exact:") else "%Y-%m-%d %H:%M")
     except Exception:
         data["scheduled_at_local"] = None
     if deliveries is not None:
         data["deliveries"] = [_delivery_public(d) for d in deliveries]
+    data["display_status"] = _job_display_status(row["status"], data.get("deliveries", []))
     return data
 
 
+def _job_display_status(status: str, deliveries: list[dict]) -> str:
+    if status in ("pending", "processing", "retry", "cancelled", "skipped", "missed"):
+        return "scheduled" if status == "pending" else status
+    if any(d["status"] in ("unknown", "sending") for d in deliveries):
+        return "unknown"
+    if status == "completed" and deliveries:
+        successful = [d for d in deliveries if d["status"] in ("accepted", "delivered", "read")]
+        if successful and all(d["display_status"] == "simulated" for d in successful):
+            return "simulated"
+        if successful and all(d["status"] in ("delivered", "read") for d in successful):
+            return "delivered"
+        if successful:
+            return "sent"
+        return "failed"
+    return status
+
+
 def _delivery_public(d) -> dict:
-    return {k: d[k] for k in (
+    data = {k: d[k] for k in (
         "id", "channel", "status", "recipient", "provider", "provider_message_id", "attempt_count", "next_retry_at",
         "error_code", "error_message", "skip_reason", "accepted_at", "delivered_at", "read_at", "failed_at",
         "updated_at")}
+    data["display_status"] = "simulated" if d["provider"] == "sandbox" and d["status"] == "accepted" else d["status"]
+    return data
 
 
 # ====================================================================== imports
@@ -541,8 +564,11 @@ def dashboard(request: Request, _: Principal = require("viewer")):
         upcoming = conn.execute(
             "SELECT COUNT(*) FROM reminder_jobs WHERE status IN ('pending','retry') AND run_at_utc >= ? AND run_at_utc < ?",
             (iso(now), iso(now + timedelta(days=7)))).fetchone()[0]
-        deliveries = conn.execute("SELECT channel, status, COUNT(*) AS n, SUM(attempt_count) AS attempts "
-                                  "FROM message_deliveries GROUP BY channel, status").fetchall()
+        deliveries = conn.execute("SELECT channel, CASE WHEN provider = 'sandbox' AND status = 'accepted' "
+                                  "THEN 'simulated' ELSE status END AS status, COUNT(*) AS n, "
+                                  "SUM(attempt_count) AS attempts FROM message_deliveries GROUP BY channel, "
+                                  "CASE WHEN provider = 'sandbox' AND status = 'accepted' "
+                                  "THEN 'simulated' ELSE status END").fetchall()
         replies = conn.execute(
             """SELECT c.id, c.customer_id, cu.name, c.channel, c.identifier, c.content, c.intent, c.created_at
                FROM communications c LEFT JOIN customers cu ON cu.customer_id = c.customer_id

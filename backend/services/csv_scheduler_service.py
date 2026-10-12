@@ -244,7 +244,10 @@ class CSVSchedulerService:
                 f"Reply to this WhatsApp chat for immediate settlement assistance."
             )
 
-            schedule_id = f"sched_{customer_id}_{campaign_id}"
+            # Invalid preview rows still need distinct identities. They must never
+            # share the persisted customer/campaign identifier "sched_None_*".
+            schedule_id = (f"sched_{customer_id}_{campaign_id}" if customer_id
+                           else f"preview_missing_customer_{idx}_{campaign_id}")
 
             record = {
                 "schedule_id": schedule_id,
@@ -331,6 +334,8 @@ class CSVSchedulerService:
             cursor = conn.cursor()
 
             for r in records:
+                if not normalize_nullable_field(r.get("customer_id")):
+                    continue  # validation-only preview rows cannot become jobs
                 sched_id = r.get("schedule_id") or f"sched_{r.get('customer_id')}_{campaign_id}"
                 cust_id = str(r.get("customer_id", ""))
                 cust_name = str(r.get("customer_name", "Customer"))

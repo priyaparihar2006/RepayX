@@ -46,6 +46,34 @@ const reminder = {
 beforeEach(() => sessionStorage.clear());
 
 describe('AutomationPage', () => {
+  it('explains exact CSV scheduling and offers a sample download', async () => {
+    sessionStorage.setItem('repayx.automationKey', KEY);
+    installFakeApi({
+      'GET /api/automation/me': { body: { success: true, name: 'omar', role: 'operator' } },
+      'GET /api/automation/dashboard': { body: { success: true, ...dashboard } },
+      'GET /api/imports': { body: { success: true, imports: [], pagination: { page: 1, total_pages: 1 } } },
+    });
+    renderAt(<AutomationPage />, { url: '/automation', path: '/automation' });
+    await userEvent.click(await screen.findByRole('button', { name: /import csv/i }));
+    expect(await screen.findByRole('button', { name: 'Download sample CSV' })).toBeInTheDocument();
+    expect(screen.getByText(/YYYY-MM-DD HH:MM:SS/)).toHaveTextContent('browser closed');
+  });
+
+  it('shows backend simulated status and scheduled IST time', async () => {
+    sessionStorage.setItem('repayx.automationKey', KEY);
+    installFakeApi({
+      'GET /api/automation/me': { body: { success: true, name: 'omar', role: 'operator' } },
+      'GET /api/automation/dashboard': { body: { success: true, ...dashboard } },
+      'GET /api/reminders': { body: { success: true,
+        reminders: [{ ...reminder, status: 'completed', display_status: 'simulated' }],
+        pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 } } },
+    });
+    renderAt(<AutomationPage />, { url: '/automation', path: '/automation' });
+    await userEvent.click(await screen.findByRole('button', { name: /reminders/i }));
+    expect(await screen.findByText('simulated')).toBeInTheDocument();
+    expect(screen.getByText('Scheduled (IST)')).toBeInTheDocument();
+    expect(screen.getByText(/10 Oct 2026.*4:00:00 pm IST/i)).toBeInTheDocument();
+  });
   it('asks for an API key, signs in, and shows real dashboard numbers', async () => {
     installFakeApi({
       'GET /api/automation/me': { body: { success: true, name: 'omar', role: 'operator' } },

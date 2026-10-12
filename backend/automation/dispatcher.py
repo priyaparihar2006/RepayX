@@ -16,6 +16,7 @@ import json
 import logging
 import random
 import sqlite3
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -35,7 +36,7 @@ from automation.policy import (
 from automation.policy_settings import CHANNELS, PolicyStore, ReminderPolicy
 from automation.providers import OutboundMessage, Provider, RateLimiter, SendResult
 from automation.scheduler import snapshot_from_rows
-from automation.util import iso, mask_identifier, parse_iso
+from automation.util import iso, mask_identifier, parse_iso, utcnow
 
 logger = logging.getLogger("repayx.automation.dispatcher")
 
@@ -119,9 +120,9 @@ class Dispatcher:
                        schedule_note = COALESCE(?, schedule_note),
                        completed_at = CASE WHEN ? THEN ? ELSE completed_at END
                        {', attempt_count = MAX(0, attempt_count - 1)' if refund_attempt else ''}
-                   WHERE id = ? AND status = 'processing'""",
+                   WHERE id = ? AND status = 'processing' AND worker_id = ?""",
                 (status, reason, error, now_s, iso(run_at) if run_at else None, status,
-                 iso(run_at) if run_at else None, note, int(terminal), now_s, job_id),
+                 iso(run_at) if run_at else None, note, int(terminal), now_s, job_id, self.worker_id),
             )
             audit(conn, "system", f"reminder.{status}", "reminder_job", job_id, {"reason": reason})
 
@@ -160,11 +161,14 @@ class Dispatcher:
     # ------------------------------------------------------------------ job execution
 
     def process_job(self, job_id: str, now: datetime) -> str:
+        started = time.monotonic()
         policy = self.policy_store.get()
         with self.db.read() as conn:
             job = conn.execute("SELECT * FROM reminder_jobs WHERE id = ?", (job_id,)).fetchone()
             if job is None or job["status"] != "processing" or job["worker_id"] != self.worker_id:
                 return "not_owned"
+            if job["channel_strategy"]:
+                policy = policy.model_copy(update={"channel_strategy": job["channel_strategy"]})
             emi = conn.execute("SELECT * FROM emis WHERE id = ?", (job["emi_id"],)).fetchone()
             customer = conn.execute("SELECT * FROM customers WHERE customer_id = ?", (emi["customer_id"],)).fetchone()
             decisions = self.channel_decisions(conn, customer, policy)
@@ -217,7 +221,8 @@ class Dispatcher:
             self._run_fallback(job, eligible, deliveries, content, customer, now)
         else:
             self._run_all(job, eligible, deliveries, content, customer, now)
-        return self._finalize(job_id, [d.channel for d in eligible], policy, now)
+        return self._finalize(job_id, [d.channel for d in eligible], policy,
+                              now + timedelta(seconds=time.monotonic() - started))
 
     def _record_skips(self, job_id: str, skipped: list[ChannelDecision], deliveries: dict, now: datetime) -> None:
         now_s = iso(now)
@@ -237,6 +242,7 @@ class Dispatcher:
                 )
 
     def _run_fallback(self, job, eligible, deliveries, content, customer, now) -> None:
+        started = time.monotonic()
         if any(d["status"] in SUCCESS for d in deliveries.values()):
             return
         for decision in eligible:
@@ -248,11 +254,13 @@ class Dispatcher:
                     return  # may already have reached the customer: never fall through
                 if current["status"] == "retry_scheduled" and parse_iso(current["next_retry_at"]) > now:
                     return
-            result = self._attempt(job, decision, content, customer, now)
+            result = self._attempt(job, decision, content, customer,
+                                   now + timedelta(seconds=time.monotonic() - started))
             if result is None or result.accepted or result.transient or result.error_code == "ambiguous_timeout":
                 return
 
     def _run_all(self, job, eligible, deliveries, content, customer, now) -> None:
+        started = time.monotonic()
         for decision in eligible:
             current = deliveries.get(decision.channel)
             if current is not None:
@@ -260,18 +268,24 @@ class Dispatcher:
                     continue
                 if current["status"] == "retry_scheduled" and parse_iso(current["next_retry_at"]) > now:
                     continue
-            self._attempt(job, decision, content, customer, now)
+            self._attempt(job, decision, content, customer,
+                          now + timedelta(seconds=time.monotonic() - started))
 
     def _backoff(self, attempt: int) -> timedelta:
         delay = min(self.config.retry_max_seconds, self.config.retry_base_seconds * (2 ** max(0, attempt - 1)))
         return timedelta(seconds=delay + random.uniform(0, delay * 0.1))
 
     def _attempt(self, job, decision: ChannelDecision, content, customer, now: datetime) -> SendResult | None:
+        started = time.monotonic()
         ch, job_id = decision.channel, job["id"]
         key = f"{job_id}:{ch}"
         provider = self.providers[ch]
         now_s = iso(now)
         with self.db.write() as conn:
+            owned = conn.execute("SELECT 1 FROM reminder_jobs WHERE id = ? AND status = 'processing' "
+                                 "AND worker_id = ?", (job_id, self.worker_id)).fetchone()
+            if not owned:
+                return None
             conn.execute(
                 """INSERT INTO message_deliveries (job_id, channel, idempotency_key, status, created_at, updated_at)
                    VALUES (?, ?, ?, 'queued', ?, ?) ON CONFLICT (job_id, channel) DO NOTHING""",
@@ -312,7 +326,7 @@ class Dispatcher:
             result = SendResult(accepted=False, error_code="ambiguous_timeout",
                                 error_message=f"Adapter error ({type(exc).__name__}); state unknown.")
 
-        done_s = iso(now)
+        done_s = iso(now + timedelta(seconds=time.monotonic() - started))
         with self.db.write() as conn:
             if result.accepted:
                 conn.execute(
@@ -398,7 +412,7 @@ class Dispatcher:
                 (self.worker_id, hostname, now_s, now_s, processed, error, processed),
             )
 
-    def run_once(self, now: datetime) -> dict:
+    def run_once(self, now: datetime, *, real_time: bool = False) -> dict:
         """One scheduler tick. Safe to call repeatedly; used by the worker loop and tests."""
         policy = self.policy_store.get()
         recovered = self.recover_stale(now)
@@ -408,7 +422,7 @@ class Dispatcher:
         claimed = self.claim(now, self.config.batch_size)
         for job_id in claimed:
             try:
-                outcome = self.process_job(job_id, now)
+                outcome = self.process_job(job_id, utcnow() if real_time else now)
             except Exception as exc:
                 logger.exception("Job %s failed unexpectedly", job_id)
                 with self.db.read() as conn:

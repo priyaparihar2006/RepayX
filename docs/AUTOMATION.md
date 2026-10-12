@@ -52,6 +52,84 @@ The trade-off: SQLite supports **one host**. Several worker processes on that ho
 
 ## CSV format
 
+### Exact date and time (recommended)
+
+Import through **Automation → Import CSV → Customers and EMIs**. The import itself
+creates persistent jobs; no Schedule or Send action is needed afterwards. The
+standalone worker must already be running as a service (see Running locally).
+Closing the browser or restarting the worker does not remove pending jobs.
+
+```csv
+customer_id,customer_name,phone_number,email,loan_id,emi_amount,due_date,reminder_datetime,channel_strategy,payment_status,timezone
+SAMPLE-1,Sample Customer,,sample@example.invalid,SAMPLE-LOAN-1,8500,2026-10-13,2026-10-13 16:00:37,all,pending,Asia/Kolkata
+```
+
+Use future dates when trying this example. The dashboard's **Download sample CSV**
+generates a sample for tomorrow at 16:00 IST; adjust it to the configured contact
+days/hours. The example address is fictional; use sandbox mode.
+
+- Required existing identifiers are `customer_id`, `customer_name`, `loan_id`,
+  `emi_amount`, `due_date`, and at least one of `phone_number` or `email`.
+- For exact scheduling, include `reminder_datetime` and supply it on every row.
+  Only `YYYY-MM-DD HH:MM:SS` is accepted, including seconds and a 24-hour clock.
+  Exact imports also require an ISO `YYYY-MM-DD` due date; ambiguous slash dates
+  are rejected. Do not combine this column with `reminder_date`/`reminder_time`.
+- Times use the row's IANA `timezone`, or `APP_TIMEZONE` (default `Asia/Kolkata`).
+  For example, `2026-10-12 16:00:00` in IST is `2026-10-12T10:30:00Z`.
+  The database stores UTC and the reminders dashboard displays IST with seconds.
+  Ambiguous or nonexistent DST wall-clock times are rejected.
+- Blank, invalid, past, present, or out-of-contact-window exact times produce
+  row-level errors. Other valid rows still import. Re-uploading a future reminder
+  is idempotent; re-uploading after its time rejects the now-past row without
+  deleting or resending its existing job.
+- Optional `channel_strategy`: `all` attempts every eligible configured channel;
+  `fallback` uses the policy's channel order, stopping after acceptance or an
+  ambiguous timeout. Blank uses the policy at scheduling/reconciliation time.
+  Explicit per-row strategy survives later global policy changes. Channel flags,
+  opt-outs, consent, payment checks and live test-recipient restrictions still apply.
+- Exact timestamps are not shifted during import or policy reconciliation. If
+  contact policy changes later, the worker can defer execution and records why.
+  Payment, hold, pause and lateness rules remain authoritative.
+- The worker polls every `SCHEDULER_POLL_SECONDS` (default 15). It claims at or
+  after the timestamp, never before; normal latency is up to a poll interval plus
+  queue/provider processing time. This is not a hard real-time delivery guarantee.
+
+Files without a `reminder_datetime` column keep the legacy policy/date/time
+behavior documented below. Omitting the column intentionally selects that mode;
+a blank value in an exact-mode file never silently falls back to policy.
+
+### Status and migration
+
+Schema version 2 is applied automatically and transactionally on API/worker
+startup. It adds `emis.reminder_datetime_utc`, `emis.channel_strategy`, and
+`reminder_jobs.channel_strategy`; existing tables and records are retained.
+
+The API preserves queue `status` and adds `display_status`: scheduled, processing,
+sent, delivered, failed, unknown or simulated, plus existing retry/partial/skip
+states. Sandbox deliveries retain the existing internal `accepted` state with
+`provider=sandbox`, are displayed as **Simulated**, and never become delivered.
+The dashboard counts simulated separately from provider acceptance and refreshes
+reminder lists/details from the API every five seconds. Provider acceptance is
+not proof of delivery.
+
+### Repeatable real-worker verification
+
+From `backend`:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/verify_exact_worker.py --output ../docs/exact-worker-evidence.json
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+The first command takes about 150 seconds. It creates a disposable database,
+imports a future CSV reminder twice, starts the actual `worker.py`, verifies an
+initial heartbeat and pending state, stops/restarts the worker before the due
+time, and verifies three sandbox outcomes at/after that time. No API or browser
+is started, no live provider is selected, and only fictional contacts are used.
+It writes scheduled/execution timestamps, attempts, restart count and final
+simulated status to the evidence JSON. The permissive test contact window affects
+only that disposable database.
+
 Two import types:
 
 **`emi_reminders`** (customers and EMIs). Required columns: `customer_id`, `customer_name`, `loan_id`, `emi_amount`, `due_date`, plus at least one of `phone_number` or `email`. Optional columns: `email`, `installment_number`, `amount_paid`, `payment_status`, `days_past_due`, `reminder_date`, `reminder_time`, `timezone`, `whatsapp_enabled`, `sms_enabled`, `email_enabled`, `preferred_language`, `consent_status`.

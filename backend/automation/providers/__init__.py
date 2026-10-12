@@ -18,7 +18,7 @@ _FACTORIES = {
 
 
 def build_providers(config: AutomationConfig) -> dict[str, Provider]:
-    if config.mode == "sandbox":
+    if config.mode != "live":
         return {ch: SandboxProvider(ch) for ch in _FACTORIES}
     selected = {"whatsapp": config.whatsapp_provider, "sms": config.sms_provider, "email": config.email_provider}
     providers: dict[str, Provider] = {}
