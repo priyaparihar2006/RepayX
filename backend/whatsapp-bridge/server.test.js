@@ -3,11 +3,11 @@ const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const { createBridge } = require('./server');
 
-async function fixture(t) {
+async function fixture(t, mode = 'live') {
   let sent = 0;
   const socket = { ev: new EventEmitter(), user: { id: '918650629360:1@s.whatsapp.net', name: 'Demo' },
     sendMessage: async () => { sent++; return { key: { id: 'real-id' } }; }, end() {} };
-  const bridge = await createBridge({ baileys: {
+  const bridge = await createBridge({ mode, baileys: {
     default: () => socket, Browsers: { ubuntu: () => ['test', 'Chrome', '1'] },
     useMultiFileAuthState: async () => ({ state: {}, saveCreds() {} }),
     DisconnectReason: { loggedOut: 401, restartRequired: 515 },
@@ -21,6 +21,12 @@ async function fixture(t) {
   return { socket, post, sent: () => sent, status: async () => (await fetch(base + '/status')).json() };
 }
 const payload = { phone: '+917060200849', message: 'Demo notice' };
+test('sandbox bridge blocks sends even with a connected socket', async t => {
+  const f = await fixture(t, 'sandbox');
+  f.socket.ev.emit('connection.update', { connection: 'open' });
+  assert.equal((await f.post('/send', payload)).status, 403);
+  assert.equal(f.sent(), 0);
+});
 test('socket must confirm connection, never invent sent results', async t => {
   const f = await fixture(t);
   assert.equal((await f.status()).connected, false);

@@ -125,10 +125,17 @@ function apiUrl(path: string): string {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(apiUrl(path), options);
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(path), options);
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error;
+    throw new ApiError('network', 'Cannot reach the RepayX API. Start the backend on port 8000 and try again.');
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new ApiError('server', data.error || 'Request failed', response.status, data.type || 'error');
+    const message = typeof data.error === 'string' ? data.error : data.error?.message;
+    throw new ApiError('server', message || 'Request failed', response.status, data.error?.code || data.type || 'error');
   }
   return data as T;
 }

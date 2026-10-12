@@ -1,0 +1,2 @@
+customer_id,customer_name,phone_number,email,loan_id,emi_amount,due_date,reminder_datetime,channel_strategy,payment_status,timezone
+SAMPLE-1,Sample Customer,,sample@example.invalid,SAMPLE-LOAN-1,8500,2026-10-13,2026-10-13 16:00:37,all,pending,Asia/Kolkata

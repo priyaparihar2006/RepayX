@@ -30,6 +30,7 @@ class EmiSnapshot:
     reminder_date: date | None
     reminder_time: time | None
     timezone: str
+    reminder_datetime_utc: datetime | None = None
 
     @property
     def outstanding(self) -> Decimal:
@@ -98,6 +99,9 @@ def plan_reminders(emi: EmiSnapshot, policy: ReminderPolicy) -> list[PlannedRemi
     due = emi.due_date.isoformat()
     candidates: list[tuple[str, str, datetime]] = []
 
+    if emi.reminder_datetime_utc is not None:
+        exact = emi.reminder_datetime_utc
+        return [PlannedReminder(f"exact:{exact.isoformat()}:{due}", "explicit", exact, None)]
     if emi.reminder_date is not None:
         at = emi.reminder_time or parse_hhmm(policy.default_reminder_time)
         local = _local(emi.reminder_date, at, tz)

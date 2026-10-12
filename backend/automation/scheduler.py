@@ -60,6 +60,7 @@ def snapshot_from_rows(emi: sqlite3.Row, customer: sqlite3.Row) -> EmiSnapshot:
         reminder_date=date.fromisoformat(emi["reminder_date"]) if emi["reminder_date"] else None,
         reminder_time=parse_hhmm(emi["reminder_time"]) if emi["reminder_time"] else None,
         timezone=customer["timezone"],
+        reminder_datetime_utc=parse_iso(emi["reminder_datetime_utc"]) if emi["reminder_datetime_utc"] else None,
     )
 
 
@@ -88,6 +89,8 @@ def reconcile_emi(
     """Bring this EMI's open jobs in line with the policy. Must run inside a write transaction."""
     result = ReconcileResult()
     emi, customer = load_emi_and_customer(conn, emi_id)
+    if emi["channel_strategy"]:
+        policy = policy.model_copy(update={"channel_strategy": emi["channel_strategy"]})
     snap = snapshot_from_rows(emi, customer)
 
     stop_reason = ineligibility_reason(snap)
@@ -98,6 +101,8 @@ def reconcile_emi(
     )
     channels = json.dumps(intended_channels(customer, policy))
     now_s = iso(now)
+    conn.execute("UPDATE reminder_jobs SET channel_strategy = ? WHERE emi_id = ? AND status = 'pending'",
+                 (policy.channel_strategy, emi_id))
 
     existing = {
         row["reminder_key"]: row
@@ -152,11 +157,12 @@ def reconcile_emi(
             conn.execute(
                 """INSERT INTO reminder_jobs (id, emi_id, customer_id, loan_id, reminder_key, reminder_type,
                        due_date, scheduled_at_utc, run_at_utc, timezone, schedule_note, channels_json,
-                       status, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+                       status, created_at, updated_at, channel_strategy)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
                    ON CONFLICT (emi_id, reminder_key) DO NOTHING""",
                 (job_id, emi_id, emi["customer_id"], emi["loan_id"], key, plan.reminder_type,
-                 snap.due_date.isoformat(), new_at, new_at, snap.timezone, plan.note, channels, now_s, now_s),
+                 snap.due_date.isoformat(), new_at, new_at, snap.timezone, plan.note, channels, now_s, now_s,
+                 policy.channel_strategy),
             )
             audit(conn, actor, "reminder.scheduled", "reminder_job", job_id,
                   {"type": plan.reminder_type, "at": new_at, "loan_id": emi["loan_id"]})
@@ -166,9 +172,9 @@ def reconcile_emi(
             conn.execute(
                 """UPDATE reminder_jobs SET status = 'pending', scheduled_at_utc = ?, run_at_utc = ?,
                        schedule_note = ?, channels_json = ?, outcome_reason = NULL, completed_at = NULL,
-                       attempt_count = 0, next_retry_at = NULL, updated_at = ?
+                       attempt_count = 0, next_retry_at = NULL, updated_at = ?, channel_strategy = ?
                    WHERE id = ?""",
-                (new_at, new_at, plan.note, channels, now_s, job["id"]),
+                (new_at, new_at, plan.note, channels, now_s, policy.channel_strategy, job["id"]),
             )
             audit(conn, actor, "reminder.reactivated", "reminder_job", job["id"], {"at": new_at})
             result.scheduled += 1

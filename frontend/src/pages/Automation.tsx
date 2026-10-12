@@ -24,6 +24,8 @@ const btnGhost = `${btn} bg-slate-100 text-slate-700 hover:bg-slate-200`;
 const input = 'border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
 
 const STATUS_STYLE: Record<string, string> = {
+  simulated: 'bg-violet-50 text-violet-700 border-violet-200', scheduled: 'bg-blue-50 text-blue-700 border-blue-200',
+  sent: 'bg-sky-50 text-sky-700 border-sky-200',
   pending: 'bg-blue-50 text-blue-700 border-blue-200', processing: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   retry: 'bg-amber-50 text-amber-800 border-amber-200', retry_scheduled: 'bg-amber-50 text-amber-800 border-amber-200',
   completed: 'bg-emerald-50 text-emerald-700 border-emerald-200', accepted: 'bg-sky-50 text-sky-700 border-sky-200',
@@ -43,10 +45,10 @@ const Badge: React.FC<{ value: string; title?: string }> = ({ value, title }) =>
   </span>
 );
 
-const fmtTime = (iso: string | null | undefined, tz?: string) => {
+const fmtTime = (iso: string | null | undefined, tz = 'Asia/Kolkata') => {
   if (!iso) return '—';
   try {
-    return new Date(iso).toLocaleString('en-IN', { timeZone: tz, dateStyle: 'medium', timeStyle: 'short' });
+    return new Date(iso).toLocaleString('en-IN', { timeZone: tz, dateStyle: 'medium', timeStyle: 'medium' });
   } catch {
     return iso;
   }
@@ -136,7 +138,7 @@ const Overview: React.FC<{ role: Role; onOpenTab: (t: Tab) => void }> = ({ role,
     setBusy(true);
     try { await (h.automation_paused ? automationApi.resume() : automationApi.pause()); reload(); } finally { setBusy(false); }
   };
-  const statuses = ['accepted', 'delivered', 'read', 'failed', 'retry_scheduled', 'skipped', 'unknown'];
+  const statuses = ['simulated', 'accepted', 'delivered', 'read', 'failed', 'retry_scheduled', 'skipped', 'unknown'];
   return (
     <div className="space-y-6">
       {h.mode === 'sandbox' && (
@@ -205,7 +207,7 @@ const Overview: React.FC<{ role: Role; onOpenTab: (t: Tab) => void }> = ({ role,
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <section className={`${card} p-5 xl:col-span-2 overflow-x-auto`}>
           <h2 className="text-sm font-bold text-slate-900">Delivery status by channel</h2>
-          <p className="text-[11px] text-slate-500">Accepted means the provider took the message; delivered and read come from provider reports.</p>
+          <p className="text-[11px] text-slate-500">Simulated means no external send. Accepted means the provider took the message; delivered and read come from provider reports.</p>
           <table className="mt-3 w-full text-xs">
             <thead><tr className="text-left text-slate-500">
               <th className="py-1.5 pr-3 font-medium">Channel</th>
@@ -319,6 +321,23 @@ const ImportTab: React.FC = () => {
           Uploading never sends messages immediately. Valid rows are saved and reminders are scheduled from each record's
           reminder date and time, or from the reminder policy when none is given. Re-uploading updates schedules without duplicates.
         </p>
+        <p className="text-xs text-slate-600">
+          Exact scheduling: include customer_id, customer_name, loan_id, emi_amount, due_date, reminder_datetime,
+          and phone_number or email. Use YYYY-MM-DD HH:MM:SS (24-hour), for example 2026-10-12 16:00:00.
+          The default timezone is Asia/Kolkata (IST); an optional timezone column overrides it.
+          Every row must have a future datetime within the contact window. Use ISO due dates (YYYY-MM-DD).
+          Optional channel_strategy is all or fallback; blank uses policy. Do not combine reminder_datetime with reminder_date/reminder_time.
+          Import schedules automatically; the server worker continues with the browser closed.
+        </p>
+        <button className={btnGhost} onClick={() => {
+          const tomorrow = new Date(Date.now() + 86_400_000);
+          const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(tomorrow);
+          const csv = 'customer_id,customer_name,phone_number,email,loan_id,emi_amount,due_date,reminder_datetime,channel_strategy,payment_status,timezone\n'
+            + `SAMPLE-1,Sample Customer,,sample@example.invalid,SAMPLE-LOAN-1,8500,${date},${date} 16:00:00,all,pending,Asia/Kolkata\n`;
+          const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+          const link = document.createElement('a'); link.href = url; link.download = 'exact_reminders_sample.csv'; link.click();
+          URL.revokeObjectURL(url);
+        }}>Download sample CSV</button>
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-xs font-medium text-slate-700">Import type
             <select className={`${input} block mt-1`} value={importType} onChange={(e) => { setImportType(e.target.value); if (file) doPreview(file, e.target.value); }}>
@@ -425,7 +444,7 @@ const ImportTab: React.FC = () => {
 // ====================================================================== reminders
 
 const ReminderDetail: React.FC<{ id: string; role: Role; onChanged: () => void; onClose: () => void }> = ({ id, role, onChanged, onClose }) => {
-  const { data, error, reload } = useLoader(() => automationApi.reminder(id), [id]);
+  const { data, error, reload } = useLoader(() => automationApi.reminder(id), [id], 5_000);
   const [when, setWhen] = useState('');
   const [reason, setReason] = useState('');
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
@@ -443,7 +462,8 @@ const ReminderDetail: React.FC<{ id: string; role: Role; onChanged: () => void; 
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-bold text-slate-900">{r.customer_id} · {r.loan_id} · {r.reminder_type.replace('_', ' ')}</h3>
-          <p className="text-[11px] text-slate-500">Scheduled {r.scheduled_at_local} ({r.timezone}) · EMI {money(data.emi.outstanding)} outstanding, due {data.emi.due_date} · payment status <Badge value={data.emi.payment_status} /></p>
+          <p className="text-[11px] text-slate-500">Scheduled {fmtTime(r.scheduled_at_utc)} IST · EMI {money(data.emi.outstanding)} outstanding, due {data.emi.due_date} · payment status <Badge value={data.emi.payment_status} /></p>
+          <Badge value={r.display_status ?? r.status} />
           {r.schedule_note && <p className="text-[11px] text-slate-500">{r.schedule_note}</p>}
           {r.outcome_reason && <p className="text-[11px] text-slate-700">Outcome: {r.outcome_reason}</p>}
         </div>
@@ -453,7 +473,7 @@ const ReminderDetail: React.FC<{ id: string; role: Role; onChanged: () => void; 
         <thead><tr className="text-left text-slate-500"><th className="py-1 pr-3">Channel</th><th className="pr-3">Status</th><th className="pr-3">To</th><th className="pr-3">Provider</th><th className="pr-3">Attempts</th><th>Detail</th></tr></thead>
         <tbody>{(r.deliveries ?? []).map((d) => (
           <tr key={d.id} className="border-t border-slate-100 align-top">
-            <td className="py-1.5 pr-3 font-semibold">{CHANNEL_LABEL[d.channel]}</td><td className="pr-3"><Badge value={d.status} /></td>
+            <td className="py-1.5 pr-3 font-semibold">{CHANNEL_LABEL[d.channel]}</td><td className="pr-3"><Badge value={d.display_status ?? d.status} /></td>
             <td className="pr-3 font-mono">{d.recipient ?? '—'}</td><td className="pr-3">{d.provider ?? '—'}</td><td className="pr-3">{d.attempt_count}</td>
             <td className="text-[11px] text-slate-600">{d.skip_reason ?? (d.error_code ? `${d.error_code}: ${d.error_message ?? ''}` : d.next_retry_at ? `retry at ${fmtTime(d.next_retry_at)}` : d.provider_message_id ?? '')}</td>
           </tr>
@@ -494,14 +514,14 @@ const RemindersTab: React.FC<{ role: Role }> = ({ role }) => {
   const [selected, setSelected] = useState<string | null>(null);
   const { data, error, reload } = useLoader(
     () => automationApi.reminders({ status, reminder_type: type, customer_id: customer.trim(), page, page_size: 25 }),
-    [status, type, customer, page], 30_000);
+    [status, type, customer, page], 5_000);
   return (
     <div className="space-y-4">
       <div className={`${card} p-4 flex flex-wrap gap-3 items-end`}>
         <label className="text-[11px] text-slate-600">Status
           <select className={`${input} block mt-1`} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
             <option value="pending,retry,processing">Open</option><option value="">All</option>
-            <option value="completed,partially_completed">Sent</option><option value="failed,dead_letter">Failed</option>
+            <option value="completed,partially_completed">Completed / simulated</option><option value="failed,dead_letter">Failed / unknown</option>
             <option value="cancelled,skipped,missed">Cancelled / skipped / missed</option>
           </select></label>
         <label className="text-[11px] text-slate-600">Type
@@ -521,16 +541,16 @@ const RemindersTab: React.FC<{ role: Role }> = ({ role }) => {
             <table className="w-full text-xs">
               <thead><tr className="text-left text-slate-500 border-b border-slate-100">
                 <th className="py-2 px-4 font-medium">Customer</th><th className="px-2 font-medium">Loan</th><th className="px-2 font-medium">Type</th>
-                <th className="px-2 font-medium">Scheduled (customer time)</th><th className="px-2 font-medium">Status</th><th className="px-2 font-medium">Channels</th><th className="px-2 font-medium">Attempts</th>
+                <th className="px-2 font-medium">Scheduled (IST)</th><th className="px-2 font-medium">Status</th><th className="px-2 font-medium">Channels</th><th className="px-2 font-medium">Attempts</th>
               </tr></thead>
               <tbody>{data.reminders.map((r: Reminder) => (
                 <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer" onClick={() => setSelected(r.id)}>
                   <td className="py-2 px-4"><span className="font-semibold text-slate-800">{r.customer_name ?? r.customer_id}</span><br /><span className="text-[10px] text-slate-500">{r.customer_id}</span></td>
                   <td className="px-2">{r.loan_id}</td><td className="px-2">{r.reminder_type.replace('_', ' ')}</td>
-                  <td className="px-2">{r.scheduled_at_local}<span className="text-[10px] text-slate-400"> {r.timezone}</span></td>
-                  <td className="px-2"><Badge value={r.status} title={r.outcome_reason ?? undefined} /></td>
+                  <td className="px-2">{fmtTime(r.scheduled_at_utc)} IST</td>
+                  <td className="px-2"><Badge value={r.display_status ?? r.status} title={r.outcome_reason ?? undefined} /></td>
                   <td className="px-2"><div className="flex flex-wrap gap-1">{(r.deliveries?.length ? r.deliveries : r.channels.map((c) => ({ channel: c, status: 'queued' }))).map((d) => (
-                    <span key={d.channel} className="text-[10px]">{CHANNEL_LABEL[d.channel as Channel]}: <Badge value={d.status} /></span>))}</div></td>
+                    <span key={d.channel} className="text-[10px]">{CHANNEL_LABEL[d.channel as Channel]}: <Badge value={'display_status' in d ? String(d.display_status ?? d.status) : d.status} /></span>))}</div></td>
                   <td className="px-2">{r.attempt_count}</td>
                 </tr>
               ))}</tbody>

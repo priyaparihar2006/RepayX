@@ -25,6 +25,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from automation.audit import audit
 from automation.config import AutomationConfig
 from automation.db import Database
+from automation.policy import within_contact_window
 from automation.policy_settings import ReminderPolicy
 from automation.scheduler import ReconcileResult, reconcile_emi
 from automation.util import (
@@ -38,6 +39,7 @@ from automation.util import (
     parse_hhmm,
     parse_money,
     stable_hash,
+    UTC,
 )
 
 ImportType = Literal["emi_reminders", "payment_updates"]
@@ -57,6 +59,8 @@ FIELD_ALIASES: dict[str, tuple[str, ...]] = {
     "payment_status": ("payment_status", "emi_status", "status"),
     "days_past_due": ("days_past_due", "dpd", "days_overdue"),
     "reminder_date": ("reminder_date", "scheduled_date", "message_date"),
+    "reminder_datetime": ("reminder_datetime",),
+    "channel_strategy": ("channel_strategy",),
     "reminder_time": ("reminder_time", "scheduled_message_time", "scheduled_time", "message_time"),
     "timezone": ("timezone", "time_zone", "tz"),
     "whatsapp_enabled": ("whatsapp_enabled", "whatsapp", "wa_enabled"),
@@ -432,6 +436,29 @@ class CsvImporter:
         except (ZoneInfoNotFoundError, ValueError):
             issues.error("timezone", f"Unknown timezone '{tz_name[:60]}'. Use an IANA name like Asia/Kolkata.")
         rec["timezone"] = tz_name
+        rec["reminder_datetime_utc"] = None
+        exact_raw = get("reminder_datetime")
+        if "reminder_datetime" in mapping:
+            if not due_raw or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", due_raw):
+                issues.error("due_date", "Exact scheduling requires an unambiguous YYYY-MM-DD due_date.")
+            try:
+                if not exact_raw or not re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", exact_raw):
+                    raise ValueError("Use YYYY-MM-DD HH:MM:SS (24-hour); a value is required on every row.")
+                naive = datetime.strptime(exact_raw, "%Y-%m-%d %H:%M:%S")
+                tz = ZoneInfo(tz_name)
+                local = naive.replace(tzinfo=tz)
+                if (local.utcoffset() != naive.replace(tzinfo=tz, fold=1).utcoffset()
+                        or local.astimezone(UTC).astimezone(tz).replace(tzinfo=None) != naive):
+                    raise ValueError("Ambiguous or nonexistent local time; choose a time outside the DST transition.")
+                rec["reminder_datetime_utc"] = local.astimezone(UTC)
+                if get("reminder_date") or get("reminder_time"):
+                    issues.error("reminder_datetime", "Use reminder_datetime OR reminder_date/reminder_time, not both.")
+            except (ValueError, ZoneInfoNotFoundError) as exc:
+                issues.error("reminder_datetime", str(exc))
+        strategy = (get("channel_strategy") or "").lower()
+        if strategy and strategy not in {"all", "fallback"}:
+            issues.error("channel_strategy", "channel_strategy must be all or fallback (blank uses policy).")
+        rec["channel_strategy"] = strategy or None
 
         rdate_raw, rtime_raw = get("reminder_date"), get("reminder_time")
         rec["reminder_date"] = parse_date(rdate_raw, self.config.csv_date_order) if rdate_raw else None
@@ -471,6 +498,12 @@ class CsvImporter:
         for row_number, raw in enumerate(rows, start=2):  # row 1 is the header
             issues = RowIssues()
             rec = self._parse_emi_row(raw, mapping, issues)
+            exact = rec["reminder_datetime_utc"]
+            if exact is not None:
+                if exact <= now:
+                    issues.error("reminder_datetime", "Reminder datetime must be in the future; past times are never sent immediately.")
+                if not within_contact_window(exact.astimezone(ZoneInfo(rec["timezone"])), policy):
+                    issues.error("reminder_datetime", "Reminder datetime is outside the configured contact hours/days; choose an allowed exact time.")
 
             if rec["loan_id"]:
                 key = (rec["loan_id"], rec["installment_key"])
@@ -499,6 +532,8 @@ class CsvImporter:
 
             self._upsert_customer(conn, rec, now_s)
             emi_id, changed = self._upsert_emi(conn, rec, source, summary, row_number, now_s, actor)
+            conn.execute("UPDATE emis SET reminder_datetime_utc = ?, channel_strategy = ? WHERE id = ?",
+                         (iso(exact) if exact else None, rec["channel_strategy"], emi_id))
             if changed:
                 summary.imported_rows += 1
             else:
@@ -536,6 +571,7 @@ class CsvImporter:
             rec["consent_status"], rec["whatsapp_enabled"], rec["sms_enabled"], rec["email_enabled"],
             rec["preferred_language"], rec["emi_amount"], rec["amount_paid"], rec["due_date"],
             rec["payment_status"], rdate, rtime,
+            rec["reminder_datetime_utc"], rec["channel_strategy"],
         )
         existing = conn.execute(
             "SELECT * FROM emis WHERE loan_id = ? AND installment_key = ?", (rec["loan_id"], rec["installment_key"])

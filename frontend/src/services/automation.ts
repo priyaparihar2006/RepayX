@@ -91,6 +91,7 @@ export type Channel = 'whatsapp' | 'sms' | 'email';
 export interface Pagination { page: number; page_size: number; total: number; total_pages: number }
 
 export interface Delivery {
+  display_status?: string;
   id: number; channel: Channel; status: string; recipient: string | null; provider: string | null;
   provider_message_id: string | null; attempt_count: number; next_retry_at: string | null;
   error_code: string | null; error_message: string | null; skip_reason: string | null;
@@ -98,6 +99,7 @@ export interface Delivery {
 }
 
 export interface Reminder {
+  display_status?: string; channel_strategy?: 'all' | 'fallback';
   id: string; emi_id: number; customer_id: string; customer_name?: string | null; loan_id: string;
   reminder_type: 'explicit' | 'pre_due' | 'due_date' | 'overdue'; due_date: string;
   scheduled_at_utc: string; scheduled_at_local: string | null; run_at_utc: string; timezone: string;
