@@ -8,12 +8,16 @@ database so administrators can change it without a redeploy; see policy_settings
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_DIR.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+import env_loader  # noqa: F401
 
 
 def _env(name: str, default: str = "") -> str:
@@ -138,6 +142,11 @@ class AutomationConfig:
 
     # Email
     email_provider: str = field(default_factory=lambda: _env("EMAIL_PROVIDER", "none").lower())
+    apps_script_url: str = field(default_factory=lambda: _env("APPS_SCRIPT_URL"))
+    apps_script_secret: str = field(default_factory=lambda: _env("APPS_SCRIPT_SHARED_SECRET"), repr=False)
+    apps_script_test_send_enabled: bool = field(default_factory=lambda: _env_bool("APPS_SCRIPT_TEST_SEND_ENABLED", False))
+    apps_script_allowed_recipients: tuple[str, ...] = field(
+        default_factory=lambda: tuple(x.lower() for x in _list("APPS_SCRIPT_ALLOWED_RECIPIENTS")))
     email_from_address: str = field(default_factory=lambda: _env("EMAIL_FROM_ADDRESS"))
     email_from_name: str = field(default_factory=lambda: _env("EMAIL_FROM_NAME", "RepayX"))
     email_reply_to: str = field(default_factory=lambda: _env("EMAIL_REPLY_TO"))

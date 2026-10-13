@@ -8,8 +8,15 @@ Run from the backend/ directory:
 from __future__ import annotations
 
 import logging
+import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+import env_loader  # noqa: F401
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import (
     routes_analytics,
     routes_automation,
+    routes_email_test,
     routes_customer,
     routes_health,
     routes_omnichannel,
@@ -39,6 +47,24 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        orig_handler = loop.get_exception_handler()
+
+        def _asyncio_exception_handler(l, context):
+            exc = context.get("exception")
+            if isinstance(exc, (ConnectionResetError, BrokenPipeError)):
+                return
+            if isinstance(exc, OSError) and getattr(exc, "winerror", None) == 10054:
+                return
+            if orig_handler:
+                orig_handler(l, context)
+            else:
+                l.default_exception_handler(context)
+
+        loop.set_exception_handler(_asyncio_exception_handler)
+
         # Artifacts are checked (and, in later phases, loaded) once per process.
         app.state.resources.refresh()
         # In production the worker runs as its own process (backend/worker.py).
@@ -77,6 +103,7 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
         routes_whatsapp.router,
         routes_omnichannel.router,
         routes_automation.router,
+        routes_email_test.router,
         routes_webhooks.router,
     ):
         app.include_router(router)

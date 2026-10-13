@@ -144,3 +144,97 @@ describe('AutomationPage', () => {
     expect(calls.find((c) => c.path === '/api/reminders')?.params.get('status')).toBe('pending,retry,processing');
   });
 });
+
+ describe('CSV upload flow', () => {
+  const preview = { success: true, headers: ['customer_id'], row_count: 1, suggested_mapping: { customer_id: 'customer_id' }, missing_required: [], available_fields: ['customer_id'], required_fields: ['customer_id'], sample_rows: [{ customer_id: 'C1' }] };
+  const summary = { success: true, import_id: 42, import_type: 'emi_reminders', status: 'completed', total_rows: 1, imported_rows: 1, unchanged_rows: 0, rejected_rows: 0, warning_count: 0, reminders_scheduled: 2, reminders_updated: 0, reminders_cancelled: 0, reminders_skipped_past: 0, issues: [], issues_truncated: false };
+  it('previews only on drop, validates separately, imports with unchanged payload and refreshes history', async () => {
+    sessionStorage.setItem('repayx.automationKey', KEY);
+    let imported = false;
+    const calls = installFakeApi({
+      'GET /api/automation/me': { body: { success: true, name: 'omar', role: 'operator' } },
+      'GET /api/automation/dashboard': { body: { success: true, ...dashboard } },
+      'GET /api/imports': () => ({ body: { success: true, imports: imported ? [{ ...summary, id: 42, filename: 'history.csv', created_at: '2026-10-13T00:00:00Z' }] : [], pagination: {} } }),
+      'POST /api/imports/preview': { body: preview },
+      'POST /api/imports/csv': ({ body }) => {
+        const form = body as FormData;
+        expect(form.get('import_type')).toBe('emi_reminders');
+        expect(form.get('mapping')).toBe(JSON.stringify({ customer_id: 'customer_id' }));
+        expect((form.get('file') as File).name).toBe('test.csv');
+        const dry = form.get('dry_run') === 'true';
+        if (!dry) imported = true;
+        return { body: { ...summary, status: dry ? 'dry_run' : 'completed' } };
+      },
+    });
+    renderAt(<AutomationPage />, { url: '/automation', path: '/automation' });
+    await userEvent.click(await screen.findByRole('button', { name: /Import CSV/i }));
+    fireEvent.drop(screen.getByRole('button', { name: 'Browse Files' }), { dataTransfer: { files: [new File(['customer_id\nC1'], 'test.csv')] } });
+    await screen.findByRole('button', { name: 'Upload CSV' });
+    expect(calls.filter(c => c.path === '/api/imports/csv')).toHaveLength(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Validate only' }));
+    expect(await screen.findByText('Validation result (nothing saved)')).toBeInTheDocument();
+    expect(screen.getByText('Reminders proposed')).toBeInTheDocument();
+    expect(imported).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Upload CSV' }));
+    expect(await screen.findByText('Import #42 complete')).toBeInTheDocument();
+    expect(await screen.findByText('history.csv')).toBeInTheDocument();
+    expect(calls.every(c => c.method === 'GET' || c.path.startsWith('/api/imports/'))).toBe(true);
+  });
+  it('shows backend preview errors', async () => {
+    sessionStorage.setItem('repayx.automationKey', KEY);
+    installFakeApi({
+      'GET /api/automation/me': { body: { success: true, name: 'omar', role: 'operator' } },
+      'GET /api/automation/dashboard': { body: { success: true, ...dashboard } },
+      'GET /api/imports': { body: { success: true, imports: [], pagination: {} } },
+      'POST /api/imports/preview': { status: 422, body: { success: false, error: { code: 'invalid_csv', message: 'CSV has invalid encoding' } } },
+    });
+    renderAt(<AutomationPage />, { url: '/automation', path: '/automation' });
+    await userEvent.click(await screen.findByRole('button', { name: /Import CSV/i }));
+    await userEvent.upload(screen.getByLabelText('CSV file'), new File(['bad'], 'test.csv', { type: 'text/csv' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('CSV has invalid encoding');
+    expect(screen.queryByRole('button', { name: 'Upload CSV' })).not.toBeInTheDocument();
+  });
+});
+
+it('ignores a preview response after the selected file is removed', async () => {
+  sessionStorage.setItem('repayx.automationKey', KEY);
+  let resolvePreview!: (value: { body: unknown }) => void;
+  installFakeApi({
+    'GET /api/automation/me': { body: { success: true, name: 'omar', role: 'operator' } },
+    'GET /api/automation/dashboard': { body: { success: true, ...dashboard } },
+    'GET /api/imports': { body: { success: true, imports: [], pagination: {} } },
+    'POST /api/imports/preview': () => new Promise(resolve => { resolvePreview = resolve; }),
+  });
+  renderAt(<AutomationPage />, { url: '/automation', path: '/automation' });
+  await userEvent.click(await screen.findByRole('button', { name: /Import CSV/i }));
+  await userEvent.upload(screen.getByLabelText('CSV file'), new File(['id\n1'], 'test.csv', { type: 'text/csv' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Remove file' }));
+  resolvePreview({ body: { success: true, headers: [], available_fields: [], required_fields: [], missing_required: [], suggested_mapping: {}, sample_rows: [], row_count: 1 } });
+  await waitFor(() => expect(screen.queryByText(/Uploading preview/)).not.toBeInTheDocument());
+  expect(screen.queryByRole('button', { name: 'Upload CSV' })).not.toBeInTheDocument();
+});
+
+it('locks duplicate submissions and displays an import failure without a success message', async () => {
+  sessionStorage.setItem('repayx.automationKey', KEY);
+  let finish!: (value: { status: number; body: unknown }) => void;
+  const calls = installFakeApi({
+    'GET /api/automation/me': { body: { success: true, name: 'omar', role: 'operator' } },
+    'GET /api/automation/dashboard': { body: { success: true, ...dashboard } },
+    'GET /api/imports': { body: { success: true, imports: [], pagination: {} } },
+    'POST /api/imports/preview': { body: { success: true, headers: ['id'], available_fields: ['customer_id'], required_fields: ['customer_id'], missing_required: [], suggested_mapping: { customer_id: 'id' }, sample_rows: [], row_count: 1 } },
+    'POST /api/imports/csv': () => new Promise(resolve => { finish = resolve; }),
+  });
+  renderAt(<AutomationPage />, { url: '/automation', path: '/automation' });
+  await userEvent.click(await screen.findByRole('button', { name: /Import CSV/i }));
+  await userEvent.upload(screen.getByLabelText('CSV file'), new File(['id\n1'], 'test.csv', { type: 'text/csv' }));
+  const upload = await screen.findByRole('button', { name: 'Upload CSV' });
+  await userEvent.dblClick(upload);
+  expect(upload).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Remove file' })).toBeDisabled();
+  expect(screen.getByLabelText('Import type')).toBeDisabled();
+  expect(calls.filter(c => c.path === '/api/imports/csv')).toHaveLength(1);
+  finish({ status: 422, body: { success: false, error: { code: 'missing_columns', message: 'customer_id is required' } } });
+  expect(await screen.findByRole('alert')).toHaveTextContent('customer_id is required');
+  expect(upload).toBeEnabled();
+  expect(screen.queryByText(/Import #.*complete/)).not.toBeInTheDocument();
+});

@@ -13,10 +13,10 @@ import logging
 import signal
 from pathlib import Path
 
-from dotenv import load_dotenv
+import env_loader
 
 if __name__ == "__main__":
-    load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
+    env_loader.load_environment()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     from automation.service import AutomationService

@@ -91,6 +91,7 @@ export type Channel = 'whatsapp' | 'sms' | 'email';
 export interface Pagination { page: number; page_size: number; total: number; total_pages: number }
 
 export interface Delivery {
+  last_attempt_at?: string | null;
   display_status?: string;
   id: number; channel: Channel; status: string; recipient: string | null; provider: string | null;
   provider_message_id: string | null; attempt_count: number; next_retry_at: string | null;
@@ -136,7 +137,7 @@ export interface Health {
   worker: { alive: boolean; worker_id: string | null; hostname: string | null; last_tick_at: string | null;
     jobs_processed: number; last_error: string | null; stale_after_seconds: number };
   queue: { due_backlog: number; oldest_due_lag_seconds: number; processing: number; dead_letter: number; unknown_deliveries: number };
-  providers: Record<Channel, { provider: string; ready: boolean; problem: string | null; sandbox: boolean; official: boolean }>;
+  providers: Record<Channel, { provider: string; configured_provider?: string; ready: boolean; problem: string | null; sandbox: boolean; official: boolean }>;
   config_warnings: string[]; server_time: string;
 }
 
@@ -176,7 +177,18 @@ export interface Communication {
 
 // ------------------------------------------------------------------ calls
 
+export interface EmailTestRun {
+  request_id: string; recipient: string; actor: string; real_send: number; status: string;
+  attempted_at: string; provider_message_id: string | null; error_code: string | null;
+}
+export interface EmailTestStatus {
+  enabled: boolean; ready: boolean; problem: string | null; allowlisted_count: number; runs: EmailTestRun[];
+}
+
 export const automationApi = {
+  emailTestStatus: () => call<EmailTestStatus>('/api/automation/email-test'),
+  testEmail: (body: { request_id: string; recipient: string; send_real: boolean; authorized: boolean }) =>
+    call<{ run: EmailTestRun }>('/api/automation/email-test', { method: 'POST', json: body }),
   me: () => call<{ name: string; role: 'viewer' | 'operator' | 'admin' }>('/api/automation/me'),
   dashboard: () => call<Dashboard>('/api/automation/dashboard'),
   health: () => call<Health>('/api/automation/health'),

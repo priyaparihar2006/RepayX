@@ -5,6 +5,7 @@ from __future__ import annotations
 from automation.config import AutomationConfig
 from automation.providers.base import OutboundMessage, Provider, RateLimiter, SendResult, UnconfiguredProvider
 from automation.providers.email import MailgunEmailProvider, SmtpEmailProvider
+from automation.providers.apps_script import AppsScriptEmailProvider
 from automation.providers.sandbox import SandboxProvider
 from automation.providers.sms import Msg91SmsProvider, TwilioSmsProvider
 from automation.providers.whatsapp import BaileysBridgeProvider, MetaCloudWhatsAppProvider
@@ -13,7 +14,7 @@ _FACTORIES = {
     "whatsapp": {"meta": MetaCloudWhatsAppProvider, "meta_cloud": MetaCloudWhatsAppProvider,
                  "baileys_bridge": BaileysBridgeProvider},
     "sms": {"twilio": TwilioSmsProvider, "msg91": Msg91SmsProvider},
-    "email": {"smtp": SmtpEmailProvider, "mailgun": MailgunEmailProvider},
+    "email": {"smtp": SmtpEmailProvider, "mailgun": MailgunEmailProvider, "google_apps_script": AppsScriptEmailProvider},
 }
 
 

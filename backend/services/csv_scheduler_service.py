@@ -15,6 +15,7 @@ import csv
 import io
 import json
 import logging
+import math
 import re
 import sqlite3
 import uuid
@@ -66,9 +67,12 @@ def clean_float(value: Any) -> float | None:
     val = normalize_nullable_field(value)
     if val is None:
         return None
-    cleaned = re.sub(r"[^\d\.]", "", str(val))
+    # Strip known currency decoration, not arbitrary letters or minus signs.
+    # Otherwise "abc100" and "-100" silently become valid positive balances.
+    cleaned = re.sub(r"(?i)\bINR\b|\bRs\.?|₹|,|\s", "", str(val))
     try:
-        return float(cleaned)
+        number = float(cleaned)
+        return number if math.isfinite(number) else None
     except Exception:
         return None
 

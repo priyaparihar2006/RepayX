@@ -111,7 +111,7 @@ def _delivery_public(d) -> dict:
     data = {k: d[k] for k in (
         "id", "channel", "status", "recipient", "provider", "provider_message_id", "attempt_count", "next_retry_at",
         "error_code", "error_message", "skip_reason", "accepted_at", "delivered_at", "read_at", "failed_at",
-        "updated_at")}
+        "updated_at", "last_attempt_at")}
     data["display_status"] = "simulated" if d["provider"] == "sandbox" and d["status"] == "accepted" else d["status"]
     return data
 
@@ -513,6 +513,8 @@ def _health(service: AutomationService) -> dict:
         problem = p.configuration_problem()
         providers[ch] = {"provider": p.name, "ready": problem is None, "problem": problem, "sandbox": p.sandbox,
                          "official": p.name not in ("baileys_bridge",)}
+        if ch == "email":
+            providers[ch]["configured_provider"] = service.config.email_provider
     return {
         "status": "ok" if alive and lag < 600 else "degraded",
         "mode": service.config.mode,

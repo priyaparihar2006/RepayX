@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, AlertTriangle, BellRing, CalendarClock, CheckCircle2, FileUp, KeyRound, ListChecks, LogOut,
   MessageSquareReply, PauseCircle, PlayCircle, RefreshCw, Settings2, Users, Wallet, XCircle,
@@ -10,12 +10,15 @@ import {
   type ImportSummary, type Pagination, type Policy, type Reminder,
 } from '../services/automation';
 import { EmptyState, ErrorState, LoadingState } from '../components/common/RequestState';
+import { EmailTestPanel } from '../components/automation/EmailTestPanel';
+import { CsvDropzone } from '../components/common/CsvDropzone';
 import { MetricCard } from '../components/analytics/MetricCard';
 
 type Role = 'viewer' | 'operator' | 'admin';
 type Tab = 'overview' | 'import' | 'reminders' | 'payments' | 'replies' | 'settings';
 const RANK: Record<Role, number> = { viewer: 0, operator: 1, admin: 2 };
 const CHANNELS: Channel[] = ['whatsapp', 'sms', 'email'];
+const providerLabel = (name: string) => name === 'google_apps_script' ? 'Google Apps Script' : name;
 const CHANNEL_LABEL: Record<Channel, string> = { whatsapp: 'WhatsApp', sms: 'SMS', email: 'Email' };
 const card = 'bg-white rounded-2xl border border-slate-200/80 shadow-xs';
 const btn = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
@@ -176,7 +179,7 @@ const Overview: React.FC<{ role: Role; onOpenTab: (t: Tab) => void }> = ({ role,
               <div key={c} className="rounded-xl border border-slate-200 p-3">
                 <p className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
                   {p.ready ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-rose-600" />}
-                  {CHANNEL_LABEL[c]} · <span className="font-mono font-normal">{p.provider}</span>
+                  {CHANNEL_LABEL[c]} · <span className="font-mono font-normal">{providerLabel(p.configured_provider ?? p.provider)}</span>
                 </p>
                 <p className="text-[11px] text-slate-500 mt-1">
                   {p.problem ?? (p.sandbox ? 'Sandbox: not sent externally' : p.official ? 'Ready' : 'Ready (unofficial transport: testing only)')}
@@ -207,7 +210,7 @@ const Overview: React.FC<{ role: Role; onOpenTab: (t: Tab) => void }> = ({ role,
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <section className={`${card} p-5 xl:col-span-2 overflow-x-auto`}>
           <h2 className="text-sm font-bold text-slate-900">Delivery status by channel</h2>
-          <p className="text-[11px] text-slate-500">Simulated means no external send. Accepted means the provider took the message; delivered and read come from provider reports.</p>
+          <p className="text-[11px] text-slate-500">Simulated means no external send. Accepted means the provider took the message; delivered and read come from provider reports. Google Apps Script acceptance does not confirm inbox delivery.</p>
           <table className="mt-3 w-full text-xs">
             <thead><tr className="text-left text-slate-500">
               <th className="py-1.5 pr-3 font-medium">Channel</th>
@@ -287,21 +290,30 @@ const ImportTab: React.FC = () => {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const history = useLoader(() => automationApi.imports(1), [result?.import_id]);
+  const [previewing, setPreviewing] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const previewVersion = useRef(0);
+  const submitting = useRef(false);
+  useEffect(() => () => { previewVersion.current++; }, []);
 
   const doPreview = async (f: File, type: string) => {
-    setError(''); setResult(null); setPreview(null);
+    const version = ++previewVersion.current;
+    setError(''); setResult(null); setPreview(null); setPreviewing(true);
     try {
       const p = await automationApi.previewImport(f, type);
+      if (version !== previewVersion.current) return;
       setPreview(p);
       setMapping(p.suggested_mapping);
-    } catch (e) { setError(errText(e)); }
+    } catch (e) { if (version === previewVersion.current) setError(errText(e)); }
+    finally { if (version === previewVersion.current) setPreviewing(false); }
   };
   const run = async (dryRun: boolean) => {
-    if (!file) return;
-    setBusy(true); setError('');
+    if (!file || !preview || submitting.current || previewing) return;
+    submitting.current = true;
+    setBusy(true); setValidating(dryRun); setError(''); setResult(null);
     try { setResult(await automationApi.importCsv(file, importType, mapping, dryRun)); }
     catch (e) { setError(errText(e)); }
-    finally { setBusy(false); }
+    finally { submitting.current = false; setBusy(false); }
   };
   const downloadIssues = async (id: number) => {
     try {
@@ -339,17 +351,19 @@ const ImportTab: React.FC = () => {
           URL.revokeObjectURL(url);
         }}>Download sample CSV</button>
         <div className="flex flex-wrap items-end gap-3">
-          <label className="text-xs font-medium text-slate-700">Import type
-            <select className={`${input} block mt-1`} value={importType} onChange={(e) => { setImportType(e.target.value); if (file) doPreview(file, e.target.value); }}>
+          <label className="max-w-full text-xs font-medium text-slate-700">Import type
+            <select className={`${input} block mt-1 max-w-full`} disabled={busy} value={importType} onChange={(e) => { setImportType(e.target.value); if (file) doPreview(file, e.target.value); }}>
               <option value="emi_reminders">Customers and EMIs (schedules reminders)</option>
               <option value="payment_updates">Payment status updates</option>
             </select>
           </label>
-          <label className="text-xs font-medium text-slate-700">CSV file
-            <input type="file" accept=".csv,text/csv" className="block mt-1 text-xs"
-              onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); if (f) doPreview(f, importType); }} />
-          </label>
         </div>
+        <CsvDropzone file={file} disabled={busy} onChange={(next) => {
+          previewVersion.current++;
+          setFile(next); setPreview(null); setMapping({}); setResult(null); setError(''); setPreviewing(false);
+          if (next) void doPreview(next, importType);
+        }} />
+        {(previewing || busy) && <p role="status" className="flex items-center gap-2 text-xs text-blue-700"><RefreshCw aria-hidden="true" className="h-4 w-4 animate-spin motion-reduce:animate-none" />{previewing ? 'Uploading preview and checking CSV...' : validating ? 'Validating CSV (nothing will be saved)...' : 'Uploading and importing CSV...'}</p>}
         {error && <Notice kind="error">{error}</Notice>}
         {preview && (
           <div className="space-y-3">
@@ -358,7 +372,7 @@ const ImportTab: React.FC = () => {
               {preview.available_fields.map((f) => (
                 <label key={f} className="text-[11px] text-slate-600 flex items-center justify-between gap-2">
                   <span className={preview.required_fields.includes(f) ? 'font-semibold text-slate-800' : ''}>{f}{preview.required_fields.includes(f) ? ' *' : ''}</span>
-                  <select className={`${input} w-40`} value={mapping[f] ?? ''}
+                  <select className={`${input} w-40`} disabled={busy} value={mapping[f] ?? ''}
                     onChange={(e) => setMapping((m) => { const next = { ...m }; if (e.target.value) next[f] = e.target.value; else delete next[f]; return next; })}>
                     <option value="">— not mapped —</option>
                     {preview.headers.map((hd) => <option key={hd} value={hd}>{hd}</option>)}
@@ -381,7 +395,7 @@ const ImportTab: React.FC = () => {
             )}
             <div className="flex gap-2">
               <button className={btnGhost} disabled={busy} onClick={() => run(true)}>Validate only</button>
-              <button className={btnPrimary} disabled={busy} onClick={() => run(false)}><FileUp className="w-4 h-4" />Import</button>
+              <button className={btnPrimary} disabled={busy} onClick={() => run(false)}><FileUp className="w-4 h-4" />Upload CSV</button>
             </div>
           </div>
         )}
@@ -389,10 +403,10 @@ const ImportTab: React.FC = () => {
 
       {result && (
         <section className={`${card} p-5 space-y-3`}>
-          <h2 className="text-sm font-bold text-slate-900">{result.status === 'dry_run' ? 'Validation result (nothing saved)' : `Import #${result.import_id} complete`}</h2>
+          <h2 role="status" className="text-sm font-bold text-slate-900">{result.status === 'dry_run' ? 'Validation result (nothing saved)' : `Import #${result.import_id} complete`}</h2>
           <dl className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 text-xs">
             {([['Total rows', result.total_rows], ['Imported', result.imported_rows], ['Unchanged', result.unchanged_rows],
-              ['Rejected', result.rejected_rows], ['Warnings', result.warning_count], ['Reminders scheduled', result.reminders_scheduled],
+              ['Rejected', result.rejected_rows], ['Warnings', result.warning_count], [result.status === 'dry_run' ? 'Reminders proposed' : 'Reminders scheduled', result.reminders_scheduled],
               ['Rescheduled', result.reminders_updated], ['Cancelled', result.reminders_cancelled]] as const).map(([k, v]) => (
               <div key={k}><dt className="text-slate-500">{k}</dt><dd className="text-lg font-semibold text-slate-900">{v}</dd></div>
             ))}
@@ -470,11 +484,11 @@ const ReminderDetail: React.FC<{ id: string; role: Role; onChanged: () => void; 
         <button className={btnGhost} onClick={onClose}>Close</button>
       </div>
       <table className="w-full text-xs">
-        <thead><tr className="text-left text-slate-500"><th className="py-1 pr-3">Channel</th><th className="pr-3">Status</th><th className="pr-3">To</th><th className="pr-3">Provider</th><th className="pr-3">Attempts</th><th>Detail</th></tr></thead>
+        <thead><tr className="text-left text-slate-500"><th className="py-1 pr-3">Channel</th><th className="pr-3">Status</th><th className="pr-3">To</th><th className="pr-3">Provider</th><th className="pr-3">Attempts</th><th className="pr-3">Last attempt (IST)</th><th>Detail</th></tr></thead>
         <tbody>{(r.deliveries ?? []).map((d) => (
           <tr key={d.id} className="border-t border-slate-100 align-top">
             <td className="py-1.5 pr-3 font-semibold">{CHANNEL_LABEL[d.channel]}</td><td className="pr-3"><Badge value={d.display_status ?? d.status} /></td>
-            <td className="pr-3 font-mono">{d.recipient ?? '—'}</td><td className="pr-3">{d.provider ?? '—'}</td><td className="pr-3">{d.attempt_count}</td>
+            <td className="pr-3 font-mono">{d.recipient ?? '—'}</td><td className="pr-3">{d.provider ? providerLabel(d.provider) : '—'}</td><td className="pr-3">{d.attempt_count}</td><td className="pr-3">{fmtTime(d.last_attempt_at ?? null)}</td>
             <td className="text-[11px] text-slate-600">{d.skip_reason ?? (d.error_code ? `${d.error_code}: ${d.error_message ?? ''}` : d.next_retry_at ? `retry at ${fmtTime(d.next_retry_at)}` : d.provider_message_id ?? '')}</td>
           </tr>
         ))}</tbody>
@@ -813,7 +827,7 @@ export const AutomationPage: React.FC = () => {
           {tab === 'reminders' && <RemindersTab role={user.role} />}
           {tab === 'payments' && <PaymentsTab role={user.role} />}
           {tab === 'replies' && <RepliesTab role={user.role} />}
-          {tab === 'settings' && <SettingsTab role={user.role} />}
+          {tab === 'settings' && <div className="space-y-6"><SettingsTab role={user.role} />{user.role === 'admin' && <EmailTestPanel />}</div>}
         </>
       )}
     </div>

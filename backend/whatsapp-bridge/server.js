@@ -9,8 +9,20 @@ const EXPECTED_SENDER = '918650629360';
 async function createBridge(deps = {}) {
   const baileys = deps.baileys || await import('@whiskeysockets/baileys');
   const authDir = deps.authDir || path.join(__dirname, 'auth_info');
+  const isLive = () => {
+    if (deps.mode) return deps.mode.trim().toLowerCase() === 'live';
+    if (process.env.AUTOMATION_MODE && process.env.AUTOMATION_MODE.trim().toLowerCase() === 'live') return true;
+    try {
+      const envPath = path.resolve(__dirname, '../../.env');
+      if (fs.existsSync(envPath)) {
+        const content = fs.readFileSync(envPath, 'utf8');
+        const match = content.match(/^AUTOMATION_MODE\s*=\s*([^\r\n#]+)/m);
+        if (match && match[1].trim().toLowerCase() === 'live') return true;
+      }
+    } catch {}
+    return false;
+  };
   const app = express();
-  const liveSending = (deps.mode || process.env.AUTOMATION_MODE || 'sandbox').trim().toLowerCase() === 'live';
   app.use((req, res, next) => req.headers.origin
     ? res.status(403).json({ success: false, error: 'Use the RepayX API.' }) : next());
   app.use(express.json({ limit: '64kb' }));
@@ -77,7 +89,7 @@ async function createBridge(deps = {}) {
               }),
             });
             const data = await res.json();
-            if (liveSending && data?.auto_reply && data?.reply_text) {
+            if (isLive() && data?.auto_reply && data?.reply_text) {
               console.log(`[WhatsApp] AI Auto-Reply to +${senderPhone}: "${data.reply_text.substring(0, 60)}..."`);
               await current.sendMessage(remoteJid, { text: data.reply_text });
             }
@@ -164,7 +176,7 @@ async function createBridge(deps = {}) {
   });
 
   app.post('/send', async (req, res) => {
-    if (!liveSending) return res.status(403).json({ success: false, error: 'Sandbox mode: live WhatsApp sending is disabled.' });
+    if (!isLive()) return res.status(403).json({ success: false, error: 'Sandbox mode: live WhatsApp sending is disabled.' });
     let phone = String(req.body.phone || req.body.recipient || '').replace(/\D/g, '');
     const message = req.body.message || req.body.text;
     if (phone.length === 10) phone = '91' + phone;
