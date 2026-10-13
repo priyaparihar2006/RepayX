@@ -23,8 +23,10 @@ async function createBridge(deps = {}) {
     return false;
   };
   const app = express();
-  app.use((req, res, next) => req.headers.origin
-    ? res.status(403).json({ success: false, error: 'Use the RepayX API.' }) : next());
+  app.use((req, res, next) => {
+    if (req.path === '/' || req.path === '/health') return next();
+    return req.headers.origin ? res.status(403).json({ success: false, error: 'Use the RepayX API.' }) : next();
+  });
   app.use(express.json({ limit: '64kb' }));
   let socket = null, state = 'DISCONNECTED', qrImage = null, qrExpires = 0, user = null;
   let initializing = false, reconnectTimer, reconnects = 0, error = null, pairingReady = false, generation = 0;
@@ -149,6 +151,7 @@ async function createBridge(deps = {}) {
     } finally { initializing = false; }
   }
 
+  app.get('/', (_req, res) => res.json({ service: 'RepayX WhatsApp Bridge', status: 'online', connected: snapshot().connected }));
   app.get('/health', (_req, res) => res.json({ status: 'ok', connected: snapshot().connected }));
   app.get('/status', (_req, res) => {
     if (!socket && !initializing && state !== 'CONNECTED' && fs.existsSync(authDir)) {
@@ -228,9 +231,10 @@ async function createBridge(deps = {}) {
 
 if (require.main === module) {
   createBridge().then(({ app, connect }) => {
-    const port = Number(process.env.WHATSAPP_BRIDGE_PORT || 8005);
-    app.listen(port, '127.0.0.1', () => {
-      console.log('[WhatsApp] Bridge listening on 127.0.0.1:' + port);
+    const port = Number(process.env.PORT || process.env.WHATSAPP_BRIDGE_PORT || 8005);
+    const host = process.env.HOST || '0.0.0.0';
+    app.listen(port, host, () => {
+      console.log(`[WhatsApp] Bridge listening on ${host}:${port}`);
       void connect();
     });
   }).catch(err => {
