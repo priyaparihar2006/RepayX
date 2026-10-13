@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "built_at": "2026-10-05T08:44:31+00:00",
+  "document_template_version": 1,
+  "customer_model_version": "repayx-logreg-20261005064635",
+  "documents": 61503,
+  "vocabulary_size": 268,
+  "scikit_learn": "1.9.1",
+  "sha256": {
+    "tfidf_vectorizer.joblib": "43d94eeaea43289548aa1d238e526337cb75bff7458549a32b05e627348e6dc9",
+    "customer_tfidf_matrix.npz": "44b0fdb3ced57a77854b309b0458a2589a10b6da9efcb82c103878799c924ef9",
+    "customer_tfidf_ids.npy": "af820ca9642bb5ed3dcbe1443c1b31a82ebc31b997bc6287b3c51cc71d627b92"
+  }
+}
