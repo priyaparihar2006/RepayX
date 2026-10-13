@@ -1,2 +1,2 @@
-web: cd backend && uvicorn api.main:app --host 0.0.0.0 --port $PORT
+web: bash backend/start.sh
 worker: cd backend && python worker.py
