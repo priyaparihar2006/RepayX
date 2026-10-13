@@ -27,6 +27,15 @@ def make_settings(tmp_path: Path) -> Settings:
     )
 
 
+@pytest.fixture(autouse=True)
+def _isolated_automation_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep every test's reminder-engine database out of backend/data."""
+    monkeypatch.setenv("AUTOMATION_DB_PATH", str(tmp_path / "automation.sqlite3"))
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("AUTOMATION_MODE", "sandbox")
+    monkeypatch.setenv("SCHEDULER_EMBEDDED", "false")
+
+
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
     return make_settings(tmp_path)

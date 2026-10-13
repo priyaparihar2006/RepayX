@@ -47,7 +47,9 @@ export const ReportsPage: React.FC = () => {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Recovery Reports & Ledgers</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight font-heading">
+          Recovery Reports & Ledgers
+        </h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
           Audited reporting on delinquency migrations, settlement fulfillment, and collection executive performance.
         </p>
@@ -61,7 +63,7 @@ export const ReportsPage: React.FC = () => {
           >
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700">
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#516072]/15 text-[#516072]">
                   {rep.type}
                 </span>
                 <span className="text-xs font-mono text-slate-400">{rep.period}</span>
@@ -76,7 +78,7 @@ export const ReportsPage: React.FC = () => {
               <span className="text-[11px] text-slate-400 font-mono">Format: .xlsx / .csv</span>
               <button
                 onClick={() => handleExport(rep.title)}
-                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                className="px-3 py-1.5 rounded-xl bg-[#516072] hover:bg-[#43505F] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download Report</span>

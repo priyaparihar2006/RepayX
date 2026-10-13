@@ -1,0 +1,38 @@
+{
+  "scheduled_utc": "2026-10-12T05:18:51Z",
+  "scheduled_ist": "2026-10-12T10:48:51+05:30",
+  "executed_utc": "2026-10-12T05:18:51Z",
+  "observed_utc": "2026-10-12T05:18:51Z",
+  "final_status": "simulated",
+  "queue_status": "completed",
+  "worker_processes": 2,
+  "job_attempts": 1,
+  "browser_or_api_running": false,
+  "duplicate_jobs": 0,
+  "deliveries": [
+    {
+      "channel": "whatsapp",
+      "provider": "sandbox",
+      "status": "accepted",
+      "accepted_at": "2026-10-12T05:18:51Z",
+      "delivered_at": null,
+      "attempt_count": 1
+    },
+    {
+      "channel": "sms",
+      "provider": "sandbox",
+      "status": "accepted",
+      "accepted_at": "2026-10-12T05:18:51Z",
+      "delivered_at": null,
+      "attempt_count": 1
+    },
+    {
+      "channel": "email",
+      "provider": "sandbox",
+      "status": "accepted",
+      "accepted_at": "2026-10-12T05:18:51Z",
+      "delivered_at": null,
+      "attempt_count": 1
+    }
+  ]
+}

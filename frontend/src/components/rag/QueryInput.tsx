@@ -42,11 +42,12 @@ export const QueryInput: React.FC<{
         </span>
         <button
           type="submit"
+          aria-busy={loading}
           disabled={empty || tooLong || loading}
           className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
         >
           {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowUp className="w-3.5 h-3.5" />}
-          Ask RepayX
+          {loading ? 'Asking...' : 'Ask RepayX'}
         </button>
       </div>
     </form>
