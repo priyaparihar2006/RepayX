@@ -1,0 +1,10 @@
+{
+  "status": "accepted",
+  "recipient": "drdopriya@gmail.com",
+  "subject": "RepayX \u2014 Authorized SMTP Test",
+  "attempts": 1,
+  "error_code": null,
+  "recorded_at_utc": "2026-10-12T11:24:29.373319+00:00",
+  "application_mode": "sandbox",
+  "delivery_confirmed": false
+}

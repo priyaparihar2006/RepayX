@@ -1,0 +1,4 @@
+customer_id,customer_name,phone_number,email,loan_id,emi_amount,due_date,payment_status,reminder_datetime,channel_strategy,timezone
+TEST-SID-001,Siddharth,+919105830551,,TEST-LOAN-001,8500,2026-10-15,pending,2026-10-14 16:00:00,all,Asia/Kolkata
+TEST-PRI-002,Pri,+916395300669,drdopriya@gmail.com,TEST-LOAN-002,6500,2026-10-15,pending,2026-10-14 16:05:00,all,Asia/Kolkata
+TEST-JAI-003,Jai,+917389437109,priyaparihar240206@gmail.com,TEST-LOAN-003,7200,2026-10-15,pending,2026-10-14 16:10:00,all,Asia/Kolkata

@@ -4,8 +4,8 @@ import type { QueryResponse } from '../types/api';
 
 type QueryState =
   | { status: 'idle'; data: undefined; error: undefined }
-  | { status: 'loading'; data: QueryResponse | undefined; error: undefined }
-  | { status: 'success'; data: QueryResponse; error: undefined }
+  | { status: 'loading'; data: undefined; error: undefined }
+  | { status: 'success'; data: QueryResponse; error: undefined; completedAt: number }
   | { status: 'error'; data: undefined; error: ApiError };
 
 /** Submits natural-language questions to POST /api/query. A new question cancels the previous one. */
@@ -24,10 +24,10 @@ export function useRepayxQuery() {
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
-    setState((prev) => ({ status: 'loading', data: prev.data, error: undefined }));
+    setState({ status: 'loading', data: undefined, error: undefined });
     try {
       const data = await api.query(text, controller.signal);
-      if (!controller.signal.aborted) setState({ status: 'success', data, error: undefined });
+      if (!controller.signal.aborted) setState({ status: 'success', data, error: undefined, completedAt: Date.now() });
     } catch (err) {
       if (controller.signal.aborted) return;
       const error = err instanceof ApiError ? err : new ApiError('invalid_response', 'Something went wrong.');

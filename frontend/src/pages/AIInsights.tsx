@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { History, Sparkles } from 'lucide-react';
 import { useRepayxQuery } from '../hooks/useQuery';
@@ -21,6 +21,14 @@ export const AIInsightsPage: React.FC = () => {
   const [history, setHistory] = useState<string[]>([]);
   const query = useRepayxQuery();
   const { ask, reset } = query;
+  const answerRef = useRef<HTMLDivElement>(null);
+  const completedAt = query.status === 'success' ? query.completedAt : undefined;
+
+  useEffect(() => {
+    if (completedAt === undefined) return;
+    answerRef.current?.focus({ preventScroll: true });
+    answerRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [completedAt]);
 
   // Run whenever the question in the URL changes (submit, suggestion, history, back/forward).
   useEffect(() => {
@@ -60,7 +68,7 @@ export const AIInsightsPage: React.FC = () => {
       <QueryInput value={draft} onChange={setDraft} onSubmit={() => submit(draft)} loading={loading} />
       <SuggestedQueries onSelect={submit} disabled={loading} />
 
-      {query.status === 'loading' && !query.data && (
+      {query.status === 'loading' && (
         <div className="bg-white rounded-2xl border border-slate-200/80"><LoadingState label="Working out the answer…" /></div>
       )}
       {query.status === 'error' && (
@@ -69,7 +77,10 @@ export const AIInsightsPage: React.FC = () => {
         </div>
       )}
       {query.data && (
-        <div className={loading ? 'opacity-60 transition-opacity' : ''}>
+        <div ref={answerRef} tabIndex={-1} aria-label="Latest answer" className="rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/30">
+          <p role="status" className="mb-2 text-xs text-emerald-700">
+            Answer updated at {new Date(query.completedAt).toLocaleTimeString()}.
+          </p>
           <QueryResponse result={query.data} />
         </div>
       )}

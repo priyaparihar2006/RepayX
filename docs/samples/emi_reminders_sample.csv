@@ -1,0 +1,4 @@
+customer_id,customer_name,phone_number,email,loan_id,emi_amount,due_date,payment_status,days_past_due,reminder_date,reminder_time,timezone,whatsapp_enabled,sms_enabled,email_enabled,preferred_language,consent_status
+CUST-1001,Rahul Sharma,+919876543210,rahul.sharma@example.com,LN-5001,8500,2026-10-11,Pending,0,2026-10-10,4:00 PM,Asia/Kolkata,yes,yes,yes,en,granted
+CUST-1002,Ananya Verma,9811287654,ananya.verma@example.com,LN-5002,4200,2026-10-20,pending,,,,Asia/Kolkata,yes,no,yes,en,granted
+CUST-1003,Vikram Singh,9717012345,,LN-5003,6200,2026-10-05,overdue,5,,,,yes,yes,no,hi,unknown

@@ -1,0 +1,5 @@
+customer_id,customer_name,phone_number,loan_id,unpaid_amount,due_date,days_past_due,payment_status,probability_of_default,risk_category,payment_link,scheduled_message_time,timezone
+RX-TEST-1001,Nans,+919058802116,LN-TEST-5001,12500,2026-09-15,25,UNPAID,0.86,HIGH,https://example.com/repay/RX-TEST-1001,10:45,Asia/Kolkata
+RX-TEST-1002,Nandini,+919410085066,LN-TEST-5002,8500,2026-09-25,15,OVERDUE,0.74,HIGH,https://example.com/repay/RX-TEST-1002,11:00,Asia/Kolkata
+RX-TEST-1003,Siddharth,+919105830551,LN-TEST-5003,6200,2026-10-05,5,UNPAID,0.58,MEDIUM,https://example.com/repay/RX-TEST-1003,,Asia/Kolkata
+RX-TEST-1004,Ajay,+918077815522,LN-TEST-5004,15750,2026-09-10,30,OVERDUE,0.93,HIGH,https://example.com/repay/RX-TEST-1004,,Asia/Kolkata
