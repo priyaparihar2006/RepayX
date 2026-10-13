@@ -26,7 +26,7 @@ from zoneinfo import ZoneInfo
 from automation.audit import audit
 from automation.config import AutomationConfig
 from automation.db import Database
-from automation.messages import render_reminder
+from automation.messages import apps_script_content, render_reminder
 from automation.policy import (
     ineligibility_reason,
     next_contact_time,
@@ -143,7 +143,9 @@ class Dispatcher:
             elif customer["consent_status"] == "revoked":
                 reason = "consent_revoked"
             elif customer["consent_status"] not in CONSENT_OK or (
-                    policy.require_explicit_consent and customer["consent_status"] != "granted"):
+                    (policy.require_explicit_consent or
+                     (ch == "email" and self.config.email_provider == "google_apps_script"))
+                    and customer["consent_status"] != "granted"):
                 reason = "consent_not_granted"
             elif conn.execute("SELECT 1 FROM suppressions WHERE channel = ? AND identifier = ?",
                               (ch, recipient)).fetchone():
@@ -302,9 +304,9 @@ class Dispatcher:
                 return SendResult.fail("max_attempts_exhausted", "Retry limit reached.", transient=False)
             claimed = conn.execute(
                 """UPDATE message_deliveries SET status = 'sending', attempt_count = attempt_count + 1,
-                       recipient = ?, provider = ?, skip_reason = NULL, next_retry_at = NULL, updated_at = ?
+                       recipient = ?, provider = ?, skip_reason = NULL, next_retry_at = NULL, updated_at = ?, last_attempt_at = ?
                    WHERE id = ? AND status NOT IN ('accepted','delivered','read','sending','unknown')""",
-                (mask_identifier(ch, decision.recipient), provider.name, now_s, row["id"]),
+                (mask_identifier(ch, decision.recipient), provider.name, now_s, now_s, row["id"]),
             ).rowcount
             if not claimed:
                 return None
@@ -318,6 +320,8 @@ class Dispatcher:
             html=content.html if ch == "email" else None,
             language=customer["preferred_language"], template_params=content.template_params,
         )
+        if ch == "email" and self.config.email_provider == "google_apps_script":
+            message.subject, message.text, message.html = apps_script_content(content.template_params)
         self.limiters[ch].wait()
         try:
             result = provider.send(message)

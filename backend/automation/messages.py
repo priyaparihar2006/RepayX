@@ -26,6 +26,15 @@ class ReminderContent:
     template_params: dict[str, str]
 
 
+def apps_script_content(params: dict[str, str]) -> tuple[str, str, str]:
+    """Match the fixed MailApp template for truthful local communication history."""
+    lines = [f"Hello {params['name']},", "", "This is a reminder regarding your upcoming EMI payment.", "",
+             f"Loan ID: {params['loan_id']}", f"EMI Amount: {params['amount']}", f"Due Date: {params['due_date']}", "",
+             "Please complete your payment by the due date if it is still pending.", "",
+             "If you have already paid, please disregard this reminder.", "", "Regards,", "RepayX Team"]
+    return "RepayX — EMI Payment Reminder", "\n".join(lines), "<div>" + "<br>".join(html.escape(x) for x in lines) + "</div>"
+
+
 def _fmt_date(d: date) -> str:
     return d.strftime("%d %b %Y")
 

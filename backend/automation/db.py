@@ -256,6 +256,18 @@ CREATE TABLE IF NOT EXISTS worker_heartbeats (
     last_error TEXT
 );
 
+CREATE TABLE IF NOT EXISTS email_test_runs (
+    request_id TEXT PRIMARY KEY,
+    recipient TEXT NOT NULL,
+    recipient_hash TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    real_send INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    attempted_at TEXT NOT NULL,
+    provider_message_id TEXT,
+    error_code TEXT
+);
+
 CREATE TABLE IF NOT EXISTS webhook_events (
     provider TEXT NOT NULL,
     event_id TEXT NOT NULL,
@@ -282,7 +294,7 @@ def init_db(db_path: Path) -> None:
         # Additive, transactional migration; safe when API and worker start together.
         conn.execute("BEGIN IMMEDIATE")
         for table, column in (("emis", "reminder_datetime_utc"), ("emis", "channel_strategy"),
-                              ("reminder_jobs", "channel_strategy")):
+                              ("reminder_jobs", "channel_strategy"), ("message_deliveries", "last_attempt_at")):
             columns = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
             if column not in columns:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")

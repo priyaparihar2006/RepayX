@@ -26,7 +26,7 @@ export function installFakeApi(handlers: Record<string, Handler | FakeResponse>)
       method: init?.method ?? 'GET',
       path: url.pathname,
       params: url.searchParams,
-      body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      body: init?.body instanceof FormData ? init.body : init?.body ? JSON.parse(String(init.body)) : undefined,
     };
     calls.push(call);
     const handler = handlers[`${call.method} ${call.path}`];
