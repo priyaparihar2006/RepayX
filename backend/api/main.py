@@ -96,6 +96,17 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
     )
     register_error_handlers(app)
 
+    @app.get("/")
+    def root():
+        return {
+            "success": True,
+            "name": "RepayX API",
+            "version": API_VERSION,
+            "status": "online",
+            "documentation": "/docs",
+            "health": "/api/health",
+        }
+
     for router in (
         routes_health.router,
         routes_customer.router,
