@@ -35,8 +35,12 @@ class Settings:
     api_port: int = field(default_factory=lambda: int(os.getenv("API_PORT", "8000")))
     cors_allowed_origins: list[str] = field(
         default_factory=lambda: _origins_from_env(
-            "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+            "CORS_ALLOWED_ORIGINS",
+            "http://localhost:3000,http://127.0.0.1:3000,https://repay-x.vercel.app,https://repayx.vercel.app",
         )
+    )
+    cors_allow_origin_regex: str | None = field(
+        default_factory=lambda: os.getenv("CORS_ALLOW_ORIGIN_REGEX", r"https:\/\/.*\.vercel\.app")
     )
 
     # Artifact locations. These are internal only and must never be returned by the API.
