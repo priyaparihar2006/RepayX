@@ -182,6 +182,24 @@ async def import_csv(
             import_type, user_mapping, dry_run)
     except ImportRejected as exc:
         raise _rejected(exc) from exc
+
+    # Automatically dispatch newly imported reminders immediately if not dry_run
+    if not dry_run and summary.imported_rows > 0:
+        try:
+            with service.db.write() as conn:
+                now_iso_str = iso(utcnow())
+                conn.execute(
+                    """UPDATE reminder_jobs
+                       SET run_at_utc = ?
+                       WHERE emi_id IN (SELECT id FROM emis WHERE last_import_id = ?)
+                         AND status = 'pending'""",
+                    (now_iso_str, summary.import_id),
+                )
+            # Run one immediate dispatch tick so emails and messages send without delay
+            await run_in_threadpool(service.tick)
+        except Exception:
+            pass
+
     return {"success": True, **summary.as_dict()}
 
 

@@ -114,8 +114,8 @@ class AutomationConfig:
     payment_instructions: str = field(default_factory=lambda: _env("PAYMENT_INSTRUCTIONS"))
     payment_link_base_url: str = field(default_factory=lambda: _env("PAYMENT_LINK_BASE_URL"))
 
-    # WhatsApp (Meta WhatsApp Business Platform / Cloud API)
-    whatsapp_provider: str = field(default_factory=lambda: _env("WHATSAPP_PROVIDER", "none").lower())
+    # WhatsApp (Baileys Web Bridge or Meta WhatsApp Business Platform)
+    whatsapp_provider: str = field(default_factory=lambda: _env("WHATSAPP_PROVIDER", "baileys_bridge").lower())
     whatsapp_access_token: str = field(default_factory=lambda: _env("WHATSAPP_ACCESS_TOKEN"), repr=False)
     whatsapp_phone_number_id: str = field(default_factory=lambda: _env("WHATSAPP_PHONE_NUMBER_ID"))
     whatsapp_graph_version: str = field(default_factory=lambda: _env("WHATSAPP_GRAPH_VERSION", "v21.0"))
