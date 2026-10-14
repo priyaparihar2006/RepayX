@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, AlertTriangle, BellRing, CalendarClock, CheckCircle2, FileUp, KeyRound, ListChecks, LogOut,
-  MessageSquareReply, PauseCircle, PlayCircle, RefreshCw, Settings2, Users, Wallet, XCircle,
+  Activity, AlertTriangle, BellRing, CalendarClock, CheckCircle2, Download, Edit3, FileUp, KeyRound, ListChecks, LogOut,
+  MessageSquareReply, PauseCircle, PlayCircle, Plus, RefreshCw, RotateCcw, Settings2, Trash2, Users, Wallet, XCircle,
 } from 'lucide-react';
 import { ApiError } from '../services/api';
 import {
@@ -290,6 +290,73 @@ const Overview: React.FC<{ role: Role; onOpenTab: (t: Tab) => void }> = ({ role,
 
 // ====================================================================== import
 
+function parseCsv(text: string): { headers: string[]; rows: Record<string, string>[] } {
+  const lines: string[][] = [];
+  let currentRow: string[] = [];
+  let currentVal = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        currentVal += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      currentRow.push(currentVal.trim());
+      currentVal = '';
+    } else if ((char === '\r' || char === '\n') && !inQuotes) {
+      if (char === '\r' && nextChar === '\n') {
+        i++;
+      }
+      currentRow.push(currentVal.trim());
+      if (currentRow.some((c) => c !== '')) {
+        lines.push(currentRow);
+      }
+      currentRow = [];
+      currentVal = '';
+    } else {
+      currentVal += char;
+    }
+  }
+  if (currentVal || currentRow.length > 0) {
+    currentRow.push(currentVal.trim());
+    if (currentRow.some((c) => c !== '')) {
+      lines.push(currentRow);
+    }
+  }
+
+  if (lines.length === 0) return { headers: [], rows: [] };
+  const headers = lines[0].map((h) => h.replace(/^["']|["']$/g, '').trim());
+  const rows = lines.slice(1).map((line) => {
+    const rowObj: Record<string, string> = {};
+    headers.forEach((h, idx) => {
+      rowObj[h] = line[idx] !== undefined ? line[idx].replace(/^["']|["']$/g, '') : '';
+    });
+    return rowObj;
+  });
+  return { headers, rows };
+}
+
+function serializeCsv(headers: string[], rows: Record<string, string>[]): string {
+  const escapeCell = (val: string | null | undefined) => {
+    if (val === null || val === undefined) return '';
+    const str = String(val);
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+  const headerLine = headers.map(escapeCell).join(',');
+  const rowLines = rows.map((r) => headers.map((h) => escapeCell(r[h])).join(','));
+  return [headerLine, ...rowLines].join('\r\n');
+}
+
 const ImportTab: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [importType, setImportType] = useState('emi_reminders');
@@ -303,27 +370,106 @@ const ImportTab: React.FC = () => {
   const [validating, setValidating] = useState(false);
   const previewVersion = useRef(0);
   const submitting = useRef(false);
+
+  // In-memory editable rows & headers
+  const [editableHeaders, setEditableHeaders] = useState<string[]>([]);
+  const [editableRows, setEditableRows] = useState<Record<string, string>[]>([]);
+  const [originalRows, setOriginalRows] = useState<Record<string, string>[]>([]);
+  const [isEditMode, setIsEditMode] = useState<boolean>(true);
+  const [hasEdits, setHasEdits] = useState<boolean>(false);
+
   useEffect(() => () => { previewVersion.current++; }, []);
 
   const doPreview = async (f: File, type: string) => {
     const version = ++previewVersion.current;
     setError(''); setResult(null); setPreview(null); setPreviewing(true);
+    setHasEdits(false);
     try {
+      // 1. Parse client-side for immediate full in-memory editing of all rows
+      const rawText = await f.text();
+      const parsed = parseCsv(rawText);
+      setEditableHeaders(parsed.headers);
+      setEditableRows(parsed.rows);
+      setOriginalRows(JSON.parse(JSON.stringify(parsed.rows)));
+
+      // 2. Query preview API for column detection & suggested mappings
       const p = await automationApi.previewImport(f, type);
       if (version !== previewVersion.current) return;
       setPreview(p);
       setMapping(p.suggested_mapping);
-    } catch (e) { if (version === previewVersion.current) setError(errText(e)); }
-    finally { if (version === previewVersion.current) setPreviewing(false); }
+    } catch (e) {
+      if (version === previewVersion.current) setError(errText(e));
+    } finally {
+      if (version === previewVersion.current) setPreviewing(false);
+    }
   };
+
+  const handleCellChange = (rowIdx: number, col: string, val: string) => {
+    setEditableRows((prev) => {
+      const next = [...prev];
+      next[rowIdx] = { ...next[rowIdx], [col]: val };
+      return next;
+    });
+    setHasEdits(true);
+  };
+
+  const handleAddRow = () => {
+    setEditableRows((prev) => {
+      const newRow: Record<string, string> = {};
+      const cols = editableHeaders.length > 0 ? editableHeaders : Object.keys(preview?.sample_rows?.[0] || {});
+      cols.forEach((h) => {
+        newRow[h] = '';
+      });
+      if ('payment_status' in newRow) newRow['payment_status'] = 'overdue';
+      if ('timezone' in newRow) newRow['timezone'] = 'Asia/Kolkata';
+      if ('channel_strategy' in newRow) newRow['channel_strategy'] = 'all';
+      if ('whatsapp_enabled' in newRow) newRow['whatsapp_enabled'] = 'true';
+      if ('email_enabled' in newRow) newRow['email_enabled'] = 'true';
+      return [...prev, newRow];
+    });
+    setHasEdits(true);
+  };
+
+  const handleDeleteRow = (rowIdx: number) => {
+    setEditableRows((prev) => prev.filter((_, idx) => idx !== rowIdx));
+    setHasEdits(true);
+  };
+
+  const handleResetEdits = () => {
+    setEditableRows(JSON.parse(JSON.stringify(originalRows)));
+    setHasEdits(false);
+  };
+
+  const handleDownloadEditedCsv = () => {
+    const cols = editableHeaders.length > 0 ? editableHeaders : Object.keys(editableRows[0] || {});
+    const csvStr = serializeCsv(cols, editableRows);
+    const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = file ? `edited_${file.name}` : 'repayx_edited_reminders.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const run = async (dryRun: boolean) => {
     if (!file || !preview || submitting.current || previewing) return;
     submitting.current = true;
     setBusy(true); setValidating(dryRun); setError(''); setResult(null);
-    try { setResult(await automationApi.importCsv(file, importType, mapping, dryRun)); }
-    catch (e) { setError(errText(e)); }
-    finally { submitting.current = false; setBusy(false); }
+    try {
+      let fileToSend = file;
+      if (editableRows.length > 0 && editableHeaders.length > 0) {
+        const csvStr = serializeCsv(editableHeaders, editableRows);
+        fileToSend = new File([csvStr], file.name, { type: 'text/csv' });
+      }
+      setResult(await automationApi.importCsv(fileToSend, importType, mapping, dryRun));
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      submitting.current = false; setBusy(false);
+    }
   };
+
   const downloadIssues = async (id: number) => {
     try {
       const text = await automationApi.downloadIssues(id);
@@ -333,6 +479,9 @@ const ImportTab: React.FC = () => {
       URL.revokeObjectURL(url);
     } catch (e) { setError(errText(e)); }
   };
+
+  const displayHeaders = editableHeaders.length > 0 ? editableHeaders : (preview?.sample_rows?.[0] ? Object.keys(preview.sample_rows[0]) : []);
+  const displayRows = editableRows.length > 0 ? editableRows : (preview?.sample_rows as Record<string, string>[] || []);
 
   return (
     <div className="space-y-6">
@@ -370,12 +519,13 @@ const ImportTab: React.FC = () => {
         <CsvDropzone file={file} disabled={busy} onChange={(next) => {
           previewVersion.current++;
           setFile(next); setPreview(null); setMapping({}); setResult(null); setError(''); setPreviewing(false);
+          setEditableHeaders([]); setEditableRows([]); setOriginalRows([]); setHasEdits(false);
           if (next) void doPreview(next, importType);
         }} />
         {(previewing || busy) && <p role="status" className="flex items-center gap-2 text-xs text-blue-700"><RefreshCw aria-hidden="true" className="h-4 w-4 animate-spin motion-reduce:animate-none" />{previewing ? 'Uploading preview and checking CSV...' : validating ? 'Validating CSV (nothing will be saved)...' : 'Uploading and importing CSV...'}</p>}
         {error && <Notice kind="error">{error}</Notice>}
         {preview && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <p className="text-xs text-slate-600">{preview.row_count} data rows · {preview.headers.length} columns. Check the column mapping:</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {preview.available_fields.map((f) => (
@@ -392,19 +542,142 @@ const ImportTab: React.FC = () => {
             {preview.missing_required.length > 0 && (
               <Notice kind="error">Not detected automatically: {preview.missing_required.join(', ')}. Map these columns before importing.</Notice>
             )}
-            {preview.sample_rows.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="text-[11px] w-full">
-                  <thead><tr className="text-left text-slate-500">{Object.keys(preview.sample_rows[0]).map((k) => <th key={k} className="pr-3 py-1 font-medium">{k}</th>)}</tr></thead>
-                  <tbody>{preview.sample_rows.map((r, i) => (
-                    <tr key={i} className="border-t border-slate-100">{Object.values(r).map((v, j) => <td key={j} className="pr-3 py-1">{v ?? '—'}</td>)}</tr>
-                  ))}</tbody>
-                </table>
+
+            {/* Editable CSV Data Table & Toolbar */}
+            {displayRows.length > 0 && (
+              <div className="space-y-3 pt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl shadow-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Edit3 className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span className="text-xs font-bold text-slate-900">
+                      Editable Data Table ({displayRows.length} rows)
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      🟢 Live Editable
+                    </span>
+                    {hasEdits && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                        Modified
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditMode((prev) => !prev)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
+                        isEditMode
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                      }`}
+                      title="Toggle between inline editable inputs and clean text view"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>{isEditMode ? 'Edit Mode: ON' : 'Turn On Edit Mode'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleAddRow}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition shadow-sm"
+                      title="Add a new borrower or reminder row"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Add Row</span>
+                    </button>
+
+                    {hasEdits && (
+                      <button
+                        type="button"
+                        onClick={handleResetEdits}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-bold rounded-xl transition"
+                        title="Discard changes and restore original CSV"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Reset Edits</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadEditedCsv}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition shadow-sm"
+                      title="Download the modified table data as a new CSV"
+                    >
+                      <Download className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Export CSV</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-96">
+                  <table className="text-[11px] w-full text-left border-collapse">
+                    <thead className="sticky top-0 bg-slate-100 z-10 border-b border-slate-200">
+                      <tr className="text-slate-700 font-bold uppercase tracking-wider text-[10px]">
+                        <th className="p-2.5 w-12 text-center bg-slate-200/60">#</th>
+                        {displayHeaders.map((k) => (
+                          <th key={k} className="p-2.5 font-bold whitespace-nowrap">
+                            {k}
+                          </th>
+                        ))}
+                        <th className="p-2.5 text-center w-14">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {displayRows.map((r, i) => (
+                        <tr key={i} className="hover:bg-slate-50/80 transition">
+                          <td className="p-2 text-center text-slate-400 font-mono text-[10px] bg-slate-50/50">
+                            {i + 1}
+                          </td>
+                          {displayHeaders.map((col) => (
+                            <td key={col} className="p-1.5">
+                              {isEditMode ? (
+                                <input
+                                  type="text"
+                                  value={r[col] ?? ''}
+                                  onChange={(e) => handleCellChange(i, col, e.target.value)}
+                                  className="w-full min-w-[130px] px-2.5 py-1 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 font-medium"
+                                  placeholder={`Enter ${col}...`}
+                                />
+                              ) : (
+                                <span className="text-xs text-slate-800 whitespace-nowrap px-1">
+                                  {r[col] !== undefined && r[col] !== '' ? r[col] : '—'}
+                                </span>
+                              )}
+                            </td>
+                          ))}
+                          <td className="p-1.5 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRow(i)}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
+                              title="Delete this row"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {hasEdits && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center justify-between">
+                    <span>✏️ <strong>Live Edits Active:</strong> Changes made in the table above will be automatically saved and scheduled when you click <strong>Upload CSV</strong> or <strong>Validate only</strong>.</span>
+                    <span className="font-semibold text-amber-800 font-mono text-[11px]">{displayRows.length} rows ready</span>
+                  </div>
+                )}
               </div>
             )}
-            <div className="flex gap-2">
+
+            <div className="flex items-center gap-3 pt-2">
               <button className={btnGhost} disabled={busy} onClick={() => run(true)}>Validate only</button>
-              <button className={btnPrimary} disabled={busy} onClick={() => run(false)}><FileUp className="w-4 h-4" />Upload CSV</button>
+              <button className={btnPrimary} disabled={busy} onClick={() => run(false)}>
+                <FileUp className="w-4 h-4" />
+                <span>Upload CSV {hasEdits ? '(with Edits)' : ''}</span>
+              </button>
             </div>
           </div>
         )}
