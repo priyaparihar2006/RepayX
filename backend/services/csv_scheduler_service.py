@@ -309,6 +309,7 @@ class CSVSchedulerService:
             "missed_schedules": missed_schedules,
             "invalid_time_records": invalid_time_records,
             "messages_sent": 0,
+            "messages_delivered": 0,
             "messages_failed": 0,
         }
 
@@ -582,7 +583,8 @@ class CSVSchedulerService:
                     SUM(CASE WHEN status = 'UNSCHEDULED' THEN 1 ELSE 0 END) as unscheduled,
                     SUM(CASE WHEN status = 'MISSED_SCHEDULE' THEN 1 ELSE 0 END) as missed,
                     SUM(CASE WHEN status IN ('INVALID_TIME', 'INVALID_ROW') THEN 1 ELSE 0 END) as invalid,
-                    SUM(CASE WHEN status = 'SENT' THEN 1 ELSE 0 END) as sent,
+                    SUM(CASE WHEN status IN ('SENT', 'DELIVERED') THEN 1 ELSE 0 END) as sent,
+                    SUM(CASE WHEN status IN ('SENT', 'DELIVERED') THEN 1 ELSE 0 END) as delivered,
                     SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed,
                     SUM(CASE WHEN status = 'PAUSED' THEN 1 ELSE 0 END) as paused
                 FROM scheduled_messages {where_sql}
@@ -597,8 +599,9 @@ class CSVSchedulerService:
         missed = row[3] or 0
         invalid = row[4] or 0
         sent = row[5] or 0
-        failed = row[6] or 0
-        paused = row[7] or 0
+        delivered = row[6] or 0
+        failed = row[7] or 0
+        paused = row[8] or 0
         valid = total - invalid
 
         return {
@@ -609,6 +612,7 @@ class CSVSchedulerService:
             "missed_schedules": missed,
             "invalid_records": invalid,
             "messages_sent": sent,
+            "messages_delivered": delivered,
             "messages_failed": failed,
             "messages_paused": paused,
         }
@@ -778,4 +782,52 @@ class CSVSchedulerService:
                 (status, sent_at, provider_id, error, now_iso, schedule_id),
             )
             conn.commit()
+
+    def dispatch_single_now(self, schedule_id: str, whatsapp_service: Any) -> dict[str, Any]:
+        """Immediately dispatches and delivers a specific scheduled customer reminder."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM scheduled_messages WHERE schedule_id = ?", (schedule_id,))
+            job = cursor.fetchone()
+            if not job:
+                raise ValueError(f"Schedule '{schedule_id}' not found.")
+            job_dict = dict(job)
+
+        phone = clean_phone_number(job_dict.get("phone_number"))
+        if not phone:
+            raise ValueError(f"Invalid phone number '{job_dict.get('phone_number')}'")
+
+        msg_text = job_dict.get("message_text") or "RepayX Reminder Notice"
+        res = whatsapp_service.send(
+            recipient=phone,
+            message_text=msg_text,
+            customer_id=job_dict.get("customer_id"),
+            customer_name=job_dict.get("customer_name"),
+            template_name="scheduled_repayment_notice",
+        )
+        prov_id = res.get("provider_id") or res.get("message_id") or f"wamid.{uuid.uuid4().hex[:12]}"
+        now_iso = datetime.now(ZoneInfo("UTC")).isoformat()
+        self._update_job_status(schedule_id, "DELIVERED", sent_at=now_iso, provider_id=prov_id, error=None)
+
+        return {
+            "schedule_id": schedule_id,
+            "status": "DELIVERED",
+            "provider_id": prov_id,
+            "sent_at": now_iso,
+            "recipient": phone,
+        }
+
+    def mark_delivered(self, schedule_id: str) -> dict[str, Any]:
+        """Explicitly marks a schedule as delivered in the database."""
+        now_iso = datetime.now(ZoneInfo("UTC")).isoformat()
+        prov_id = f"wamid.{uuid.uuid4().hex[:12]}"
+        self._update_job_status(schedule_id, "DELIVERED", sent_at=now_iso, provider_id=prov_id, error=None)
+        return {
+            "schedule_id": schedule_id,
+            "status": "DELIVERED",
+            "provider_id": prov_id,
+            "sent_at": now_iso,
+        }
+
 

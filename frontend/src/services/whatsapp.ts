@@ -299,6 +299,26 @@ export const whatsapp = {
       { method: 'POST' }
     ),
 
+  dispatchScheduledNow: (schedule_id: string) =>
+    request<{ success: boolean; schedule_id: string; status: string; provider_id: string; sent_at: string }>(
+      '/api/whatsapp/scheduled/dispatch-now',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schedule_id }),
+      }
+    ),
+
+  markScheduledDelivered: (schedule_id: string) =>
+    request<{ success: boolean; schedule_id: string; status: string; provider_id: string; sent_at: string }>(
+      '/api/whatsapp/scheduled/mark-delivered',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schedule_id }),
+      }
+    ),
+
   getValidationReportDownloadUrl: (campaignId = 'default', format: 'csv' | 'json' = 'csv') =>
     apiUrl(`/api/whatsapp/scheduled/download-validation-report?campaign_id=${campaignId}&format=${format}`),
 
@@ -325,13 +345,15 @@ export interface ScheduledRecord {
   timezone: string;
   scheduled_message_at: string | null;
   target_date?: string;
-  schedule_status: 'SCHEDULED' | 'UNSCHEDULED' | 'INVALID_TIME' | 'MISSED_SCHEDULE' | 'INVALID_ROW' | 'SENT' | 'FAILED' | 'PAUSED';
+  schedule_status: 'SCHEDULED' | 'UNSCHEDULED' | 'INVALID_TIME' | 'MISSED_SCHEDULE' | 'INVALID_ROW' | 'SENT' | 'DELIVERED' | 'FAILED' | 'PAUSED';
   status?: string;
   is_valid?: boolean;
   validation_errors?: string[];
   message_text: string;
   attempt_count?: number;
   sent_at?: string | null;
+  provider_id?: string | null;
+  delivery_status?: string | null;
   last_error?: string | null;
 }
 
@@ -344,6 +366,7 @@ export interface SchedulingSummary {
   missed_schedules: number;
   invalid_time_records?: number;
   messages_sent: number;
+  messages_delivered?: number;
   messages_failed: number;
   messages_paused?: number;
 }
