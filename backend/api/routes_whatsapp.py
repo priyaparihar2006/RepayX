@@ -372,14 +372,16 @@ def scheduled_confirm_schedule(
     body: ConfirmScheduleRequest,
     messaging: WhatsAppService = Depends(service),
 ):
-    """Persists confirmed customer schedules to SQLite.
-
-    Idempotent: preserves already-sent messages without re-sending.
-    """
+    """Persists confirmed customer schedules to SQLite and auto-dispatches due messages."""
     res = messaging.scheduler.save_confirmed_schedules(
         records=body.records,
         campaign_id=body.campaign_id,
     )
+    try:
+        # Trigger immediate dispatch for newly scheduled messages
+        messaging.scheduler.process_due_jobs(messaging)
+    except Exception:
+        pass
     return res
 
 
