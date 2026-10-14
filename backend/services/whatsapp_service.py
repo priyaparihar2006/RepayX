@@ -165,21 +165,27 @@ class WhatsAppService:
 
     def _bridge(self, path: str, payload: dict | None = None) -> dict:
         data = None if payload is None else json.dumps(payload).encode()
+        base_url = self.settings.bridge_url.rstrip("/")
+        clean_path = path.lstrip("/")
+        url = f"{base_url}/{clean_path}"
         request = Request(
-            f"{self.settings.bridge_url}/{path}", data=data,
+            url, data=data,
             headers={"Content-Type": "application/json"} if data is not None else {},
         )
         try:
             with urlopen(request, timeout=20) as response:
                 result = json.load(response)
         except HTTPError as exc:
+            body_text = ""
             try:
-                message = json.load(exc).get("error", "WhatsApp request failed.")
+                body_text = exc.read().decode("utf-8", errors="replace")
+                parsed = json.loads(body_text)
+                message = parsed.get("error", parsed.get("message", f"HTTP {exc.code}"))
             except Exception:
-                message = "WhatsApp request failed."
+                message = f"HTTP {exc.code} from {base_url}: {body_text[:120] if body_text else exc.reason}"
             raise APIError(exc.code, "whatsapp_error", str(message)) from exc
         except (URLError, TimeoutError, OSError, ValueError) as exc:
-            raise APIError(503, "bridge_unavailable", "Cannot reach the WhatsApp bridge on port 8005.") from exc
+            raise APIError(503, "bridge_unavailable", f"Cannot reach WhatsApp bridge at {base_url} ({exc}).") from exc
         if result.get("success") is not True:
             raise APIError(502, "whatsapp_error", "WhatsApp did not confirm the request.")
         return result
@@ -204,6 +210,7 @@ class WhatsAppService:
 
         return {
             **live,
+            "bridge_url": self.settings.bridge_url,
             "enabled": self.settings.enabled,
             "expected_sender": EXPECTED_SENDER,
             "stats": {
