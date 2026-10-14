@@ -409,9 +409,13 @@ export function WhatsAppPage() {
             customer_name: draft.name,
             request_id: draft.requestId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `req_${Date.now()}_${Math.random().toString(36).slice(2)}`),
           });
-          draft.result = res.provider_id || res.message_id || 'sent';
-          draft.error = '';
-          sent++;
+          if (res.status === 'failed' || res.error) {
+            draft.error = res.error || 'WhatsApp send failed.';
+          } else {
+            draft.result = res.provider_id || res.message_id || 'sent';
+            draft.error = '';
+            sent++;
+          }
         } catch (err) {
           draft.error = messageOf(err);
         }

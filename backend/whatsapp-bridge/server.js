@@ -11,16 +11,17 @@ async function createBridge(deps = {}) {
   const authDir = deps.authDir || path.join(__dirname, 'auth_info');
   const isLive = () => {
     if (deps.mode) return deps.mode.trim().toLowerCase() === 'live';
-    if (process.env.AUTOMATION_MODE && process.env.AUTOMATION_MODE.trim().toLowerCase() === 'live') return true;
+    const mode = (process.env.AUTOMATION_MODE || '').trim().toLowerCase();
+    if (mode === 'sandbox') return false;
     try {
       const envPath = path.resolve(__dirname, '../../.env');
       if (fs.existsSync(envPath)) {
         const content = fs.readFileSync(envPath, 'utf8');
         const match = content.match(/^AUTOMATION_MODE\s*=\s*([^\r\n#]+)/m);
-        if (match && match[1].trim().toLowerCase() === 'live') return true;
+        if (match && match[1].trim().toLowerCase() === 'sandbox') return false;
       }
     } catch {}
-    return false;
+    return true;
   };
   const app = express();
   app.use((req, res, next) => {

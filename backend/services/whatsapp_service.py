@@ -426,6 +426,9 @@ class WhatsAppService:
             )
             conn.commit()
 
+        if delivery_status == "failed":
+            raise APIError(502, "whatsapp_send_failed", error_msg or "WhatsApp bridge could not deliver message.")
+
         return {
             "request_id": req_id,
             "status": delivery_status,
