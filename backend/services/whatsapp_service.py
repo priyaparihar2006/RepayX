@@ -212,7 +212,7 @@ class WhatsAppService:
             **live,
             "bridge_url": self.settings.bridge_url,
             "enabled": self.settings.enabled,
-            "expected_sender": EXPECTED_SENDER,
+            "expected_sender": (live.get("session_info") or {}).get("phone_number") or EXPECTED_SENDER,
             "stats": {
                 "total_sent": counts.get("sent", 0) + counts.get("delivered", 0),
                 "total_failed": counts.get("failed", 0),
