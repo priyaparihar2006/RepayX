@@ -1,4 +1,4 @@
-customer_id,customer_name,phone_number,email,loan_id,emi_amount,due_date,payment_status,reminder_datetime,channel_strategy,timezone
-TEST-SID-001,Siddharth,+919105830551,,TEST-LOAN-001,8500,2026-10-15,pending,2026-10-14 16:00:00,all,Asia/Kolkata
-TEST-PRI-002,Pri,+916395300669,drdopriya@gmail.com,TEST-LOAN-002,6500,2026-10-15,pending,2026-10-14 16:05:00,all,Asia/Kolkata
-TEST-JAI-003,Jai,+917389437109,priyaparihar240206@gmail.com,TEST-LOAN-003,7200,2026-10-15,pending,2026-10-14 16:10:00,all,Asia/Kolkata
+customer_id,customer_name,phone_number,email,loan_id,installment_number,emi_amount,unpaid_amount,amount_paid,due_date,days_past_due,payment_status,risk_category,probability_of_default,payment_link,scheduled_message_time,reminder_time,reminder_date,reminder_datetime,channel_strategy,whatsapp_enabled,email_enabled,sms_enabled,preferred_language,consent_status,timezone
+CUST-PRI-001,Priya,+916395300669,priyaparihar240206@gmail.com,LN-2026-7891,3,6500.00,6500.00,0.00,2026-10-20,5,overdue,High Risk,0.72,https://repay-x.vercel.app/pay/LN-2026-7891,11:45,11:45,2026-10-14,2026-10-14 11:45:00,all,true,true,true,en,granted,Asia/Kolkata
+CUST-SID-002,Siddharth,+919105830551,sidd204.sk@gmail.com,LN-2026-7892,5,8500.00,8500.00,0.00,2026-10-22,12,overdue,Medium Risk,0.45,https://repay-x.vercel.app/pay/LN-2026-7892,11:50,11:50,2026-10-14,2026-10-14 11:50:00,all,true,true,true,en,granted,Asia/Kolkata
+CUST-NAN-003,Nandini,+919410085066,nandinichaturvedi501@gmail.com,LN-2026-7893,2,7200.00,7200.00,0.00,2026-10-18,3,overdue,Low Risk,0.28,https://repay-x.vercel.app/pay/LN-2026-7893,11:55,11:55,2026-10-14,2026-10-14 11:55:00,all,true,true,true,en,granted,Asia/Kolkata
