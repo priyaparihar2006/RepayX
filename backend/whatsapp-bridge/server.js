@@ -166,7 +166,7 @@ async function createBridge(deps = {}) {
   });
   app.post('/pair-code', async (req, res) => {
     const phone = String(req.body.phone || '').replace(/\D/g, '');
-    if (phone !== EXPECTED_SENDER) return res.status(400).json({ success: false, error: 'Use +91 8650629360 for this account.' });
+    if (!phone || phone.length < 10) return res.status(400).json({ success: false, error: 'Enter a valid 10-digit mobile number.' });
     if (snapshot().connected) return res.status(409).json({ success: false, error: 'An account is already linked.' });
     try {
       if (!socket) await connect();

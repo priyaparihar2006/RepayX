@@ -337,12 +337,12 @@ export function WhatsAppPage() {
 
   const connected = !!status?.connected;
   const senderDigits = (status?.session_info?.phone_number || '').replace(/\D/g, '');
-  const correctSender = connected && (!senderDigits || senderDigits.endsWith('8650629360'));
-  const wrongSender = connected && !!senderDigits && !senderDigits.endsWith('8650629360');
+  const correctSender = connected;
+  const wrongSender = false;
   const qrRemaining = Math.max(0, Math.ceil((qrDeadline - now) / 1000));
   const qrVisible = !!status?.qr_code && qrRemaining > 0 && !connected;
   const pending = drafts.filter((draft) => !draft.result);
-  const canSend = correctSender && !sending && pending.length > 0 && pending.every((draft) => draft.message?.trim());
+  const canSend = connected && !sending && pending.length > 0 && pending.every((draft) => draft.message?.trim());
 
   async function generateQR() {
     setGenerating(true);
@@ -637,7 +637,7 @@ export function WhatsAppPage() {
                     ) : (
                       <button
                         onClick={() => sendDrafts([draft])}
-                        disabled={!correctSender || sending || !draft.message?.trim() || !!draft.error}
+                        disabled={!connected || sending || !draft.message?.trim()}
                         className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm disabled:opacity-40"
                       >
                         <Send className="w-3 h-3" /> Send to {draft.name}
