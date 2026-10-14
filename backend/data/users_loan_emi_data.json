@@ -61,8 +61,8 @@
   },
   {
     "customer_id": 385000,
-    "customer_name": "Priya Parihar (Admin Account)",
-    "phone": "+918650629360",
+    "customer_name": "Priya Parihar",
+    "phone": "+916395300669",
     "total_loan_amount": 150000.0,
     "emi_paid_amount": 95000.0,
     "emi_left_to_repay": 55000.0,
@@ -81,8 +81,8 @@
   },
   {
     "customer_id": 385001,
-    "customer_name": "Aarav Sharma",
-    "phone": "+918650629360",
+    "customer_name": "Nandini Chaturvedi",
+    "phone": "+919410085066",
     "total_loan_amount": 406871.83,
     "emi_paid_amount": 390721.07,
     "emi_left_to_repay": 16150.76,

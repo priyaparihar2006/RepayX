@@ -590,6 +590,7 @@ class CsvImporter:
             return cur.lastrowid, True
 
         if existing["row_hash"] == row_hash:
+            conn.execute("UPDATE emis SET last_import_id = ? WHERE id = ?", (summary.import_id, existing["id"]))
             return existing["id"], False
 
         status, paid = rec["payment_status"], str(rec["amount_paid"])
