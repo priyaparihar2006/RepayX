@@ -287,8 +287,14 @@ export function WhatsAppPage() {
           setDrafts(
             value.contacts.map((contact) => ({
               ...contact,
-              message: typeof contact.message === 'string' ? contact.message : '',
-              requestId: crypto.randomUUID(),
+              message:
+                typeof contact.message === 'string' && contact.message.trim()
+                  ? contact.message
+                  : `URGENT NOTICE: Dear ${contact.name}, your loan account #${contact.customer_id} has an overdue balance of ₹${contact.amount} (${contact.late_days} days past due). To avoid legal escalation or credit score degradation, please clear your outstanding EMI immediately using your secure RepayX link: https://pay.repayx.ai/inv/${contact.customer_id}`,
+              requestId:
+                typeof crypto !== 'undefined' && crypto.randomUUID
+                  ? crypto.randomUUID()
+                  : `req_${Date.now()}_${Math.random().toString(36).slice(2)}`,
               result: '',
               error: '',
             }))
@@ -342,7 +348,7 @@ export function WhatsAppPage() {
   const qrRemaining = Math.max(0, Math.ceil((qrDeadline - now) / 1000));
   const qrVisible = !!status?.qr_code && qrRemaining > 0 && !connected;
   const pending = drafts.filter((draft) => !draft.result);
-  const canSend = connected && !sending && pending.length > 0 && pending.every((draft) => draft.message?.trim());
+  const canSend = connected && !sending && pending.length > 0;
 
   async function generateQR() {
     setGenerating(true);
@@ -401,10 +407,13 @@ export function WhatsAppPage() {
     let sent = 0;
     try {
       for (const draft of targets) {
+        const textToSend =
+          draft.message?.trim() ||
+          `URGENT NOTICE: Dear ${draft.name}, your loan account #${draft.customer_id} has an overdue balance of ₹${draft.amount} (${draft.late_days} days past due). To avoid legal escalation or credit score degradation, please clear your outstanding EMI immediately using your secure RepayX link: https://pay.repayx.ai/inv/${draft.customer_id}`;
         try {
           const res = await whatsapp.sendMessage({
             recipient: draft.phone,
-            message: draft.message || '',
+            message: textToSend,
             customer_id: draft.customer_id,
             customer_name: draft.name,
             request_id: draft.requestId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `req_${Date.now()}_${Math.random().toString(36).slice(2)}`),
@@ -526,7 +535,9 @@ export function WhatsAppPage() {
 
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
               <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Sending From Account</div>
-              <div className="text-sm font-black text-slate-900 font-mono">+91 8650629360</div>
+              <div className="text-sm font-black text-slate-900 font-mono">
+                {status?.session_info?.phone_number || '+91 9105830551'}
+              </div>
             </div>
 
             {connected ? (
@@ -535,7 +546,9 @@ export function WhatsAppPage() {
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
                 <div className="text-sm font-black text-emerald-950">WhatsApp Connected</div>
-                <div className="text-xs text-emerald-700 font-mono">+91 8650629360 (Multi-Device)</div>
+                <div className="text-xs text-emerald-700 font-mono">
+                  {status?.session_info?.phone_number || '+91 9105830551'} (Multi-Device Active)
+                </div>
               </div>
             ) : qrVisible ? (
               <div className="text-center space-y-3">
@@ -637,7 +650,7 @@ export function WhatsAppPage() {
                     ) : (
                       <button
                         onClick={() => sendDrafts([draft])}
-                        disabled={!connected || sending || !draft.message?.trim()}
+                        disabled={!connected || sending}
                         className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm disabled:opacity-40"
                       >
                         <Send className="w-3 h-3" /> Send to {draft.name}

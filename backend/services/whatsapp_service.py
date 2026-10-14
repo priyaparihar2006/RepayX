@@ -628,6 +628,16 @@ class WhatsAppService:
         data = self.get_loan_emi_data(page=1, page_size=10)
         contacts = []
         for u in data["users"][:5]:
+            msg = self.render_template(
+                "urgent_settlement",
+                {
+                    "customer_name": u["customer_name"],
+                    "customer_id": u["customer_id"],
+                    "unpaid_amount": u["emi_left_to_repay"],
+                    "late_days": u["days_past_due"],
+                    "risk_score": u.get("risk_score", "High"),
+                },
+            )
             contacts.append({
                 "name": u["customer_name"],
                 "phone": u["phone"],
@@ -636,5 +646,7 @@ class WhatsAppService:
                 "late_days": u["days_past_due"],
                 "total_loan": u["total_loan_amount"],
                 "emi_paid": u["emi_paid_amount"],
+                "message": msg,
             })
         return contacts
+
