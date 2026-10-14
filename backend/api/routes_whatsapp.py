@@ -428,6 +428,34 @@ def scheduled_process_due(
     return messaging.scheduler.process_due_jobs(messaging)
 
 
+class DispatchSingleScheduleRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    schedule_id: str
+
+
+@router.post("/scheduled/dispatch-now")
+def scheduled_dispatch_now(
+    body: DispatchSingleScheduleRequest,
+    messaging: WhatsAppService = Depends(service),
+):
+    """Immediately dispatches and delivers an individual scheduled message."""
+    try:
+        res = messaging.scheduler.dispatch_single_now(body.schedule_id, messaging)
+        return {"success": True, **res}
+    except Exception as exc:
+        return Response(status_code=400, content=json.dumps({"success": False, "error": str(exc)}), media_type="application/json")
+
+
+@router.post("/scheduled/mark-delivered")
+def scheduled_mark_delivered(
+    body: DispatchSingleScheduleRequest,
+    messaging: WhatsAppService = Depends(service),
+):
+    """Marks a scheduled message as delivered."""
+    res = messaging.scheduler.mark_delivered(body.schedule_id)
+    return {"success": True, **res}
+
+
 @router.get("/scheduled/download-validation-report")
 def scheduled_download_validation_report(
     campaign_id: str | None = Query(default=None),

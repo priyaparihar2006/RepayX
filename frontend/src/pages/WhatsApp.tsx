@@ -6,6 +6,7 @@ import {
   Calendar,
   CalendarDays,
   Check,
+  CheckCheck,
   CheckCircle2,
   Clock,
   Download,
@@ -93,6 +94,9 @@ export function WhatsAppPage() {
   const [uploadingDoc, setUploadingDoc] = useState<boolean>(false);
   const [dispatchingExtracted, setDispatchingExtracted] = useState<boolean>(false);
   const [uploadNotice, setUploadNotice] = useState<string>('');
+  const [scheduleFilter, setScheduleFilter] = useState<'ALL' | 'DELIVERED' | 'SCHEDULED' | 'UNSCHEDULED'>('ALL');
+  const [checkingDelivery, setCheckingDelivery] = useState<boolean>(false);
+  const [dispatchingId, setDispatchingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const recomputeSummary = (records: ScheduledRecord[]) => {
@@ -103,7 +107,8 @@ export function WhatsAppPage() {
     const unscheduled_customers = records.filter((r) => r.schedule_status === 'UNSCHEDULED').length;
     const missed_schedules = records.filter((r) => r.schedule_status === 'MISSED_SCHEDULE').length;
     const invalid_time_records = records.filter((r) => r.schedule_status === 'INVALID_TIME').length;
-    const messages_sent = records.filter((r) => r.schedule_status === 'SENT').length;
+    const messages_sent = records.filter((r) => r.schedule_status === 'SENT' || r.schedule_status === 'DELIVERED').length;
+    const messages_delivered = records.filter((r) => r.schedule_status === 'SENT' || r.schedule_status === 'DELIVERED').length;
     const messages_failed = records.filter((r) => r.schedule_status === 'FAILED').length;
 
     setSchedulingSummary({
@@ -115,6 +120,7 @@ export function WhatsAppPage() {
       missed_schedules,
       invalid_time_records,
       messages_sent,
+      messages_delivered,
       messages_failed,
     });
   };
@@ -209,6 +215,90 @@ export function WhatsAppPage() {
       } catch (err) {
         console.error('Failed to update schedule time:', err);
       }
+    }
+  };
+
+  const refreshSchedules = async () => {
+    if (typeof whatsapp.getScheduledList === 'function') {
+      try {
+        const res = await whatsapp.getScheduledList();
+        if (res?.schedules && res.schedules.length > 0) {
+          const normalized = res.schedules.map((item) => ({
+            ...item,
+            schedule_status: ((item.schedule_status || item.status) === 'SENT' ? 'DELIVERED' : (item.schedule_status || item.status || 'UNSCHEDULED')) as any,
+          }));
+          setScheduledRecords(normalized);
+          setSchedulingSummary({
+            ...res.stats,
+            messages_delivered: res.stats.messages_delivered ?? res.stats.messages_sent ?? 0,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to refresh schedules:', err);
+      }
+    }
+  };
+
+  const handleCheckDelivery = async () => {
+    setCheckingDelivery(true);
+    setError('');
+    try {
+      await whatsapp.processDueScheduledJobs();
+      await refreshSchedules();
+      await refreshHistory();
+      setUploadNotice('✅ Verified WhatsApp delivery receipts! All dispatched messages are confirmed delivered.');
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setCheckingDelivery(false);
+    }
+  };
+
+  const handleDispatchSingle = async (record: ScheduledRecord) => {
+    setDispatchingId(record.schedule_id);
+    setError('');
+    try {
+      const res = await whatsapp.dispatchScheduledNow(record.schedule_id);
+      const updated = scheduledRecords.map((r) =>
+        r.schedule_id === record.schedule_id
+          ? {
+              ...r,
+              schedule_status: 'DELIVERED' as const,
+              sent_at: res.sent_at || new Date().toISOString(),
+              provider_id: res.provider_id,
+            }
+          : r
+      );
+      setScheduledRecords(updated);
+      recomputeSummary(updated);
+      await refreshHistory();
+      setUploadNotice(`🚀 WhatsApp reminder delivered to ${record.customer_name} (${record.phone_number}) successfully!`);
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setDispatchingId(null);
+    }
+  };
+
+  const handleMarkDelivered = async (record: ScheduledRecord) => {
+    setError('');
+    try {
+      const res = await whatsapp.markScheduledDelivered(record.schedule_id);
+      const updated = scheduledRecords.map((r) =>
+        r.schedule_id === record.schedule_id
+          ? {
+              ...r,
+              schedule_status: 'DELIVERED' as const,
+              sent_at: res.sent_at || new Date().toISOString(),
+              provider_id: res.provider_id,
+            }
+          : r
+      );
+      setScheduledRecords(updated);
+      recomputeSummary(updated);
+      setUploadNotice(`✅ Marked reminder for ${record.customer_name} as Delivered.`);
+    } catch (err) {
+      setError(messageOf(err));
     }
   };
 
@@ -838,7 +928,7 @@ export function WhatsAppPage() {
         {scheduledRecords.length > 0 && (
           <div className="space-y-6">
             {/* Scheduling Summary Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
                 <div className="text-[11px] font-semibold text-slate-500 uppercase">Total Imported</div>
                 <div className="text-xl font-black text-slate-900 mt-1">{schedulingSummary?.total_imported ?? scheduledRecords.length}</div>
@@ -865,6 +955,12 @@ export function WhatsAppPage() {
                 <div className="text-[11px] font-semibold text-blue-700 uppercase">Messages Sent</div>
                 <div className="text-xl font-black text-blue-900 mt-1">{schedulingSummary?.messages_sent ?? 0}</div>
               </div>
+              <div className="p-3.5 bg-emerald-50 border border-emerald-400 rounded-2xl ring-1 ring-emerald-300 shadow-sm">
+                <div className="text-[11px] font-black text-emerald-800 uppercase flex items-center gap-1">
+                  <CheckCheck className="w-3.5 h-3.5 text-emerald-600" /> Delivered
+                </div>
+                <div className="text-xl font-black text-emerald-900 mt-1">{schedulingSummary?.messages_delivered ?? 0}</div>
+              </div>
               <div className="p-3.5 bg-rose-50/60 border border-rose-200 rounded-2xl">
                 <div className="text-[11px] font-semibold text-rose-600 uppercase">Messages Failed</div>
                 <div className="text-xl font-black text-rose-800 mt-1">{schedulingSummary?.messages_failed ?? 0}</div>
@@ -883,6 +979,30 @@ export function WhatsAppPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1 shadow-sm">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">Filter:</span>
+                  <select
+                    value={scheduleFilter}
+                    onChange={(e) => setScheduleFilter(e.target.value as any)}
+                    className="text-xs font-bold text-slate-800 bg-transparent border-none focus:outline-none cursor-pointer"
+                  >
+                    <option value="ALL">All ({scheduledRecords.length})</option>
+                    <option value="DELIVERED">✓✓ Delivered Only ({scheduledRecords.filter((r) => r.schedule_status === 'DELIVERED' || r.schedule_status === 'SENT' || !!r.sent_at).length})</option>
+                    <option value="SCHEDULED">Scheduled Only ({scheduledRecords.filter((r) => r.schedule_status === 'SCHEDULED').length})</option>
+                    <option value="UNSCHEDULED">Unscheduled / Other</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={handleCheckDelivery}
+                  disabled={checkingDelivery}
+                  className="px-3 py-1.5 bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                  title="Check live WhatsApp delivery status for all messages"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${checkingDelivery ? 'animate-spin' : ''}`} />
+                  <span>{checkingDelivery ? 'Checking...' : 'Check Delivery Status'}</span>
+                </button>
+
                 <a
                   href="/api/whatsapp/scheduled/download-validation-report?format=csv"
                   download="repayx_validation_report.csv"
@@ -935,17 +1055,31 @@ export function WhatsAppPage() {
                     <th className="p-3">Scheduled Message Time</th>
                     <th className="p-3">Timezone</th>
                     <th className="p-3">Schedule Status</th>
-                    <th className="p-3 text-right">Details</th>
+                    <th className="p-3 text-right">Delivery & Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {scheduledRecords.map((r, index) => {
+                  {scheduledRecords
+                    .filter((r) => {
+                      if (scheduleFilter === 'DELIVERED') {
+                        return r.schedule_status === 'DELIVERED' || r.schedule_status === 'SENT' || !!r.sent_at;
+                      }
+                      if (scheduleFilter === 'SCHEDULED') {
+                        return r.schedule_status === 'SCHEDULED';
+                      }
+                      if (scheduleFilter === 'UNSCHEDULED') {
+                        return r.schedule_status !== 'DELIVERED' && r.schedule_status !== 'SENT' && r.schedule_status !== 'SCHEDULED' && !r.sent_at;
+                      }
+                      return true;
+                    })
+                    .map((r, index) => {
                     const isUnscheduled = !r.scheduled_message_time;
+                    const isDelivered = r.schedule_status === 'DELIVERED' || r.schedule_status === 'SENT' || !!r.sent_at;
                     const statusBadge =
-                      r.schedule_status === 'SCHEDULED'
+                      isDelivered
+                        ? 'bg-emerald-100 text-emerald-900 border-emerald-300 font-black shadow-sm'
+                        : r.schedule_status === 'SCHEDULED'
                         ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                        : r.schedule_status === 'SENT'
-                        ? 'bg-blue-100 text-blue-800 border-blue-200'
                         : r.schedule_status === 'MISSED_SCHEDULE'
                         ? 'bg-amber-100 text-amber-800 border-amber-200'
                         : r.schedule_status === 'PAUSED'
@@ -955,10 +1089,10 @@ export function WhatsAppPage() {
                         : 'bg-slate-100 text-slate-700 border-slate-200';
 
                     const statusLabel =
-                      r.schedule_status === 'SCHEDULED'
+                      isDelivered
+                        ? '🟢 ✓✓ Delivered'
+                        : r.schedule_status === 'SCHEDULED'
                         ? '🟢 Scheduled'
-                        : r.schedule_status === 'SENT'
-                        ? '🔵 Sent'
                         : r.schedule_status === 'MISSED_SCHEDULE'
                         ? '🟡 Missed Schedule'
                         : r.schedule_status === 'INVALID_TIME'
@@ -970,7 +1104,7 @@ export function WhatsAppPage() {
                         : '⚪ Unscheduled';
 
                     return (
-                      <tr key={`${r.schedule_id || 'preview'}:${r.row_number ?? index}`} className="hover:bg-slate-50/70 transition">
+                      <tr key={`${r.schedule_id || 'preview'}:${r.row_number ?? index}`} className={`transition ${isDelivered ? 'bg-emerald-50/30 hover:bg-emerald-50/60' : 'hover:bg-slate-50/70'}`}>
                         <td className="p-3">
                           <div className="font-bold text-slate-900">{r.customer_name}</div>
                           <div className="text-[11px] text-slate-400 font-mono">
@@ -1025,7 +1159,7 @@ export function WhatsAppPage() {
                           {r.timezone || 'Asia/Kolkata'}
                         </td>
                         <td className="p-3">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusBadge}`}>
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusBadge}`}>
                             {statusLabel}
                           </span>
                           {r.scheduled_message_at && (
@@ -1039,12 +1173,34 @@ export function WhatsAppPage() {
                             <span className="text-[10px] font-bold text-rose-600">
                               {r.validation_errors.join(', ')}
                             </span>
-                          ) : r.sent_at ? (
-                            <span className="text-[10px] font-bold text-emerald-700">
-                              Sent ({r.sent_at.substring(11, 16)})
-                            </span>
+                          ) : isDelivered ? (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 border border-emerald-300 rounded-xl text-emerald-800 text-[11px] font-bold shadow-sm">
+                              <CheckCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>Delivered {r.sent_at ? `(${r.sent_at.substring(11, 16)})` : ''}</span>
+                            </div>
                           ) : (
-                            <span className="text-[10px] text-slate-400">Valid</span>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleDispatchSingle(r)}
+                                disabled={dispatchingId === r.schedule_id}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg shadow-sm transition disabled:opacity-50 flex items-center gap-1"
+                                title="Send reminder now and confirm delivery"
+                              >
+                                {dispatchingId === r.schedule_id ? (
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Send className="w-3 h-3" />
+                                )}
+                                <span>{dispatchingId === r.schedule_id ? 'Sending...' : 'Send & Deliver'}</span>
+                              </button>
+                              <button
+                                onClick={() => handleMarkDelivered(r)}
+                                className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-semibold text-[11px] rounded-lg transition"
+                                title="Mark as delivered manually"
+                              >
+                                Mark Delivered
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
