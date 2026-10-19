@@ -458,7 +458,7 @@ class CsvImporter:
         strategy = (get("channel_strategy") or "").lower()
         if strategy and strategy not in {"all", "fallback"}:
             issues.error("channel_strategy", "channel_strategy must be all or fallback (blank uses policy).")
-        rec["channel_strategy"] = strategy or None
+        rec["channel_strategy"] = strategy or "all"
 
         rdate_raw, rtime_raw = get("reminder_date"), get("reminder_time")
         rec["reminder_date"] = parse_date(rdate_raw, self.config.csv_date_order) if rdate_raw else None

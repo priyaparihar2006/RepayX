@@ -105,6 +105,7 @@ class CSVSchedulerService:
                     customer_id TEXT NOT NULL,
                     customer_name TEXT NOT NULL,
                     phone_number TEXT NOT NULL,
+                    email TEXT,
                     loan_id TEXT,
                     unpaid_amount REAL,
                     due_date TEXT,
@@ -130,6 +131,10 @@ class CSVSchedulerService:
                 CREATE INDEX IF NOT EXISTS idx_sched_customer ON scheduled_messages(customer_id);
                 CREATE INDEX IF NOT EXISTS idx_sched_campaign ON scheduled_messages(campaign_id);
             """)
+            try:
+                conn.execute("ALTER TABLE scheduled_messages ADD COLUMN email TEXT")
+            except Exception:
+                pass
             conn.commit()
 
     def parse_csv_content(
@@ -163,6 +168,8 @@ class CSVSchedulerService:
             customer_name = row.get("customer_name")
             raw_phone = row.get("phone_number") or row.get("phone")
             phone_number = clean_phone_number(raw_phone)
+            raw_email = row.get("email") or row.get("email_address") or row.get("email_id") or row.get("mail")
+            email = str(raw_email).strip().lower() if raw_email else None
             loan_id = row.get("loan_id")
             unpaid_amount = clean_float(row.get("unpaid_amount"))
             due_date = row.get("due_date")
@@ -260,6 +267,7 @@ class CSVSchedulerService:
                 "customer_name": customer_name,
                 "phone_number": phone_number,
                 "raw_phone": raw_phone,
+                "email": email,
                 "loan_id": loan_id,
                 "unpaid_amount": unpaid_amount,
                 "due_date": due_date,
@@ -284,6 +292,7 @@ class CSVSchedulerService:
                 "customer_id": customer_id,
                 "customer_name": customer_name,
                 "phone_number": phone_number,
+                "email": email,
                 "scheduled_message_time": sched_time,
                 "timezone": tz_str,
                 "schedule_status": schedule_status,
@@ -345,6 +354,7 @@ class CSVSchedulerService:
                 cust_id = str(r.get("customer_id", ""))
                 cust_name = str(r.get("customer_name", "Customer"))
                 phone = str(r.get("phone_number", ""))
+                email = r.get("email")
                 loan_id = r.get("loan_id")
                 unpaid_amt = r.get("unpaid_amount")
                 due_date = r.get("due_date")
@@ -372,16 +382,17 @@ class CSVSchedulerService:
                 cursor.execute(
                     """
                     INSERT INTO scheduled_messages (
-                        schedule_id, customer_id, customer_name, phone_number,
+                        schedule_id, customer_id, customer_name, phone_number, email,
                         loan_id, unpaid_amount, due_date, days_past_due, payment_status,
                         probability_of_default, risk_category, payment_link,
                         scheduled_message_time, timezone, scheduled_message_at,
                         message_text, campaign_id, status, attempt_count,
                         created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
                     ON CONFLICT(schedule_id) DO UPDATE SET
                         customer_name = excluded.customer_name,
                         phone_number = excluded.phone_number,
+                        email = excluded.email,
                         loan_id = excluded.loan_id,
                         unpaid_amount = excluded.unpaid_amount,
                         due_date = excluded.due_date,
@@ -402,6 +413,7 @@ class CSVSchedulerService:
                         cust_id,
                         cust_name,
                         phone,
+                        email,
                         loan_id,
                         unpaid_amt,
                         due_date,
@@ -743,6 +755,38 @@ class CSVSchedulerService:
                         "phone": phone,
                         "provider_id": prov_id,
                     })
+
+                # Dual-dispatch email reminder if customer has an email address
+                email_addr = job.get("email")
+                if email_addr:
+                    try:
+                        from automation.config import get_automation_config
+                        from automation.providers.email import SmtpEmailProvider
+                        from automation.providers.base import OutboundMessage
+                        from automation.messages import render_reminder
+                        from decimal import Decimal
+                        cfg = get_automation_config()
+                        email_prov = SmtpEmailProvider(cfg)
+                        content = render_reminder(
+                            config=cfg,
+                            customer_name=job.get("customer_name") or "Customer",
+                            loan_id=job.get("loan_id") or "LOAN",
+                            outstanding=Decimal(str(job.get("unpaid_amount") or 0)),
+                            due_date=date.fromisoformat(job["due_date"]) if job.get("due_date") else date.today(),
+                            local_now=datetime.now(ZoneInfo(job.get("timezone") or "Asia/Kolkata")),
+                        )
+                        email_msg = OutboundMessage(
+                            channel="email",
+                            recipient=email_addr,
+                            text=content.text,
+                            subject=content.subject,
+                            html=content.html,
+                            idempotency_key=f"sched-email-{sched_id}",
+                            template_params=content.template_params,
+                        )
+                        email_prov.send(email_msg)
+                    except Exception as exc:
+                        logger.warning("Dual email dispatch error for %s: %s", email_addr, exc)
             except Exception as exc:
                 self._update_job_status(
                     sched_id,

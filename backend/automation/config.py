@@ -176,7 +176,7 @@ class AutomationConfig:
                 self.email_from_address = "priiiiicaptures@gmail.com"
             if not self.email_reply_to:
                 self.email_reply_to = "priiiiicaptures@gmail.com"
-            if not self.email_provider:
+            if not self.email_provider or self.email_provider == "none":
                 self.email_provider = "smtp"
 
     def validate(self) -> list[str]:
