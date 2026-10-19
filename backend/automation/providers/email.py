@@ -93,11 +93,19 @@ class SmtpEmailProvider(Provider):
         if problem:
             return SendResult.fail("provider_not_configured", problem, transient=False)
         c = self.config
+
+        # 1. When an HTTPS email relay is configured (e.g. on Render Free where outbound port 587 is blocked),
+        # dispatch via the HTTPS relay first to avoid slow 20-second TCP connection drop timeouts.
+        if getattr(c, "email_relay_url", None):
+            relay_res = self._send_via_https_relay(message)
+            if relay_res.accepted:
+                return relay_res
+
+        # 2. Direct SMTP connection
         msg = self.build(message)
         try:
             server = smtplib.SMTP(c.smtp_host, c.smtp_port, timeout=self.timeout)
         except (OSError, smtplib.SMTPException):
-            # Outbound port 587 is blocked by hosting environment (e.g. Render Free); try HTTPS relay
             return self._send_via_https_relay(message)
         try:
             try:

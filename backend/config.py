@@ -13,7 +13,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 import env_loader  # noqa: F401
 
-API_VERSION = "0.1.0"
+API_VERSION = "0.1.1-relay"
 
 
 def _path_from_env(name: str, default: Path) -> Path:
