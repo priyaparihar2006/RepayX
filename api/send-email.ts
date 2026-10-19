@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 
 const SHARED_SECRET = process.env.EMAIL_RELAY_SECRET || 'YieD8a2iKNAiRQBCZL5FKy1jO-cKhz8WmCgqaxPVIAU';
 
-export default async function handler(req, res) {
+export default async function handler(req: any, res: any) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -60,11 +60,11 @@ export default async function handler(req, res) {
       accepted: info.accepted,
       rejected: info.rejected,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Email relay failed:', err);
     return res.status(500).json({
       success: false,
-      error: err.message || 'Internal error sending email',
+      error: err?.message || 'Internal error sending email',
     });
   }
 }
