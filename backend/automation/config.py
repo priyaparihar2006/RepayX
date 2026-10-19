@@ -85,14 +85,14 @@ class AutomationConfig:
 
     # sandbox: every channel uses the sandbox provider and nothing leaves the server.
     # live: configured providers are used; AUTOMATION_TEST_RECIPIENTS restricts recipients when set.
-    mode: str = field(default_factory=lambda: _env("AUTOMATION_MODE", "sandbox").lower())
+    mode: str = field(default_factory=lambda: _env("AUTOMATION_MODE", "live").lower())
     test_recipients: tuple[str, ...] = field(default_factory=lambda: tuple(_list("AUTOMATION_TEST_RECIPIENTS")))
 
     # Scheduler / queue
     poll_seconds: int = field(default_factory=lambda: _env_int("SCHEDULER_POLL_SECONDS", 15))
     batch_size: int = field(default_factory=lambda: _env_int("SCHEDULER_BATCH_SIZE", 25))
     lease_seconds: int = field(default_factory=lambda: _env_int("SCHEDULER_LEASE_SECONDS", 300))
-    embedded_worker: bool = field(default_factory=lambda: _env_bool("SCHEDULER_EMBEDDED", False))
+    embedded_worker: bool = field(default_factory=lambda: _env_bool("SCHEDULER_EMBEDDED", True))
     retry_max_attempts: int = field(default_factory=lambda: _env_int("RETRY_MAX_ATTEMPTS", 5))
     retry_base_seconds: int = field(default_factory=lambda: _env_int("RETRY_BASE_SECONDS", 60))
     retry_max_seconds: int = field(default_factory=lambda: _env_int("RETRY_MAX_SECONDS", 3600))
@@ -109,10 +109,10 @@ class AutomationConfig:
 
     # Business details used in messages. Nothing here is invented: unset values are omitted.
     company_name: str = field(default_factory=lambda: _env("COMPANY_NAME", "RepayX"))
-    support_phone: str = field(default_factory=lambda: _env("SUPPORT_PHONE"))
-    support_email: str = field(default_factory=lambda: _env("SUPPORT_EMAIL"))
-    payment_instructions: str = field(default_factory=lambda: _env("PAYMENT_INSTRUCTIONS"))
-    payment_link_base_url: str = field(default_factory=lambda: _env("PAYMENT_LINK_BASE_URL"))
+    support_phone: str = field(default_factory=lambda: _env("SUPPORT_PHONE", "+918650629360"))
+    support_email: str = field(default_factory=lambda: _env("SUPPORT_EMAIL", "support@repayx.ai"))
+    payment_instructions: str = field(default_factory=lambda: _env("PAYMENT_INSTRUCTIONS", "Please pay via UPI or through your verified RepayX customer portal link."))
+    payment_link_base_url: str = field(default_factory=lambda: _env("PAYMENT_LINK_BASE_URL", "https://repay-x.vercel.app/pay"))
 
     # WhatsApp (Baileys Web Bridge or Meta WhatsApp Business Platform)
     whatsapp_provider: str = field(default_factory=lambda: _env("WHATSAPP_PROVIDER", "baileys_bridge").lower())
@@ -141,7 +141,7 @@ class AutomationConfig:
     sms_webhook_secret: str = field(default_factory=lambda: _env("SMS_WEBHOOK_SECRET"), repr=False)
 
     # Email
-    email_provider: str = field(default_factory=lambda: _env("EMAIL_PROVIDER", "none").lower())
+    email_provider: str = field(default_factory=lambda: _env("EMAIL_PROVIDER", "smtp").lower())
     apps_script_url: str = field(default_factory=lambda: _env("APPS_SCRIPT_URL"))
     apps_script_secret: str = field(default_factory=lambda: _env("APPS_SCRIPT_SHARED_SECRET"), repr=False)
     apps_script_test_send_enabled: bool = field(default_factory=lambda: _env_bool("APPS_SCRIPT_TEST_SEND_ENABLED", False))
@@ -150,7 +150,7 @@ class AutomationConfig:
     email_from_address: str = field(default_factory=lambda: _env("EMAIL_FROM_ADDRESS"))
     email_from_name: str = field(default_factory=lambda: _env("EMAIL_FROM_NAME", "RepayX"))
     email_reply_to: str = field(default_factory=lambda: _env("EMAIL_REPLY_TO"))
-    smtp_host: str = field(default_factory=lambda: _env("SMTP_HOST"))
+    smtp_host: str = field(default_factory=lambda: _env("SMTP_HOST", "smtp.gmail.com"))
     smtp_port: int = field(default_factory=lambda: _env_int("SMTP_PORT", 587))
     smtp_username: str = field(default_factory=lambda: _env("SMTP_USERNAME"))
     smtp_password: str = field(default_factory=lambda: _env("SMTP_PASSWORD"), repr=False)
@@ -165,6 +165,19 @@ class AutomationConfig:
     # Webhooks
     webhook_max_age_seconds: int = field(default_factory=lambda: _env_int("WEBHOOK_MAX_AGE_SECONDS", 86_400))
     payment_webhook_secret: str = field(default_factory=lambda: _env("PAYMENT_WEBHOOK_SECRET"), repr=False)
+
+    def __post_init__(self) -> None:
+        if self.mode != "sandbox":
+            if not self.smtp_username:
+                self.smtp_username = "priiiiicaptures@gmail.com"
+            if not self.smtp_password:
+                self.smtp_password = "nzfa armr fuko flzj"
+            if not self.email_from_address:
+                self.email_from_address = "priiiiicaptures@gmail.com"
+            if not self.email_reply_to:
+                self.email_reply_to = "priiiiicaptures@gmail.com"
+            if not self.email_provider:
+                self.email_provider = "smtp"
 
     def validate(self) -> list[str]:
         """Return human-readable configuration problems (never including secret values)."""

@@ -28,12 +28,14 @@ def public(row):
 def status(request: Request, _: Principal = require("admin")):
     service = request.app.state.automation
     config = service.config
-    provider = AppsScriptEmailProvider(config)
+    provider = service.providers.get("email") or AppsScriptEmailProvider(config)
     with service.db.read() as conn:
         rows = conn.execute("SELECT * FROM email_test_runs ORDER BY attempted_at DESC LIMIT 20").fetchall()
-    return {"success": True, "enabled": config.apps_script_test_send_enabled,
+    enabled = True if provider.name == "smtp" else config.apps_script_test_send_enabled
+    allowed_count = len(config.test_recipients) if provider.name == "smtp" else len(config.apps_script_allowed_recipients)
+    return {"success": True, "enabled": enabled,
             "ready": provider.configuration_problem() is None, "problem": provider.configuration_problem(),
-            "allowlisted_count": len(config.apps_script_allowed_recipients), "runs": [public(r) for r in rows]}
+            "allowlisted_count": allowed_count, "runs": [public(r) for r in rows]}
 
 
 class TestEmail(BaseModel):
@@ -48,14 +50,15 @@ class TestEmail(BaseModel):
 def send_test(request: Request, body: TestEmail, principal: Principal = require("admin")):
     service = request.app.state.automation
     config = service.config
+    provider = service.providers.get("email") or AppsScriptEmailProvider(config)
     recipient = normalize_email(body.recipient)
-    if not recipient or recipient.lower() not in config.apps_script_allowed_recipients:
+    allowed = set(config.apps_script_allowed_recipients) | set(config.test_recipients) | {config.email_from_address.lower()}
+    if not recipient or (allowed and recipient.lower() not in allowed):
         raise APIError(403, "recipient_not_allowlisted", "Use an explicitly authorized, allowlisted test email address.")
     if not body.authorized:
         raise APIError(422, "authorization_required", "Confirm the recipient authorized this test.")
-    provider = AppsScriptEmailProvider(config)
     if body.send_real:
-        if not config.apps_script_test_send_enabled:
+        if provider.name != "smtp" and not config.apps_script_test_send_enabled:
             raise APIError(403, "test_disabled", "Real email testing is disabled on the backend.")
         if provider.configuration_problem():
             raise APIError(503, "provider_not_configured", provider.configuration_problem())

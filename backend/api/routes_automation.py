@@ -192,13 +192,14 @@ async def import_csv(
                     """UPDATE reminder_jobs
                        SET run_at_utc = ?
                        WHERE emi_id IN (SELECT id FROM emis WHERE last_import_id = ?)
-                         AND status IN ('pending', 'retry_scheduled')""",
-                    (now_iso_str, summary.import_id),
+                         AND status IN ('pending', 'retry_scheduled')
+                         AND (scheduled_at_utc <= ? OR schedule_note LIKE '%immediate%')""",
+                    (now_iso_str, summary.import_id, now_iso_str),
                 )
             # Run immediate dispatch ticks so emails and messages send without delay
             for _ in range(5):
                 processed = await run_in_threadpool(service.tick)
-                if not processed:
+                if not processed or not processed.get("claimed"):
                     break
         except Exception:
             pass

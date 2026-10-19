@@ -533,7 +533,7 @@ class CsvImporter:
             self._upsert_customer(conn, rec, now_s)
             emi_id, changed = self._upsert_emi(conn, rec, source, summary, row_number, now_s, actor)
             conn.execute("UPDATE emis SET reminder_datetime_utc = ?, channel_strategy = ? WHERE id = ?",
-                         (iso(exact) if exact else None, rec["channel_strategy"], emi_id))
+                         (iso(rec["reminder_datetime_utc"]) if rec["reminder_datetime_utc"] else None, rec["channel_strategy"], emi_id))
             if changed:
                 summary.imported_rows += 1
             else:

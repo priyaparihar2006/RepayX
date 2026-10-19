@@ -149,8 +149,14 @@ def reconcile_emi(
         job = existing.get(key)
         if plan.scheduled_at < now:
             if job is None:
-                result.skipped_past += 1
-            continue
+                tz = ZoneInfo(snap.timezone)
+                if plan.scheduled_at.astimezone(tz).date() >= now.astimezone(tz).date():
+                    plan = PlannedReminder(plan.key, plan.reminder_type, now, "Scheduled for immediate dispatch")
+                else:
+                    result.skipped_past += 1
+                    continue
+            else:
+                continue
         new_at = iso(plan.scheduled_at)
         if job is None:
             job_id = str(uuid.uuid4())

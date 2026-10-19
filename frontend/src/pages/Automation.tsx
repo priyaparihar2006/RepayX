@@ -665,7 +665,7 @@ const ImportTab: React.FC = () => {
 
                 {hasEdits && (
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center justify-between">
-                    <span>✏️ <strong>Live Edits Active:</strong> Changes made in the table above will be automatically saved and scheduled when you click <strong>Upload CSV</strong> or <strong>Validate only</strong>.</span>
+                    <span>✏️ <strong>Live Edits Active:</strong> Changes made in the table above will be automatically saved and scheduled when you click <strong>Upload CSV</strong>. (Clicking <em>Validate only</em> runs a test simulation without saving).</span>
                     <span className="font-semibold text-amber-800 font-mono text-[11px]">{displayRows.length} rows ready</span>
                   </div>
                 )}
@@ -684,8 +684,30 @@ const ImportTab: React.FC = () => {
       </section>
 
       {result && (
-        <section className={`${card} p-5 space-y-3`}>
-          <h2 role="status" className="text-sm font-bold text-slate-900">{result.status === 'dry_run' ? 'Validation result (nothing saved)' : `Import #${result.import_id} complete`}</h2>
+        <section className={`${card} p-5 space-y-4`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 role="status" className="text-sm font-bold text-slate-900">
+                {result.status === 'dry_run' ? 'Validation result (Dry Run - Nothing Saved)' : `Import #${result.import_id} complete`}
+              </h2>
+              {result.status === 'dry_run' && (
+                <p className="text-xs text-amber-700 mt-1">
+                  ⚠️ This was a preview validation check only. No reminders were saved and no emails will be sent until you click <strong>Upload CSV & Schedule</strong>.
+                </p>
+              )}
+            </div>
+            {result.status === 'dry_run' && (
+              <button
+                type="button"
+                className={btnPrimary}
+                disabled={busy}
+                onClick={() => run(false)}
+              >
+                <FileUp className="w-4 h-4" />
+                <span>Upload CSV & Schedule Reminders Now</span>
+              </button>
+            )}
+          </div>
           <dl className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 text-xs">
             {([['Total rows', result.total_rows], ['Imported', result.imported_rows], ['Unchanged', result.unchanged_rows],
               ['Rejected', result.rejected_rows], ['Warnings', result.warning_count], [result.status === 'dry_run' ? 'Reminders proposed' : 'Reminders scheduled', result.reminders_scheduled],
