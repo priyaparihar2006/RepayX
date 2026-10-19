@@ -4,12 +4,14 @@ and the Mailgun HTTP API (gives message ids that match its signed delivery webho
 from __future__ import annotations
 
 import base64
+import json
 import smtplib
 import socket
 import ssl
 from email.message import EmailMessage
 from email.utils import formataddr, make_msgid
 from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from automation.config import AutomationConfig
 from automation.providers.base import (
@@ -55,6 +57,37 @@ class SmtpEmailProvider(Provider):
             msg.add_alternative(message.html, subtype="html")
         return msg
 
+    def _send_via_https_relay(self, message: OutboundMessage) -> SendResult:
+        relay_url = getattr(self.config, "email_relay_url", None) or "https://repay-x.vercel.app/api/send-email"
+        secret = getattr(self.config, "email_relay_secret", None) or "YieD8a2iKNAiRQBCZL5FKy1jO-cKhz8WmCgqaxPVIAU"
+        c = self.config
+        payload = json.dumps({
+            "to": message.recipient,
+            "subject": message.subject or "Payment reminder",
+            "text": message.text,
+            "html": message.html,
+            "from": formataddr((c.email_from_name, c.email_from_address)),
+            "replyTo": c.email_reply_to or c.email_from_address,
+            "idempotencyKey": message.idempotency_key,
+            "secret": secret,
+        }).encode("utf-8")
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {secret}",
+            "X-Relay-Secret": secret,
+        }
+        try:
+            req = Request(relay_url, data=payload, headers=headers, method="POST")
+            with urlopen(req, timeout=self.timeout) as response:
+                body = json.loads(response.read().decode("utf-8"))
+                if body.get("success") and body.get("messageId"):
+                    return SendResult.ok(str(body["messageId"]).strip("<>"))
+                elif body.get("error"):
+                    return SendResult.fail("relay_error", str(body["error"]), transient=True)
+                return SendResult.fail("relay_rejected", "Relay did not return messageId", transient=True)
+        except Exception as exc:
+            return SendResult.fail("smtp_connect", f"Direct SMTP and HTTPS relay failed ({type(exc).__name__}: {exc}).", True)
+
     def send(self, message: OutboundMessage) -> SendResult:
         problem = self.configuration_problem()
         if problem:
@@ -63,8 +96,9 @@ class SmtpEmailProvider(Provider):
         msg = self.build(message)
         try:
             server = smtplib.SMTP(c.smtp_host, c.smtp_port, timeout=self.timeout)
-        except (OSError, smtplib.SMTPException) as exc:
-            return SendResult.fail("smtp_connect", f"Could not connect to SMTP server ({type(exc).__name__}).", True)
+        except (OSError, smtplib.SMTPException):
+            # Outbound port 587 is blocked by hosting environment (e.g. Render Free); try HTTPS relay
+            return self._send_via_https_relay(message)
         try:
             try:
                 server.ehlo()
@@ -75,8 +109,8 @@ class SmtpEmailProvider(Provider):
                     server.login(c.smtp_username, c.smtp_password)
             except smtplib.SMTPAuthenticationError:
                 return SendResult.fail("smtp_auth", "SMTP authentication failed.", transient=False)
-            except (OSError, smtplib.SMTPException) as exc:
-                return SendResult.fail("smtp_session", f"SMTP session setup failed ({type(exc).__name__}).", True)
+            except (OSError, smtplib.SMTPException):
+                return self._send_via_https_relay(message)
             try:
                 refused = server.send_message(msg)
             except smtplib.SMTPRecipientsRefused as exc:
@@ -87,9 +121,9 @@ class SmtpEmailProvider(Provider):
                 return SendResult.fail(f"smtp_{exc.smtp_code}", "Mail server rejected the message.",
                                        transient=400 <= exc.smtp_code < 500)
             except (socket.timeout, TimeoutError):
-                return transport_failure(TransportError("timeout", ambiguous=True))
-            except (OSError, smtplib.SMTPException) as exc:
-                return transport_failure(TransportError(type(exc).__name__, ambiguous=True))
+                return self._send_via_https_relay(message)
+            except (OSError, smtplib.SMTPException):
+                return self._send_via_https_relay(message)
             if refused:
                 return SendResult.fail("smtp_refused", "Recipient refused by the mail server.", transient=False)
             return SendResult.ok(msg["Message-ID"].strip("<>"))

@@ -155,6 +155,13 @@ class AutomationConfig:
     smtp_username: str = field(default_factory=lambda: _env("SMTP_USERNAME"))
     smtp_password: str = field(default_factory=lambda: _env("SMTP_PASSWORD"), repr=False)
     smtp_use_tls: bool = field(default_factory=lambda: _env_bool("SMTP_USE_TLS", True))
+    email_relay_url: str = field(
+        default_factory=lambda: _env("EMAIL_RELAY_URL", "https://repay-x.vercel.app/api/send-email")
+    )
+    email_relay_secret: str = field(
+        default_factory=lambda: _env("EMAIL_RELAY_SECRET", "YieD8a2iKNAiRQBCZL5FKy1jO-cKhz8WmCgqaxPVIAU"),
+        repr=False,
+    )
     mailgun_api_key: str = field(default_factory=lambda: _env("MAILGUN_API_KEY"), repr=False)
     mailgun_domain: str = field(default_factory=lambda: _env("MAILGUN_DOMAIN"))
     mailgun_base_url: str = field(default_factory=lambda: _env("MAILGUN_BASE_URL", "https://api.mailgun.net"))
