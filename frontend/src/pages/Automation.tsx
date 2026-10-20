@@ -357,6 +357,17 @@ function serializeCsv(headers: string[], rows: Record<string, string>[]): string
   return [headerLine, ...rowLines].join('\r\n');
 }
 
+const getColMinWidth = (col: string) => {
+  const c = col.toLowerCase();
+  if (c.includes('email')) return 'min-w-[240px]';
+  if (c.includes('datetime') || c.includes('reminder')) return 'min-w-[185px]';
+  if (c.includes('name')) return 'min-w-[160px]';
+  if (c.includes('phone')) return 'min-w-[150px]';
+  if (c.includes('loan')) return 'min-w-[140px]';
+  return 'min-w-[120px]';
+};
+
+
 // ====================================================================== Instant Email Dispatcher
 
 const InstantEmailCard: React.FC<{ onSent?: () => void }> = ({ onSent }) => {
@@ -1020,7 +1031,7 @@ const ImportTab: React.FC = () => {
                                   type="text"
                                   value={r[col] ?? ''}
                                   onChange={(e) => handleCellChange(i, col, e.target.value)}
-                                  className="w-full min-w-[130px] px-2.5 py-1 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 font-medium"
+                                  className={`w-full ${getColMinWidth(col)} px-2.5 py-1 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 font-medium`}
                                   placeholder={`Enter ${col}...`}
                                 />
                               ) : (

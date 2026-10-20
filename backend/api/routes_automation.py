@@ -195,11 +195,11 @@ async def import_csv(
                        SET run_at_utc = ?
                        WHERE emi_id IN (SELECT id FROM emis WHERE last_import_id = ?)
                          AND status IN ('pending', 'retry_scheduled')
-                         AND (scheduled_at_utc <= ? OR schedule_note LIKE '%immediate%')""",
+                         AND (scheduled_at_utc <= datetime(?, '+5 minutes') OR schedule_note LIKE '%immediate%')""",
                     (now_iso_str, summary.import_id, now_iso_str),
                 )
             # Run immediate dispatch ticks so emails and messages send without delay
-            for _ in range(5):
+            for _ in range(10):
                 processed = await run_in_threadpool(service.tick)
                 if not processed or not processed.get("claimed"):
                     break

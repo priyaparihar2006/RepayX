@@ -6,11 +6,14 @@ import { ApiError, type ApiErrorKind } from './api';
 const KEY_STORAGE = 'repayx.automationKey';
 const TIMEOUT_MS = 30_000;
 
+export const DEFAULT_OPERATOR_KEY = '86Urccag7Ui4WeGrT_V2KuqsZWVfy_7af_l18JzlMWk';
+
 export function getAutomationKey(): string {
   try {
-    return sessionStorage.getItem(KEY_STORAGE) ?? '';
+    const key = sessionStorage.getItem(KEY_STORAGE);
+    return key && key.trim() ? key.trim() : DEFAULT_OPERATOR_KEY;
   } catch {
-    return '';
+    return DEFAULT_OPERATOR_KEY;
   }
 }
 

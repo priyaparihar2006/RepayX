@@ -154,7 +154,7 @@ class Dispatcher:
                 problem = self.providers[ch].configuration_problem()
                 if problem:
                     reason = "provider_not_configured"
-                elif self.config.mode == "live" and self.config.test_recipients:
+                elif self.config.mode == "test" and self.config.test_recipients:
                     if ch == "email":
                         allowed_emails = {r.lower().strip() for r in self.config.test_recipients if "@" in r}
                         if not allowed_emails or recipient.lower().strip() not in allowed_emails:
