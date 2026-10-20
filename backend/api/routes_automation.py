@@ -12,6 +12,8 @@ import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
+import uuid
+from automation.providers.base import OutboundMessage
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, File, Form, Query, Request, UploadFile
@@ -377,6 +379,109 @@ def retry_reminder(request: Request, job_id: str, principal: Principal = require
     except JobActionError as exc:
         _raise(exc)
     return get_reminder(request, job_id, principal)
+
+
+@router.post("/reminders/{job_id}/send-now")
+def send_now_reminder(request: Request, job_id: str, principal: Principal = require("operator")):
+    service = svc(request)
+    now = utcnow()
+    try:
+        with service.db.write() as conn:
+            job = conn.execute("SELECT * FROM reminder_jobs WHERE id = ?", (job_id,)).fetchone()
+            if not job:
+                raise APIError(404, "not_found", "Reminder job not found.")
+            conn.execute(
+                "UPDATE reminder_jobs SET run_at_utc = ?, status = 'pending', attempt_count = 0 WHERE id = ?",
+                (iso(now), job_id),
+            )
+        service.dispatcher.run_once(now)
+    except JobActionError as exc:
+        _raise(exc)
+    return get_reminder(request, job_id, principal)
+
+
+class InstantEmailBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    recipient: str = Field(min_length=3, max_length=254)
+    name: str = "Valued Customer"
+    loan_id: str = "LN-DEMO"
+    amount: str = "₹10,000.00"
+    due_date: str | None = None
+    subject: str | None = None
+    message: str | None = None
+
+
+@router.post("/automation/send-instant-email")
+def send_instant_email(request: Request, body: InstantEmailBody, principal: Principal = require("operator")):
+    service = svc(request)
+    provider = service.providers.get("email")
+    if not provider:
+        raise APIError(503, "no_email_provider", "No email provider configured.")
+    problem = provider.configuration_problem()
+    if problem:
+        raise APIError(503, "provider_not_configured", problem)
+
+    now = utcnow()
+    due_date = body.due_date or now.strftime("%Y-%m-%d")
+    subject = body.subject or f"Payment Reminder: RepayX Loan #{body.loan_id}"
+    amount_str = body.amount if body.amount.startswith("₹") else f"₹{body.amount}"
+
+    text = (
+        f"Dear {body.name},\n\n"
+        f"This is an instant reminder regarding your loan installment for {body.loan_id}.\n"
+        f"Amount Due: {amount_str}\n"
+        f"Due Date: {due_date}\n\n"
+        f"{body.message or 'Please ensure timely payment via UPI or through your verified RepayX portal link.'}\n\n"
+        f"Regards,\nRepayX Collections Team"
+    )
+
+    html = (
+        f'<div style="font-family: Arial, sans-serif; max-width: 600px; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">'
+        f'<div style="border-bottom: 2px solid #4f46e5; padding-bottom: 12px; margin-bottom: 16px;">'
+        f'<h2 style="color: #0f172a; margin: 0; font-size: 20px;">RepayX Payment Reminder</h2>'
+        f'<p style="color: #64748b; font-size: 12px; margin: 4px 0 0;">Loan Account: <strong>{body.loan_id}</strong></p>'
+        f'</div>'
+        f'<p style="color: #334155; font-size: 14px;">Dear <strong>{body.name}</strong>,</p>'
+        f'<p style="color: #334155; font-size: 14px;">This is an instant reminder regarding your loan installment with RepayX:</p>'
+        f'<div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 14px 18px; border-radius: 8px; margin: 18px 0;">'
+        f'<p style="color: #475569; font-size: 13px; margin: 0 0 6px;">Amount Due: <strong style="color: #0f172a; font-size: 16px;">{amount_str}</strong></p>'
+        f'<p style="color: #475569; font-size: 13px; margin: 0 0 6px;">Due Date: <strong>{due_date}</strong></p>'
+        f'<p style="color: #475569; font-size: 13px; margin: 0;">Loan ID: <strong>{body.loan_id}</strong></p>'
+        f'</div>'
+        f'<p style="color: #334155; font-size: 13px;">{body.message or "Please ensure your payment is made on or before the due date to avoid late charges."}</p>'
+        f'<hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />'
+        f'<p style="color: #94a3b8; font-size: 11px; margin: 0;">Sent via RepayX Automated Delivery Engine</p>'
+        f'</div>'
+    )
+
+    req_id = str(uuid.uuid4())
+    msg = OutboundMessage(
+        channel="email",
+        recipient=body.recipient.strip(),
+        subject=subject,
+        text=text,
+        html=html,
+        idempotency_key=f"instant-mail:{req_id}",
+    )
+    res = provider.send(msg)
+
+    with service.db.write() as conn:
+        conn.execute(
+            """INSERT INTO communications (customer_id, loan_id, channel, direction, kind, identifier, subject, content, status, created_at)
+               VALUES (?, ?, 'email', 'outbound', 'instant_reminder', ?, ?, ?, ?, ?)""",
+            (body.name, body.loan_id, body.recipient.strip(), subject, text, "accepted" if res.accepted else "failed", iso(now)),
+        )
+
+    if not res.accepted:
+        raise APIError(502, res.error_code or "send_failed", res.error_message or "Email provider rejected message.")
+
+    return {
+        "success": True,
+        "recipient": body.recipient.strip(),
+        "status": "accepted",
+        "message_id": res.provider_message_id,
+        "sent_at": iso(now),
+    }
 
 
 # ====================================================================== EMIs and payments

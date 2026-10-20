@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, AlertTriangle, BellRing, CalendarClock, CheckCircle2, Download, Edit3, FileUp, KeyRound, ListChecks, LogOut,
-  MessageSquareReply, PauseCircle, PlayCircle, Plus, RefreshCw, RotateCcw, Settings2, Trash2, Users, Wallet, XCircle,
+  MessageSquareReply, PauseCircle, PlayCircle, Plus, RefreshCw, RotateCcw, Settings2, Trash2, Users, Wallet, XCircle, Zap, Send, Mail,
 } from 'lucide-react';
 import { ApiError } from '../services/api';
 import {
@@ -357,6 +357,153 @@ function serializeCsv(headers: string[], rows: Record<string, string>[]): string
   return [headerLine, ...rowLines].join('\r\n');
 }
 
+// ====================================================================== Instant Email Dispatcher
+
+const InstantEmailCard: React.FC<{ onSent?: () => void }> = ({ onSent }) => {
+  const [recipient, setRecipient] = useState('priyaparihar240206@gmail.com');
+  const [name, setName] = useState('Priya Parihar');
+  const [loanId, setLoanId] = useState('LN-1001');
+  const [amount, setAmount] = useState('₹15,000');
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+
+  const QUICK_EMAILS = [
+    'priyaparihar240206@gmail.com',
+    'sidd204.sk@gmail.com',
+    'nandinichaturvedi501@gmail.com',
+    'priiiiicaptures@gmail.com',
+  ];
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recipient.trim()) return;
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await automationApi.sendInstantEmail({
+        recipient: recipient.trim(),
+        name: name.trim() || undefined,
+        loan_id: loanId.trim() || undefined,
+        amount: amount.trim() || undefined,
+      });
+      setResult({
+        kind: 'ok',
+        text: `✅ Instant email sent to ${res.recipient}! Accepted by Gmail SMTP (Message ID: ${res.message_id})`,
+      });
+      if (onSent) onSent();
+    } catch (err) {
+      setResult({
+        kind: 'error',
+        text: errText(err),
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <section className="bg-white rounded-2xl border border-indigo-200/80 p-5 shadow-sm space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+            <Zap className="w-5 h-5 fill-current" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">⚡ Instant Email Dispatcher</h2>
+            <p className="text-xs text-slate-500">Send an instant live email reminder to any address right now.</p>
+          </div>
+        </div>
+        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+          Direct SMTP Active
+        </span>
+      </div>
+
+      {/* Quick Recipient Chips */}
+      <div>
+        <span className="text-[11px] font-semibold text-slate-600 block mb-1.5">Quick Select Authorized Email:</span>
+        <div className="flex flex-wrap gap-1.5">
+          {QUICK_EMAILS.map((em) => (
+            <button
+              key={em}
+              type="button"
+              onClick={() => { setRecipient(em); setResult(null); }}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition cursor-pointer ${
+                recipient === em
+                  ? 'bg-indigo-600 text-white border-indigo-600 font-semibold shadow-xs'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              {em}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <form onSubmit={handleSend} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+        <div>
+          <label className="text-[11px] font-semibold text-slate-700 block mb-1">Recipient Email *</label>
+          <input
+            type="email"
+            required
+            value={recipient}
+            onChange={(e) => setRecipient(e.target.value)}
+            placeholder="borrower@example.com"
+            className={`${input} w-full`}
+          />
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-slate-700 block mb-1">Borrower Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Priya Parihar"
+            className={`${input} w-full`}
+          />
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-slate-700 block mb-1">Loan ID & Amount</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={loanId}
+              onChange={(e) => setLoanId(e.target.value)}
+              placeholder="Loan ID"
+              className={`${input} w-1/2`}
+            />
+            <input
+              type="text"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="₹ Amount"
+              className={`${input} w-1/2`}
+            />
+          </div>
+        </div>
+        <div>
+          <button
+            type="submit"
+            disabled={sending || !recipient.trim()}
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md disabled:opacity-50 cursor-pointer transition"
+          >
+            {sending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-current" />}
+            <span>{sending ? 'Sending Mail...' : '⚡ Send Instant Mail Now'}</span>
+          </button>
+        </div>
+      </form>
+
+      {result && (
+        <div className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
+          result.kind === 'ok' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-800'
+        }`}>
+          {result.kind === 'ok' ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> : <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />}
+          <div>{result.text}</div>
+        </div>
+      )}
+    </section>
+  );
+};
+
 const ImportTab: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [importType, setImportType] = useState('emi_reminders');
@@ -482,11 +629,15 @@ const ImportTab: React.FC = () => {
     setHasEdits(true);
   };
 
-  const applyPresetTime = (offsetDays: number, timeStr?: string) => {
+  const applyPresetTime = (offsetDays: number, timeStr?: string, isInstant = false) => {
     const targetDate = new Date(Date.now() + offsetDays * 86_400_000);
     const datePart = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(targetDate);
     let finalTime = timeStr;
-    if (!finalTime) {
+    if (isInstant) {
+      const rightNow = new Date(Date.now() + 2_000);
+      const timeFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      finalTime = timeFormatter.format(rightNow);
+    } else if (!finalTime) {
       const in2Min = new Date(Date.now() + 2 * 60_000);
       const timeFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
       finalTime = timeFormatter.format(in2Min);
@@ -494,6 +645,43 @@ const ImportTab: React.FC = () => {
     const preset = `${datePart} ${finalTime}`;
     setEditableRows((prev) => prev.map((r) => ({ ...r, reminder_datetime: preset })));
     setHasEdits(true);
+  };
+
+  const handleSendAllInstantly = async () => {
+    const now = new Date(Date.now() + 2_000);
+    const datePart = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+    const timePart = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now);
+    const instantDt = `${datePart} ${timePart}`;
+
+    const instantRows = (editableRows.length > 0 ? editableRows : (preview?.sample_rows as Record<string, string>[] || [])).map((r) => ({
+      ...r,
+      reminder_datetime: instantDt,
+    }));
+    setEditableRows(instantRows);
+    setHasEdits(true);
+
+    if (!file || !preview) return;
+    submitting.current = true;
+    setBusy(true); setError(''); setResult(null);
+
+    if (automationPaused) {
+      try {
+        await automationApi.resume();
+        setAutomationPaused(false);
+      } catch {}
+    }
+
+    try {
+      const cols = editableHeaders.length > 0 ? editableHeaders : Object.keys(instantRows[0] || {});
+      const csvStr = serializeCsv(cols, instantRows);
+      const fileToSend = new File([csvStr], file.name, { type: 'text/csv' });
+      const res = await automationApi.importCsv(fileToSend, importType, mapping, false);
+      setResult(res);
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      submitting.current = false; setBusy(false);
+    }
   };
 
   const handleAddRow = () => {
@@ -614,6 +802,9 @@ const ImportTab: React.FC = () => {
           <span>{automationPaused ? 'Start Automation' : 'Stop Automation'}</span>
         </button>
       </section>
+
+      {/* Instant Direct Email Dispatcher */}
+      <InstantEmailCard onSent={() => history.reload()} />
 
       <section className={`${card} p-5 space-y-4`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -761,6 +952,15 @@ const ImportTab: React.FC = () => {
                     <span className="text-[11px] font-semibold text-slate-600">Quick Time Presets:</span>
                     <button
                       type="button"
+                      onClick={() => applyPresetTime(0, undefined, true)}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-100 text-amber-900 hover:bg-amber-200 border border-amber-300 cursor-pointer transition shadow-xs flex items-center gap-1"
+                      title="Set reminder_datetime on all rows to right now for instant dispatch"
+                    >
+                      <Zap className="w-3 h-3 fill-current" />
+                      <span>⚡ Send Instantly Now</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => applyPresetTime(0)}
                       className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 cursor-pointer transition"
                       title="Set reminder_datetime on all rows to 2 minutes from right now"
@@ -856,6 +1056,16 @@ const ImportTab: React.FC = () => {
               >
                 <PlayCircle className="w-4 h-4 text-emerald-400" />
                 <span>🚀 Start Automation & Schedule Reminders {hasEdits ? '(with Edits)' : ''}</span>
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md disabled:opacity-50 cursor-pointer transition"
+                disabled={busy}
+                onClick={handleSendAllInstantly}
+                title="Set all reminder dates to right now and dispatch immediately"
+              >
+                <Zap className="w-4 h-4 text-slate-950 fill-current" />
+                <span>⚡ Send All Instantly Now</span>
               </button>
               <button
                 type="button"
@@ -1053,7 +1263,7 @@ const RemindersTab: React.FC<{ role: Role }> = ({ role }) => {
             <table className="w-full text-xs">
               <thead><tr className="text-left text-slate-500 border-b border-slate-100">
                 <th className="py-2 px-4 font-medium">Customer</th><th className="px-2 font-medium">Loan</th><th className="px-2 font-medium">Type</th>
-                <th className="px-2 font-medium">Scheduled (IST)</th><th className="px-2 font-medium">Status</th><th className="px-2 font-medium">Channels</th><th className="px-2 font-medium">Attempts</th>
+                <th className="px-2 font-medium">Scheduled (IST)</th><th className="px-2 font-medium">Status</th><th className="px-2 font-medium">Channels</th><th className="px-2 font-medium">Attempts</th><th className="px-2 font-medium text-right">Action</th>
               </tr></thead>
               <tbody>{data.reminders.map((r: Reminder) => (
                 <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer" onClick={() => setSelected(r.id)}>
@@ -1064,6 +1274,22 @@ const RemindersTab: React.FC<{ role: Role }> = ({ role }) => {
                   <td className="px-2"><div className="flex flex-wrap gap-1">{(r.deliveries?.length ? r.deliveries : r.channels.map((c) => ({ channel: c, status: 'queued' }))).map((d) => (
                     <span key={d.channel} className="text-[10px]">{CHANNEL_LABEL[d.channel as Channel]}: <Badge value={'display_status' in d ? String(d.display_status ?? d.status) : d.status} /></span>))}</div></td>
                   <td className="px-2">{r.attempt_count}</td>
+                  <td className="px-2 text-right">
+                    {(r.status === 'pending' || r.status === 'retry') && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          automationApi.sendNowReminder(r.id).then(() => reload()).catch((err) => alert(errText(err)));
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer transition shadow-xs"
+                        title="Dispatch this reminder right now"
+                      >
+                        <Zap className="w-3 h-3 fill-current" />
+                        <span>Send Now</span>
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}</tbody>
             </table>

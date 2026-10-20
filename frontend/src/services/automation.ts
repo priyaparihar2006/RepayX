@@ -220,6 +220,16 @@ export const automationApi = {
   cancel: (id: string, reason: string) =>
     call(`/api/reminders/${encodeURIComponent(id)}/cancel`, { method: 'POST', json: { reason } }),
   retry: (id: string) => call(`/api/reminders/${encodeURIComponent(id)}/retry`, { method: 'POST' }),
+  sendNowReminder: (id: string) => call<{ reminder: Reminder }>(`/api/reminders/${encodeURIComponent(id)}/send-now`, { method: 'POST' }),
+  sendInstantEmail: (body: {
+    recipient: string;
+    name?: string;
+    loan_id?: string;
+    amount?: string;
+    due_date?: string;
+    subject?: string;
+    message?: string;
+  }) => call<{ success: boolean; recipient: string; status: string; message_id: string; sent_at: string }>('/api/automation/send-instant-email', { method: 'POST', json: body }),
 
   emis: (params: { payment_status?: string; claim_pending?: boolean; search?: string; page?: number }) =>
     call<{ emis: Emi[]; pagination: Pagination }>(`/api/emis${qs(params)}`),
