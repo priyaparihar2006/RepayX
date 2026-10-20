@@ -36,7 +36,7 @@ class Settings:
     cors_allowed_origins: list[str] = field(
         default_factory=lambda: _origins_from_env(
             "CORS_ALLOWED_ORIGINS",
-            "http://localhost:3000,http://127.0.0.1:3000,https://repay-x.vercel.app,https://repayx.vercel.app",
+            "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,https://repay-x.vercel.app,https://repayx.vercel.app",
         )
     )
     cors_allow_origin_regex: str | None = field(
