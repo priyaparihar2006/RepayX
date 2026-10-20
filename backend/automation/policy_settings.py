@@ -36,7 +36,7 @@ class ReminderPolicy(BaseModel):
     )
     # all: send on every eligible channel (dispatches both WhatsApp and Email).
     # fallback: try channels in order and stop at the first accepted send.
-    channel_strategy: Literal["fallback", "all"] = "all"
+    channel_strategy: Literal["fallback", "all"] = "fallback"
     channel_order: list[Channel] = Field(default_factory=lambda: ["whatsapp", "sms", "email"])
 
     default_reminder_time: str = "10:00"

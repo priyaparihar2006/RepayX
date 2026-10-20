@@ -17,7 +17,7 @@ import json
 import re
 import sqlite3
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -458,7 +458,7 @@ class CsvImporter:
         strategy = (get("channel_strategy") or "").lower()
         if strategy and strategy not in {"all", "fallback"}:
             issues.error("channel_strategy", "channel_strategy must be all or fallback (blank uses policy).")
-        rec["channel_strategy"] = strategy or "all"
+        rec["channel_strategy"] = strategy or None
 
         rdate_raw, rtime_raw = get("reminder_date"), get("reminder_time")
         rec["reminder_date"] = parse_date(rdate_raw, self.config.csv_date_order) if rdate_raw else None
@@ -501,8 +501,22 @@ class CsvImporter:
             exact = rec["reminder_datetime_utc"]
             if exact is not None:
                 if exact <= now:
-                    issues.error("reminder_datetime", "Reminder datetime must be in the future; past times are never sent immediately.")
-                if not within_contact_window(exact.astimezone(ZoneInfo(rec["timezone"])), policy):
+                    tz = ZoneInfo(rec["timezone"])
+                    local_exact = exact.astimezone(tz)
+                    local_now = now.astimezone(tz)
+                    if local_exact.date() < local_now.date():
+                        candidate = local_exact.replace(year=local_now.year, month=local_now.month, day=local_now.day)
+                        if candidate > local_now:
+                            exact = candidate.astimezone(UTC)
+                            rec["reminder_datetime_utc"] = exact
+                            issues.warn("reminder_datetime", f"Past date {local_exact.strftime('%Y-%m-%d')} auto-updated to today at {candidate.strftime('%H:%M:%S')}.")
+                        else:
+                            exact = now + timedelta(seconds=1)
+                            rec["reminder_datetime_utc"] = exact
+                            issues.warn("reminder_datetime", "Reminder time was earlier today; scheduled for immediate dispatch.")
+                    else:
+                        issues.error("reminder_datetime", "Reminder datetime must be in the future; past times are never sent immediately.")
+                if exact and not within_contact_window(exact.astimezone(ZoneInfo(rec["timezone"])), policy):
                     issues.error("reminder_datetime", "Reminder datetime is outside the configured contact hours/days; choose an allowed exact time.")
 
             if rec["loan_id"]:

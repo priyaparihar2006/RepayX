@@ -157,11 +157,11 @@ class Dispatcher:
                 elif self.config.mode == "live" and self.config.test_recipients:
                     if ch == "email":
                         allowed_emails = {r.lower().strip() for r in self.config.test_recipients if "@" in r}
-                        if allowed_emails and recipient.lower().strip() not in allowed_emails:
+                        if not allowed_emails or recipient.lower().strip() not in allowed_emails:
                             reason = "test_mode_recipient_not_allowlisted"
                     else:
                         allowed_phones = {r.strip() for r in self.config.test_recipients if "@" not in r}
-                        if allowed_phones and recipient.strip() not in allowed_phones:
+                        if not allowed_phones or recipient.strip() not in allowed_phones:
                             reason = "test_mode_recipient_not_allowlisted"
             decisions.append(ChannelDecision(ch, recipient, reason))
         return decisions

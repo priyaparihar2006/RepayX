@@ -371,12 +371,48 @@ const ImportTab: React.FC = () => {
   const previewVersion = useRef(0);
   const submitting = useRef(false);
 
+  // Master automation state
+  const [automationPaused, setAutomationPaused] = useState<boolean>(false);
+  const [togglingAutomation, setTogglingAutomation] = useState(false);
+
   // In-memory editable rows & headers
   const [editableHeaders, setEditableHeaders] = useState<string[]>([]);
   const [editableRows, setEditableRows] = useState<Record<string, string>[]>([]);
   const [originalRows, setOriginalRows] = useState<Record<string, string>[]>([]);
   const [isEditMode, setIsEditMode] = useState<boolean>(true);
   const [hasEdits, setHasEdits] = useState<boolean>(false);
+
+  const checkAutomationStatus = useCallback(async () => {
+    try {
+      const h = await automationApi.health();
+      setAutomationPaused(h.automation_paused);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    void checkAutomationStatus();
+  }, [checkAutomationStatus]);
+
+  const handleToggleAutomation = async () => {
+    setTogglingAutomation(true);
+    try {
+      if (automationPaused) {
+        await automationApi.resume();
+        setAutomationPaused(false);
+      } else {
+        await automationApi.pause();
+        setAutomationPaused(true);
+      }
+    } catch (err) {
+      setError(errText(err));
+    } finally {
+      setTogglingAutomation(false);
+    }
+  };
+
+  const getTodayDateStr = () => {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  };
 
   useEffect(() => () => { previewVersion.current++; }, []);
 
@@ -388,9 +424,32 @@ const ImportTab: React.FC = () => {
       // 1. Parse client-side for immediate full in-memory editing of all rows
       const rawText = await f.text();
       const parsed = parseCsv(rawText);
+
+      // Auto-correct past dates (e.g. yesterday) to today so rows are never rejected
+      const todayStr = getTodayDateStr();
+      let autoRolledCount = 0;
+      const processedRows = parsed.rows.map((row) => {
+        const r = { ...row };
+        if (r.reminder_datetime) {
+          const match = r.reminder_datetime.match(/^(\d{4}-\d{2}-\d{2})(.*)$/);
+          if (match) {
+            const rowDate = match[1];
+            const rest = match[2];
+            if (rowDate < todayStr) {
+              r.reminder_datetime = `${todayStr}${rest}`;
+              autoRolledCount++;
+            }
+          }
+        }
+        return r;
+      });
+
       setEditableHeaders(parsed.headers);
-      setEditableRows(parsed.rows);
-      setOriginalRows(JSON.parse(JSON.stringify(parsed.rows)));
+      setEditableRows(processedRows);
+      setOriginalRows(JSON.parse(JSON.stringify(processedRows)));
+      if (autoRolledCount > 0) {
+        setHasEdits(true);
+      }
 
       // 2. Query preview API for column detection & suggested mappings
       const p = await automationApi.previewImport(f, type);
@@ -405,11 +464,35 @@ const ImportTab: React.FC = () => {
   };
 
   const handleCellChange = (rowIdx: number, col: string, val: string) => {
+    let finalVal = val;
+    // If user enters just time e.g. "11:10" or "11:10:00" in reminder_datetime, automatically prepend today's date
+    if (col === 'reminder_datetime' && /^\d{1,2}:\d{2}(:\d{2})?$/.test(val.trim())) {
+      const parts = val.trim().split(':');
+      const hh = parts[0].padStart(2, '0');
+      const mm = parts[1].padStart(2, '0');
+      const ss = parts[2] ? parts[2].padStart(2, '0') : '00';
+      finalVal = `${getTodayDateStr()} ${hh}:${mm}:${ss}`;
+    }
+
     setEditableRows((prev) => {
       const next = [...prev];
-      next[rowIdx] = { ...next[rowIdx], [col]: val };
+      next[rowIdx] = { ...next[rowIdx], [col]: finalVal };
       return next;
     });
+    setHasEdits(true);
+  };
+
+  const applyPresetTime = (offsetDays: number, timeStr?: string) => {
+    const targetDate = new Date(Date.now() + offsetDays * 86_400_000);
+    const datePart = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(targetDate);
+    let finalTime = timeStr;
+    if (!finalTime) {
+      const in2Min = new Date(Date.now() + 2 * 60_000);
+      const timeFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      finalTime = timeFormatter.format(in2Min);
+    }
+    const preset = `${datePart} ${finalTime}`;
+    setEditableRows((prev) => prev.map((r) => ({ ...r, reminder_datetime: preset })));
     setHasEdits(true);
   };
 
@@ -456,6 +539,15 @@ const ImportTab: React.FC = () => {
     if (!file || !preview || submitting.current || previewing) return;
     submitting.current = true;
     setBusy(true); setValidating(dryRun); setError(''); setResult(null);
+
+    // If starting automation and it was paused, automatically resume it!
+    if (!dryRun && automationPaused) {
+      try {
+        await automationApi.resume();
+        setAutomationPaused(false);
+      } catch {}
+    }
+
     try {
       let fileToSend = file;
       if (editableRows.length > 0 && editableHeaders.length > 0) {
@@ -485,8 +577,62 @@ const ImportTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Master 1-Click Automation Switch */}
+      <section className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-5 shadow-lg border border-indigo-900/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide ${
+              automationPaused
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${automationPaused ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'}`} />
+              {automationPaused ? '⏸️ AUTOMATION STOPPED' : '🟢 AUTOMATION RUNNING 24/7 (CLOUD)'}
+            </span>
+            <span className="text-[11px] text-slate-400">Render Cloud Worker</span>
+          </div>
+          <h3 className="text-base font-bold text-white">
+            {automationPaused ? 'Automation is Paused' : 'Cloud Reminder Engine is Active'}
+          </h3>
+          <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+            {automationPaused
+              ? 'Click "Start Automation" to enable automatic email and WhatsApp delivery.'
+              : 'All scheduled reminders run 24/7 on the cloud server. Reminders scheduled for today, tomorrow, or 2 days later will automatically send at the exact time — even if your computer is completely shut down.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={togglingAutomation}
+          onClick={handleToggleAutomation}
+          className={`px-6 py-3 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-2 shrink-0 cursor-pointer shadow-md ${
+            automationPaused
+              ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 scale-100 hover:scale-105 active:scale-95'
+              : 'bg-rose-600 hover:bg-rose-500 text-white border border-rose-400/40'
+          }`}
+        >
+          {automationPaused ? <PlayCircle className="w-5 h-5 text-slate-950" /> : <PauseCircle className="w-5 h-5 text-white" />}
+          <span>{automationPaused ? 'Start Automation' : 'Stop Automation'}</span>
+        </button>
+      </section>
+
       <section className={`${card} p-5 space-y-4`}>
-        <h2 className="text-sm font-bold text-slate-900">Upload a CSV</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">Upload CSV to Schedule Reminders</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Upload your customer & EMI data. You can edit times, send now, or schedule for 2 days later.
+            </p>
+          </div>
+          <button className={btnGhost} onClick={() => {
+            const tomorrow = new Date(Date.now() + 86_400_000);
+            const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(tomorrow);
+            const csv = 'customer_id,customer_name,phone_number,email,loan_id,emi_amount,due_date,reminder_datetime,channel_strategy,payment_status,timezone\n'
+              + `SAMPLE-1,Sample Customer,,sample@example.invalid,SAMPLE-LOAN-1,8500,${date},${date} 16:00:00,all,pending,Asia/Kolkata\n`;
+            const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+            const link = document.createElement('a'); link.href = url; link.download = 'exact_reminders_sample.csv'; link.click();
+            URL.revokeObjectURL(url);
+          }}>Download sample CSV</button>
+        </div>
         <p className="text-xs text-slate-500">
           Uploading never sends messages immediately. Valid rows are saved and reminders are scheduled from each record's
           reminder date and time, or from the reminder policy when none is given. Re-uploading updates schedules without duplicates.
@@ -609,6 +755,35 @@ const ImportTab: React.FC = () => {
                       <span>Export CSV</span>
                     </button>
                   </div>
+
+                  {/* 1-Click Quick Time Presets */}
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200">
+                    <span className="text-[11px] font-semibold text-slate-600">Quick Time Presets:</span>
+                    <button
+                      type="button"
+                      onClick={() => applyPresetTime(0)}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 cursor-pointer transition"
+                      title="Set reminder_datetime on all rows to 2 minutes from right now"
+                    >
+                      ⚡ Send in 2 Minutes (Test Now)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyPresetTime(0, '13:00:00')}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 cursor-pointer transition"
+                      title="Set reminder_datetime on all rows to today at 1:00 PM"
+                    >
+                      📅 Today at 1:00 PM
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyPresetTime(2, '11:10:00')}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 cursor-pointer transition"
+                      title="Set reminder_datetime on all rows to 2 days from now at 11:10 AM"
+                    >
+                      📆 In 2 Days at 11:10 AM (Sends Even When PC Is Off)
+                    </button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-96">
@@ -672,11 +847,23 @@ const ImportTab: React.FC = () => {
               </div>
             )}
 
-            <div className="flex items-center gap-3 pt-2">
-              <button className={btnGhost} disabled={busy} onClick={() => run(true)}>Validate only</button>
-              <button className={btnPrimary} disabled={busy} onClick={() => run(false)}>
-                <FileUp className="w-4 h-4" />
-                <span>Upload CSV {hasEdits ? '(with Edits)' : ''}</span>
+            <div className="flex flex-wrap items-center gap-3 pt-3">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-md disabled:opacity-50 cursor-pointer transition"
+                disabled={busy}
+                onClick={() => run(false)}
+              >
+                <PlayCircle className="w-4 h-4 text-emerald-400" />
+                <span>🚀 Start Automation & Schedule Reminders {hasEdits ? '(with Edits)' : ''}</span>
+              </button>
+              <button
+                type="button"
+                className={`${btnGhost} text-slate-500 hover:text-slate-700`}
+                disabled={busy}
+                onClick={() => run(true)}
+              >
+                <span>Test / Validate only (Dry run)</span>
               </button>
             </div>
           </div>
@@ -690,10 +877,17 @@ const ImportTab: React.FC = () => {
               <h2 role="status" className="text-sm font-bold text-slate-900">
                 {result.status === 'dry_run' ? 'Validation result (Dry Run - Nothing Saved)' : `Import #${result.import_id} complete`}
               </h2>
-              {result.status === 'dry_run' && (
+              {result.status === 'dry_run' ? (
                 <p className="text-xs text-amber-700 mt-1">
-                  ⚠️ This was a preview validation check only. No reminders were saved and no emails will be sent until you click <strong>Upload CSV & Schedule</strong>.
+                  ⚠️ This was a preview validation check only. No reminders were saved and no emails will be sent until you click <strong>Start Automation & Schedule Reminders</strong>.
                 </p>
+              ) : (
+                <div className="mt-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-start gap-2.5">
+                  <span className="text-base">☁️</span>
+                  <div>
+                    <strong className="text-emerald-950 font-semibold">Cloud Automation Active:</strong> Reminders are queued on the 24/7 cloud server. Scheduled emails and messages will dispatch at the exact time — even if this browser tab is closed or your computer is turned off.
+                  </div>
+                </div>
               )}
             </div>
             {result.status === 'dry_run' && (
