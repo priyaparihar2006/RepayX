@@ -475,10 +475,15 @@ def send_instant_email(request: Request, body: InstantEmailBody, principal: Prin
     if not res.accepted:
         raise APIError(502, res.error_code or "send_failed", res.error_message or "Email provider rejected message.")
 
+    clean_ref = (res.provider_message_id or req_id).split("@")[0].strip("<>")
+    from_addr = getattr(provider.config, "email_from_address", "priiiiicaptures@gmail.com")
+
     return {
         "success": True,
+        "from_address": from_addr,
         "recipient": body.recipient.strip(),
         "status": "accepted",
+        "tracking_ref": clean_ref,
         "message_id": res.provider_message_id,
         "sent_at": iso(now),
     }

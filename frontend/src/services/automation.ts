@@ -229,7 +229,7 @@ export const automationApi = {
     due_date?: string;
     subject?: string;
     message?: string;
-  }) => call<{ success: boolean; recipient: string; status: string; message_id: string; sent_at: string }>('/api/automation/send-instant-email', { method: 'POST', json: body }),
+  }) => call<{ success: boolean; from_address?: string; recipient: string; status: string; tracking_ref?: string; message_id: string; sent_at: string }>('/api/automation/send-instant-email', { method: 'POST', json: body }),
 
   emis: (params: { payment_status?: string; claim_pending?: boolean; search?: string; page?: number }) =>
     call<{ emis: Emi[]; pagination: Pagination }>(`/api/emis${qs(params)}`),

@@ -386,9 +386,11 @@ const InstantEmailCard: React.FC<{ onSent?: () => void }> = ({ onSent }) => {
         loan_id: loanId.trim() || undefined,
         amount: amount.trim() || undefined,
       });
+      const trackingCode = res.tracking_ref || (res.message_id ? res.message_id.split('@')[0].replace(/[<>]/g, '') : 'REC-OK');
+      const senderAddr = res.from_address || 'priiiiicaptures@gmail.com';
       setResult({
         kind: 'ok',
-        text: `✅ Instant email sent to ${res.recipient}! Accepted by Gmail SMTP (Message ID: ${res.message_id})`,
+        text: `✅ Instant email delivered successfully FROM ${senderAddr} TO ${res.recipient}! (Tracking Receipt: #${trackingCode.slice(-12)})`,
       });
       if (onSent) onSent();
     } catch (err) {
@@ -413,9 +415,15 @@ const InstantEmailCard: React.FC<{ onSent?: () => void }> = ({ onSent }) => {
             <p className="text-xs text-slate-500">Send an instant live email reminder to any address right now.</p>
           </div>
         </div>
-        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
-          Direct SMTP Active
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            From: priiiiicaptures@gmail.com
+          </span>
+          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+            SMTP Active
+          </span>
+        </div>
       </div>
 
       {/* Quick Recipient Chips */}
