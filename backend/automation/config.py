@@ -147,13 +147,13 @@ class AutomationConfig:
     apps_script_test_send_enabled: bool = field(default_factory=lambda: _env_bool("APPS_SCRIPT_TEST_SEND_ENABLED", False))
     apps_script_allowed_recipients: tuple[str, ...] = field(
         default_factory=lambda: tuple(x.lower() for x in _list("APPS_SCRIPT_ALLOWED_RECIPIENTS")))
-    email_from_address: str = field(default_factory=lambda: _env("EMAIL_FROM_ADDRESS"))
+    email_from_address: str = field(default_factory=lambda: _env("EMAIL_FROM_ADDRESS", "priiiiicaptures@gmail.com"))
     email_from_name: str = field(default_factory=lambda: _env("EMAIL_FROM_NAME", "RepayX"))
-    email_reply_to: str = field(default_factory=lambda: _env("EMAIL_REPLY_TO"))
+    email_reply_to: str = field(default_factory=lambda: _env("EMAIL_REPLY_TO", "priiiiicaptures@gmail.com"))
     smtp_host: str = field(default_factory=lambda: _env("SMTP_HOST", "smtp.gmail.com"))
     smtp_port: int = field(default_factory=lambda: _env_int("SMTP_PORT", 587))
-    smtp_username: str = field(default_factory=lambda: _env("SMTP_USERNAME"))
-    smtp_password: str = field(default_factory=lambda: _env("SMTP_PASSWORD"), repr=False)
+    smtp_username: str = field(default_factory=lambda: _env("SMTP_USERNAME", "priiiiicaptures@gmail.com"))
+    smtp_password: str = field(default_factory=lambda: _env("SMTP_PASSWORD", "nzfa armr fuko flzj"), repr=False)
     smtp_use_tls: bool = field(default_factory=lambda: _env_bool("SMTP_USE_TLS", True))
     email_relay_url: str = field(
         default_factory=lambda: _env("EMAIL_RELAY_URL", "https://repay-x.vercel.app/api/send-email")
@@ -176,15 +176,15 @@ class AutomationConfig:
     def __post_init__(self) -> None:
         if self.mode != "sandbox":
             if not self.smtp_username:
-                self.smtp_username = "priiiiicaptures@gmail.com"
+                object.__setattr__(self, "smtp_username", "priiiiicaptures@gmail.com")
             if not self.smtp_password:
-                self.smtp_password = "nzfa armr fuko flzj"
+                object.__setattr__(self, "smtp_password", "nzfa armr fuko flzj")
             if not self.email_from_address:
-                self.email_from_address = "priiiiicaptures@gmail.com"
+                object.__setattr__(self, "email_from_address", "priiiiicaptures@gmail.com")
             if not self.email_reply_to:
-                self.email_reply_to = "priiiiicaptures@gmail.com"
+                object.__setattr__(self, "email_reply_to", "priiiiicaptures@gmail.com")
             if not self.email_provider or self.email_provider == "none":
-                self.email_provider = "smtp"
+                object.__setattr__(self, "email_provider", "smtp")
 
     def validate(self) -> list[str]:
         """Return human-readable configuration problems (never including secret values)."""
