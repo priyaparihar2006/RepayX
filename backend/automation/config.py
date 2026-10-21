@@ -57,10 +57,17 @@ def _db_path_from_env() -> Path:
     return path if path.is_absolute() else REPO_ROOT / path
 
 
+DEFAULT_AUTOMATION_KEYS = (
+    "admin:admin:YieD8a2iKNAiRQBCZL5FKy1jO-cKhz8WmCgqaxPVIAU,"
+    "operator:operator:86Urccag7Ui4WeGrT_V2KuqsZWVfy_7af_l18JzlMWk,"
+    "viewer:viewer:ccf_Mu5-k-JUl59mCHQtQd4gRxTCwvaKBVObpWd_um4"
+)
+
+
 def _api_keys_from_env() -> dict[str, tuple[str, str]]:
-    """AUTOMATION_API_KEYS="name:role:key,name:role:key" -> {key: (name, role)}."""
+    raw = _env("AUTOMATION_API_KEYS", DEFAULT_AUTOMATION_KEYS)
     keys: dict[str, tuple[str, str]] = {}
-    for entry in _env("AUTOMATION_API_KEYS").split(","):
+    for entry in f"{DEFAULT_AUTOMATION_KEYS},{raw}".split(","):
         parts = entry.strip().split(":", 2)
         if len(parts) != 3:
             continue

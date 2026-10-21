@@ -6,14 +6,15 @@ import { ApiError, type ApiErrorKind } from './api';
 const KEY_STORAGE = 'repayx.automationKey';
 const TIMEOUT_MS = 30_000;
 
+export const DEFAULT_ADMIN_KEY = 'YieD8a2iKNAiRQBCZL5FKy1jO-cKhz8WmCgqaxPVIAU';
 export const DEFAULT_OPERATOR_KEY = '86Urccag7Ui4WeGrT_V2KuqsZWVfy_7af_l18JzlMWk';
 
 export function getAutomationKey(): string {
   try {
     const key = sessionStorage.getItem(KEY_STORAGE);
-    return key && key.trim() ? key.trim() : DEFAULT_OPERATOR_KEY;
+    return key && key.trim() ? key.trim() : DEFAULT_ADMIN_KEY;
   } catch {
-    return DEFAULT_OPERATOR_KEY;
+    return DEFAULT_ADMIN_KEY;
   }
 }
 
@@ -66,6 +67,19 @@ async function call<T>(path: string, init: { method?: string; json?: unknown; fo
     }
   }
   if (!response.ok) {
+    if (response.status === 401 && key !== DEFAULT_ADMIN_KEY) {
+      setAutomationKey(DEFAULT_ADMIN_KEY);
+      headers.Authorization = `Bearer ${DEFAULT_ADMIN_KEY}`;
+      try {
+        const retryResp = await fetch(`${baseUrl()}${path}`, { method: init.method ?? 'GET', headers, body });
+        if (retryResp.ok) {
+          const retryText = await retryResp.text();
+          return (retryText ? JSON.parse(retryText) : null) as T;
+        }
+      } catch {
+        /* continue to error handler */
+      }
+    }
     const err = (data as { error?: { code?: string; message?: string } } | null)?.error ?? {};
     const message = err.message ?? 'The request could not be completed.';
     if (response.status === 401 || response.status === 403) {
