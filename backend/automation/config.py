@@ -173,19 +173,6 @@ class AutomationConfig:
     webhook_max_age_seconds: int = field(default_factory=lambda: _env_int("WEBHOOK_MAX_AGE_SECONDS", 86_400))
     payment_webhook_secret: str = field(default_factory=lambda: _env("PAYMENT_WEBHOOK_SECRET"), repr=False)
 
-    def __post_init__(self) -> None:
-        if self.mode != "sandbox":
-            if not self.smtp_username:
-                object.__setattr__(self, "smtp_username", "priiiiicaptures@gmail.com")
-            if not self.smtp_password:
-                object.__setattr__(self, "smtp_password", "nzfa armr fuko flzj")
-            if not self.email_from_address:
-                object.__setattr__(self, "email_from_address", "priiiiicaptures@gmail.com")
-            if not self.email_reply_to:
-                object.__setattr__(self, "email_reply_to", "priiiiicaptures@gmail.com")
-            if not self.email_provider or self.email_provider == "none":
-                object.__setattr__(self, "email_provider", "smtp")
-
     def validate(self) -> list[str]:
         """Return human-readable configuration problems (never including secret values)."""
         problems: list[str] = []
