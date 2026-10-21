@@ -31,8 +31,8 @@ def _origins_from_env(name: str, default: str) -> list[str]:
 
 @dataclass(frozen=True)
 class Settings:
-    api_host: str = field(default_factory=lambda: os.getenv("API_HOST", "127.0.0.1"))
-    api_port: int = field(default_factory=lambda: int(os.getenv("API_PORT", "8000")))
+    api_host: str = field(default_factory=lambda: os.getenv("API_HOST", "0.0.0.0"))
+    api_port: int = field(default_factory=lambda: int(os.getenv("PORT", os.getenv("API_PORT", "8000"))))
     cors_allowed_origins: list[str] = field(
         default_factory=lambda: _origins_from_env(
             "CORS_ALLOWED_ORIGINS",

@@ -5,6 +5,7 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python requirements
@@ -20,9 +21,10 @@ ENV PYTHONUNBUFFERED=1
 ENV AUTOMATION_MODE=live
 ENV SCHEDULER_EMBEDDED=true
 ENV PYTHONPATH=/app/backend:/app
+ENV HOST=0.0.0.0
 
 EXPOSE 8000
 
 # Start FastAPI server
 WORKDIR /app/backend
-CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["python", "run.py"]
