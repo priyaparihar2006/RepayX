@@ -1,0 +1,56 @@
+services:
+  - type: web
+    name: repayx-backend
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: AUTOMATION_MODE
+        value: live
+      - key: SCHEDULER_EMBEDDED
+        value: "true"
+      - key: SCHEDULER_POLL_SECONDS
+        value: "15"
+      - key: APP_TIMEZONE
+        value: Asia/Kolkata
+      - key: DEFAULT_REMINDER_TIME
+        value: "10:00"
+      - key: CONTACT_WINDOW_START
+        value: "09:00"
+      - key: CONTACT_WINDOW_END
+        value: "19:00"
+      - key: CSV_DATE_ORDER
+        value: DMY
+      - key: EMAIL_PROVIDER
+        value: smtp
+      - key: EMAIL_FROM_ADDRESS
+        value: priiiiicaptures@gmail.com
+      - key: EMAIL_FROM_NAME
+        value: RepayX
+      - key: EMAIL_REPLY_TO
+        value: priiiiicaptures@gmail.com
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        value: priiiiicaptures@gmail.com
+      - key: SMTP_PASSWORD
+        value: "nzfa armr fuko flzj"
+      - key: SMTP_USE_TLS
+        value: "true"
+      - key: AUTOMATION_API_KEYS
+        value: "admin:admin:YieD8a2iKNAiRQBCZL5FKy1jO-cKhz8WmCgqaxPVIAU,operator:operator:86Urccag7Ui4WeGrT_V2KuqsZWVfy_7af_l18JzlMWk,viewer:viewer:ccf_Mu5-k-JUl59mCHQtQd4gRxTCwvaKBVObpWd_um4"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "http://localhost:3000,https://repay-x.vercel.app,https://repayx.vercel.app"
+      - key: CORS_ALLOW_ORIGIN_REGEX
+        value: "https:\\/\\/.*\\.vercel\\.app"
+      - key: EMAIL_RELAY_URL
+        value: "https://repay-x.vercel.app/api/send-email"
+      - key: EMAIL_RELAY_SECRET
+        value: "YieD8a2iKNAiRQBCZL5FKy1jO-cKhz8WmCgqaxPVIAU"
