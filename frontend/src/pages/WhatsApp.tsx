@@ -174,7 +174,7 @@ export function WhatsAppPage() {
   const handleUpdateTime = async (record: ScheduledRecord, newTime: string) => {
     const trimmed = newTime.trim();
     const updated = scheduledRecords.map((r) => {
-      if (r === record) {
+      if (r === record || (r.schedule_id && r.schedule_id === record.schedule_id)) {
         const timeVal = trimmed || null;
         let newStatus: ScheduledRecord['schedule_status'] = 'UNSCHEDULED';
         let newSchedAt: string | null = null;
@@ -215,6 +215,86 @@ export function WhatsAppPage() {
       } catch (err) {
         console.error('Failed to update schedule time:', err);
       }
+    }
+  };
+
+  const handleUpdateField = (record: ScheduledRecord, field: keyof ScheduledRecord, value: any) => {
+    const updated = scheduledRecords.map((r) => {
+      if (r === record || (r.schedule_id && r.schedule_id === record.schedule_id)) {
+        return {
+          ...r,
+          [field]: value,
+          ...(field === 'phone_number' ? { raw_phone: value } : {}),
+        };
+      }
+      return r;
+    });
+    setScheduledRecords(updated);
+    recomputeSummary(updated);
+  };
+
+  const [dispatchingAll, setDispatchingAll] = useState(false);
+
+  const handleDispatchAll = async () => {
+    let records = [...scheduledRecords];
+    if (!scheduleConfirmed && records.length > 0) {
+      try {
+        setConfirmingSchedule(true);
+        const confRes = await whatsapp.confirmSchedule(records, 'default');
+        setScheduleConfirmed(true);
+        setSchedulingSummary(confRes.stats);
+        if (confRes.schedules && confRes.schedules.length > 0) {
+          records = confRes.schedules;
+          setScheduledRecords(records);
+        }
+      } catch (err) {
+        console.error('Auto-confirm schedule failed:', err);
+      } finally {
+        setConfirmingSchedule(false);
+      }
+    }
+
+    const toSend = records.filter(
+      (r) => r.schedule_status !== 'DELIVERED' && r.schedule_status !== 'SENT' && !r.sent_at
+    );
+
+    if (toSend.length === 0) {
+      setUploadNotice('All messages have already been delivered!');
+      return;
+    }
+
+    setDispatchingAll(true);
+    setError('');
+    let sentCount = 0;
+    let failedCount = 0;
+    let currentRecords = [...records];
+
+    for (const record of toSend) {
+      try {
+        const res = await whatsapp.dispatchScheduledNow(record.schedule_id);
+        currentRecords = currentRecords.map((r) =>
+          r.schedule_id === record.schedule_id
+            ? {
+                ...r,
+                schedule_status: 'DELIVERED' as const,
+                sent_at: res.sent_at || new Date().toISOString(),
+                provider_id: res.provider_id,
+              }
+            : r
+        );
+        sentCount++;
+        setScheduledRecords(currentRecords);
+        recomputeSummary(currentRecords);
+      } catch (err) {
+        failedCount++;
+      }
+    }
+    await refreshHistory();
+    setDispatchingAll(false);
+    if (failedCount > 0) {
+      setUploadNotice(`⚡ Instant messages sent: ${sentCount} succeeded (${failedCount} failed or skipped).`);
+    } else {
+      setUploadNotice(`✅ Successfully dispatched instant messages to all ${sentCount} customers!`);
     }
   };
 
@@ -1029,6 +1109,7 @@ export function WhatsAppPage() {
                   onClick={handleConfirmSchedule}
                   disabled={confirmingSchedule}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition shadow-sm disabled:opacity-50"
+                  title="Save any edited fields and update the background schedule"
                 >
                   <Clock className="w-3.5 h-3.5" />
                   <span>
@@ -1038,6 +1119,19 @@ export function WhatsAppPage() {
                       ? '✅ Update / Re-Confirm Schedule'
                       : 'Confirm & Activate Schedule'}
                   </span>
+                </button>
+                <button
+                  onClick={handleDispatchAll}
+                  disabled={dispatchingAll || scheduledRecords.filter((r) => r.schedule_status !== 'DELIVERED' && !r.sent_at).length === 0}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition shadow-sm disabled:opacity-50"
+                  title="Send instant WhatsApp message to all customers at once"
+                >
+                  {dispatchingAll ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Zap className="w-3.5 h-3.5" />
+                  )}
+                  <span>{dispatchingAll ? 'Sending to All...' : '⚡ Instant Send to All'}</span>
                 </button>
               </div>
             </div>
@@ -1106,38 +1200,65 @@ export function WhatsAppPage() {
                     return (
                       <tr key={`${r.schedule_id || 'preview'}:${r.row_number ?? index}`} className={`transition ${isDelivered ? 'bg-emerald-50/30 hover:bg-emerald-50/60' : 'hover:bg-slate-50/70'}`}>
                         <td className="p-3">
-                          <div className="font-bold text-slate-900">{r.customer_name}</div>
-                          <div className="text-[11px] text-slate-400 font-mono">
+                          <input
+                            type="text"
+                            value={r.customer_name || ''}
+                            onChange={(e) => handleUpdateField(r, 'customer_name', e.target.value)}
+                            className="px-2 py-1 bg-white border border-slate-300 hover:border-slate-400 focus:border-indigo-500 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full min-w-[130px]"
+                            placeholder="Name..."
+                          />
+                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
                             #{r.customer_id} {r.loan_id ? `· ${r.loan_id}` : ''}
                           </div>
                         </td>
-                        <td className="p-3 font-mono font-semibold text-slate-800">
-                          {r.phone_number || r.raw_phone || 'Missing Phone'}
-                        </td>
-                        <td className="p-3 font-bold text-rose-700 text-sm">
-                          {r.unpaid_amount !== null && r.unpaid_amount !== undefined
-                            ? formatCurrency(r.unpaid_amount)
-                            : 'N/A'}
+                        <td className="p-3">
+                          <input
+                            type="text"
+                            value={r.phone_number || r.raw_phone || ''}
+                            onChange={(e) => handleUpdateField(r, 'phone_number', e.target.value)}
+                            className="px-2 py-1 bg-white border border-slate-300 hover:border-slate-400 focus:border-indigo-500 rounded-lg text-xs font-mono font-semibold text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-32"
+                            placeholder="+91..."
+                          />
                         </td>
                         <td className="p-3">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          <div className="relative flex items-center">
+                            <span className="absolute left-2 text-slate-400 text-xs font-bold">₹</span>
+                            <input
+                              type="number"
+                              value={r.unpaid_amount ?? ''}
+                              onChange={(e) => handleUpdateField(r, 'unpaid_amount', e.target.value === '' ? null : parseFloat(e.target.value))}
+                              className="pl-5 pr-2 py-1 bg-white border border-slate-300 hover:border-slate-400 focus:border-indigo-500 rounded-lg text-xs font-bold text-rose-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-24"
+                              placeholder="Amount"
+                            />
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <select
+                            value={r.risk_category || 'MEDIUM'}
+                            onChange={(e) => handleUpdateField(r, 'risk_category', e.target.value)}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-bold border border-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer ${
                               r.risk_category === 'HIGH'
-                                ? 'bg-rose-100 text-rose-800'
+                                ? 'bg-rose-50 text-rose-800 border-rose-300'
                                 : r.risk_category === 'MEDIUM'
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-emerald-100 text-emerald-800'
+                                ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                : 'bg-emerald-50 text-emerald-800 border-emerald-300'
                             }`}
                           >
-                            {r.risk_category || 'N/A'}
-                          </span>
+                            <option value="HIGH">HIGH</option>
+                            <option value="MEDIUM">MEDIUM</option>
+                            <option value="LOW">LOW</option>
+                          </select>
                         </td>
                         <td className="p-3">
-                          <span className="font-mono text-[11px] text-slate-700 font-semibold">
-                            {r.payment_status || 'N/A'}
-                          </span>
+                          <input
+                            type="text"
+                            value={r.payment_status || ''}
+                            onChange={(e) => handleUpdateField(r, 'payment_status', e.target.value)}
+                            className="px-2 py-1 bg-white border border-slate-300 hover:border-slate-400 focus:border-indigo-500 rounded-lg text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-24"
+                            placeholder="Status..."
+                          />
                           {r.days_past_due ? (
-                            <div className="text-[10px] text-slate-400">{r.days_past_due}d late</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">{r.days_past_due}d late</div>
                           ) : null}
                         </td>
                         <td className="p-3">
