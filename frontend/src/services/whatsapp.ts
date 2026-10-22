@@ -126,15 +126,24 @@ function apiUrl(path: string): string {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   let response: Response;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 90_000);
   try {
-    response = await fetch(apiUrl(path), options);
+    response = await fetch(apiUrl(path), { ...options, signal: options?.signal || controller.signal });
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') throw error;
-    throw new ApiError('network', 'Cannot reach the RepayX API. Start the backend on port 8000 and try again.');
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError('timeout', 'The RepayX API took too long to respond. The server may be waking up from sleep; please try again.');
+    }
+    throw new ApiError('network', 'Cannot reach the RepayX API. Check that the backend is running.');
+  } finally {
+    clearTimeout(timer);
   }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = typeof data.error === 'string' ? data.error : data.error?.message;
+    let message = typeof data.error === 'string' ? data.error : data.error?.message;
+    if (typeof message === 'string' && (message.includes('<!DOCTYPE') || message.includes('<html'))) {
+      message = 'WhatsApp bridge service is currently offline or waking up on Render. Please wait ~30s and try again.';
+    }
     throw new ApiError('server', message || 'Request failed', response.status, data.error?.code || data.type || 'error');
   }
   return data as T;

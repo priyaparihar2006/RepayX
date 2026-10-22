@@ -4,7 +4,7 @@
 import { ApiError, type ApiErrorKind } from './api';
 
 const KEY_STORAGE = 'repayx.automationKey';
-const TIMEOUT_MS = 30_000;
+const TIMEOUT_MS = 90_000;
 
 export const DEFAULT_ADMIN_KEY = 'YieD8a2iKNAiRQBCZL5FKy1jO-cKhz8WmCgqaxPVIAU';
 export const DEFAULT_OPERATOR_KEY = '86Urccag7Ui4WeGrT_V2KuqsZWVfy_7af_l18JzlMWk';

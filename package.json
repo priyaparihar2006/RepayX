@@ -1,0 +1,9 @@
+{
+  "name": "repayx",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "cd backend/whatsapp-bridge && npm install --production",
+    "start": "cd backend/whatsapp-bridge && node server.js"
+  }
+}

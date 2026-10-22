@@ -31,7 +31,7 @@ export class ApiError extends Error {
   }
 }
 
-const REQUEST_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = 90_000; // Allow 90s for cloud instances (e.g. Render free tier cold starts)
 
 function baseUrl(): string {
   const value = import.meta.env.VITE_API_BASE_URL;

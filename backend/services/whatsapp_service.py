@@ -182,7 +182,10 @@ class WhatsAppService:
                 parsed = json.loads(body_text)
                 message = parsed.get("error", parsed.get("message", f"HTTP {exc.code}"))
             except Exception:
-                message = f"HTTP {exc.code} from {base_url}: {body_text[:120] if body_text else exc.reason}"
+                if "<html" in body_text.lower() or "<!doctype" in body_text.lower():
+                    message = f"WhatsApp bridge at {base_url} is currently offline or waking up (HTTP {exc.code})."
+                else:
+                    message = f"HTTP {exc.code} from {base_url}: {body_text[:120] if body_text else exc.reason}"
             raise APIError(exc.code, "whatsapp_error", str(message)) from exc
         except (URLError, TimeoutError, OSError, ValueError) as exc:
             raise APIError(503, "bridge_unavailable", f"Cannot reach WhatsApp bridge at {base_url} ({exc}).") from exc
@@ -226,13 +229,32 @@ class WhatsAppService:
         return self.configuration()
 
     def generate_qr(self) -> dict:
-        return self._bridge("qr/generate", {})
+        try:
+            return self._bridge("qr/generate", {})
+        except APIError as exc:
+            return {
+                "success": False,
+                "ready": False,
+                "connected": False,
+                "status": "OFFLINE",
+                "qr_code": None,
+                "error": f"WhatsApp bridge is temporarily offline ({exc.message}). Please wait ~30s for Render to wake up and try again.",
+            }
 
     def pair_by_code(self, phone: str) -> dict:
-        return self._bridge("pair-code", {"phone": phone})
+        try:
+            return self._bridge("pair-code", {"phone": phone})
+        except APIError as exc:
+            return {
+                "success": False,
+                "error": f"WhatsApp bridge is temporarily offline ({exc.message}).",
+            }
 
     def disconnect(self) -> dict:
-        return self._bridge("disconnect", {})
+        try:
+            return self._bridge("disconnect", {})
+        except APIError:
+            return {"success": True, "status": "DISCONNECTED"}
 
     def templates(self) -> list[dict]:
         return DEFAULT_TEMPLATES
