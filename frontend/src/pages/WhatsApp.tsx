@@ -338,9 +338,22 @@ export function WhatsAppPage() {
     setDispatchingId(record.schedule_id);
     setError('');
     try {
-      const res = await whatsapp.dispatchScheduledNow(record.schedule_id);
+      let targetId = record.schedule_id;
+      if (!targetId || targetId.startsWith('preview:') || !scheduleConfirmed) {
+        const confRes = await whatsapp.confirmSchedule(scheduledRecords, 'default');
+        setScheduleConfirmed(true);
+        setSchedulingSummary(confRes.stats);
+        if (confRes.schedules && confRes.schedules.length > 0) {
+          setScheduledRecords(confRes.schedules);
+          const found = confRes.schedules.find(
+            (s) => s.row_number === record.row_number || s.phone_number === record.phone_number
+          );
+          if (found) targetId = found.schedule_id;
+        }
+      }
+      const res = await whatsapp.dispatchScheduledNow(targetId);
       const updated = scheduledRecords.map((r) =>
-        r.schedule_id === record.schedule_id
+        r.schedule_id === targetId || r.schedule_id === record.schedule_id
           ? {
               ...r,
               schedule_status: 'DELIVERED' as const,
@@ -363,9 +376,22 @@ export function WhatsAppPage() {
   const handleMarkDelivered = async (record: ScheduledRecord) => {
     setError('');
     try {
-      const res = await whatsapp.markScheduledDelivered(record.schedule_id);
+      let targetId = record.schedule_id;
+      if (!targetId || targetId.startsWith('preview:') || !scheduleConfirmed) {
+        const confRes = await whatsapp.confirmSchedule(scheduledRecords, 'default');
+        setScheduleConfirmed(true);
+        setSchedulingSummary(confRes.stats);
+        if (confRes.schedules && confRes.schedules.length > 0) {
+          setScheduledRecords(confRes.schedules);
+          const found = confRes.schedules.find(
+            (s) => s.row_number === record.row_number || s.phone_number === record.phone_number
+          );
+          if (found) targetId = found.schedule_id;
+        }
+      }
+      const res = await whatsapp.markScheduledDelivered(targetId);
       const updated = scheduledRecords.map((r) =>
-        r.schedule_id === record.schedule_id
+        r.schedule_id === targetId || r.schedule_id === record.schedule_id
           ? {
               ...r,
               schedule_status: 'DELIVERED' as const,
@@ -1122,14 +1148,14 @@ export function WhatsAppPage() {
                 </button>
                 <button
                   onClick={handleDispatchAll}
-                  disabled={dispatchingAll || scheduledRecords.filter((r) => r.schedule_status !== 'DELIVERED' && !r.sent_at).length === 0}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition shadow-sm disabled:opacity-50"
-                  title="Send instant WhatsApp message to all customers at once"
+                  disabled={dispatchingAll || scheduledRecords.length === 0}
+                  className="px-4 py-2 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white font-black text-xs rounded-xl flex items-center gap-1.5 transition shadow-md hover:shadow-lg disabled:opacity-50 active:scale-95 cursor-pointer ring-2 ring-indigo-300"
+                  title="Send instant WhatsApp message to all customers in the list at once"
                 >
                   {dispatchingAll ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
                   ) : (
-                    <Zap className="w-3.5 h-3.5" />
+                    <Zap className="w-4 h-4 fill-amber-300 text-amber-300" />
                   )}
                   <span>{dispatchingAll ? 'Sending to All...' : '⚡ Instant Send to All'}</span>
                 </button>
@@ -1207,8 +1233,16 @@ export function WhatsAppPage() {
                             className="px-2 py-1 bg-white border border-slate-300 hover:border-slate-400 focus:border-indigo-500 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full min-w-[130px]"
                             placeholder="Name..."
                           />
-                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                            #{r.customer_id} {r.loan_id ? `· ${r.loan_id}` : ''}
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className="text-[10px] text-slate-400 font-mono">#{r.customer_id}</span>
+                            <input
+                              type="text"
+                              value={r.loan_id || ''}
+                              onChange={(e) => handleUpdateField(r, 'loan_id', e.target.value)}
+                              className="px-1.5 py-0.5 bg-slate-50 border border-slate-200 hover:border-slate-300 rounded text-[10px] font-mono text-slate-600 w-28"
+                              placeholder="Loan ID..."
+                              title="Click to edit Loan ID"
+                            />
                           </div>
                         </td>
                         <td className="p-3">
@@ -1276,8 +1310,14 @@ export function WhatsAppPage() {
                             )}
                           </div>
                         </td>
-                        <td className="p-3 font-mono text-[11px] text-slate-600">
-                          {r.timezone || 'Asia/Kolkata'}
+                        <td className="p-3">
+                          <input
+                            type="text"
+                            value={r.timezone || 'Asia/Kolkata'}
+                            onChange={(e) => handleUpdateField(r, 'timezone', e.target.value)}
+                            className="px-1.5 py-1 bg-white border border-slate-200 hover:border-slate-300 rounded text-[11px] font-mono text-slate-700 w-28"
+                            placeholder="Timezone..."
+                          />
                         </td>
                         <td className="p-3">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusBadge}`}>
