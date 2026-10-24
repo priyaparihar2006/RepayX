@@ -44,6 +44,14 @@ class MetaCloudWhatsAppProvider(Provider):
 
     def build_payload(self, message: OutboundMessage) -> dict:
         to = message.recipient.lstrip("+")
+        if message.media_type == "audio" and message.media_url:
+            return {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": to,
+                "type": "audio",
+                "audio": {"link": message.media_url},
+            }
         if message.is_reply:
             return {"messaging_product": "whatsapp", "recipient_type": "individual", "to": to,
                     "type": "text", "text": {"preview_url": False, "body": message.text[:4096]}}

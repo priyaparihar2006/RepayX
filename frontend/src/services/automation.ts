@@ -98,8 +98,8 @@ const qs = (params: Record<string, string | number | boolean | undefined | null>
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') s.set(k, String(v));
   });
-  const out = s.toString();
-  return out ? `?${out}` : '';
+  const res = s.toString();
+  return res ? `?${res}` : '';
 };
 
 // ------------------------------------------------------------------ types
@@ -114,6 +114,9 @@ export interface Delivery {
   provider_message_id: string | null; attempt_count: number; next_retry_at: string | null;
   error_code: string | null; error_message: string | null; skip_reason: string | null;
   accepted_at: string | null; delivered_at: string | null; read_at: string | null; failed_at: string | null;
+  media_type?: string | null;
+  media_url?: string | null;
+  voice_script?: string | null;
 }
 
 export interface Reminder {
@@ -123,6 +126,11 @@ export interface Reminder {
   scheduled_at_utc: string; scheduled_at_local: string | null; run_at_utc: string; timezone: string;
   schedule_note: string | null; status: string; attempt_count: number; next_retry_at: string | null;
   outcome_reason: string | null; last_error: string | null; manual_override: boolean; channels: Channel[];
+  stage?: number;
+  stage_name?: string;
+  media_type?: string | null;
+  media_url?: string | null;
+  voice_script?: string | null;
   deliveries?: Delivery[];
 }
 
@@ -130,6 +138,38 @@ export interface Emi {
   emi_id: number; customer_id: string; customer_name?: string; loan_id: string; installment: string;
   emi_amount: string; amount_paid: string; outstanding: string; due_date: string; payment_status: string;
   payment_status_source: string; payment_status_updated_at: string; payment_claim_pending: boolean;
+}
+
+export interface EscalationCase {
+  id: number;
+  emi_id: number;
+  customer_id: string;
+  customer_name?: string;
+  phone?: string;
+  loan_id: string;
+  stage_reached: number;
+  overdue_days: number;
+  outstanding_amount: string;
+  status: 'open' | 'under_review' | 'resolved' | 'written_off';
+  assigned_to: string | null;
+  human_takeover?: boolean;
+  escalated_at: string;
+  notes: string | null;
+  resolved_at: string | null;
+}
+
+export interface VoiceMessage {
+  id: number;
+  job_id: string | null;
+  customer_id: string;
+  customer_name?: string;
+  loan_id: string;
+  language: string;
+  voice_id: string;
+  script_text: string;
+  audio_url: string;
+  duration_seconds: number | null;
+  created_at: string;
 }
 
 export interface ImportIssue { row: number; severity: 'error' | 'warning'; field: string | null; message: string }
@@ -174,6 +214,8 @@ export interface Dashboard {
     content: string; intent: string | null; created_at: string }[];
   followups_open: number; followups: FollowUp[];
   last_import: { id: number; filename: string; status: string; completed_at: string | null } | null;
+  escalation_cases_open?: number;
+  voice_messages_sent?: number;
   health: Health; app_timezone: string;
 }
 
@@ -184,6 +226,11 @@ export interface Policy {
   contact_window_start: string; contact_window_end: string; contact_days: number[]; max_lateness_minutes: number;
   require_explicit_consent: boolean; suppress_on_payment_claim: boolean; auto_reply_enabled: boolean;
   auto_reply_channels: Channel[];
+  three_stage_workflow?: boolean;
+  max_stages?: number;
+  voice_reminders_enabled?: boolean;
+  voice_language?: string;
+  voice_id?: string;
 }
 
 export interface Communication {
@@ -253,6 +300,18 @@ export const automationApi = {
   updatePayment: (emiId: number, body: { payment_status: string; amount_paid?: string; reference?: string; note?: string }) =>
     call<{ emi: Emi; reminders_cancelled: number }>(`/api/emis/${emiId}/payment`, { method: 'PATCH', json: body }),
   rejectClaim: (emiId: number, note: string) => call(`/api/emis/${emiId}/claim/reject`, { method: 'POST', json: { note } }),
+
+  // 3-Stage Escalations
+  escalations: (status?: string) =>
+    call<{ success: boolean; escalations: EscalationCase[] }>(`/api/escalations${qs({ status })}`),
+  resolveEscalation: (id: number, note: string) =>
+    call<{ success: boolean }>(`/api/escalations/${id}/resolve`, { method: 'POST', json: { note } }),
+  takeoverEscalation: (id: number, assignedTo?: string) =>
+    call<{ success: boolean; human_takeover: boolean; assigned_to: string }>(`/api/escalations/${id}/takeover`, { method: 'POST', json: { assigned_to: assignedTo } }),
+
+  // Voice Messages
+  voiceMessages: (params?: { customer_id?: string; limit?: number }) =>
+    call<{ success: boolean; voice_messages: VoiceMessage[] }>(`/api/voice-messages${qs(params ?? {})}`),
 
   settings: () => call<{ settings: Policy; app_timezone: string; mode: string }>('/api/automation/settings'),
   updateSettings: (changes: Partial<Policy>) =>

@@ -30,6 +30,9 @@ class OutboundMessage:
     # Ordered values for providers that require pre-approved templates (WhatsApp, Indian DLT SMS).
     template_params: dict[str, str] = field(default_factory=dict)
     is_reply: bool = False  # inside a customer-initiated session (e.g. WhatsApp 24h window)
+    media_type: str = "text"  # "text" or "audio"
+    media_url: str | None = None
+    voice_script: str | None = None
 
 
 @dataclass

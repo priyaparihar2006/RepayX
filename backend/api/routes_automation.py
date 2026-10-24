@@ -185,26 +185,7 @@ async def import_csv(
     except ImportRejected as exc:
         raise _rejected(exc) from exc
 
-    # Automatically dispatch newly imported or re-imported reminders immediately if not dry_run
-    if not dry_run and (summary.imported_rows > 0 or summary.unchanged_rows > 0 or summary.reconcile.scheduled > 0):
-        try:
-            with service.db.write() as conn:
-                now_iso_str = iso(utcnow())
-                conn.execute(
-                    """UPDATE reminder_jobs
-                       SET run_at_utc = ?
-                       WHERE emi_id IN (SELECT id FROM emis WHERE last_import_id = ?)
-                         AND status IN ('pending', 'retry_scheduled')
-                         AND (scheduled_at_utc <= datetime(?, '+5 minutes') OR schedule_note LIKE '%immediate%')""",
-                    (now_iso_str, summary.import_id, now_iso_str),
-                )
-            # Run immediate dispatch ticks so emails and messages send without delay
-            for _ in range(10):
-                processed = await run_in_threadpool(service.tick)
-                if not processed or not processed.get("claimed"):
-                    break
-        except Exception:
-            pass
+
 
     return {"success": True, **summary.as_dict()}
 
@@ -712,6 +693,9 @@ def dashboard(request: Request, _: Principal = require("viewer")):
                WHERE f.status = 'open' ORDER BY CASE f.priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END,
                f.id DESC LIMIT 10""").fetchall()
         open_followups = conn.execute("SELECT COUNT(*) FROM followup_tasks WHERE status = 'open'").fetchone()[0]
+        escalations_total = conn.execute("SELECT COUNT(*) FROM escalation_cases").fetchone()[0]
+        escalations_open = conn.execute("SELECT COUNT(*) FROM escalation_cases WHERE status = 'open'").fetchone()[0]
+        voice_count = conn.execute("SELECT COUNT(*) FROM voice_messages").fetchone()[0]
         last_import = conn.execute("SELECT id, filename, status, completed_at FROM imports ORDER BY id DESC LIMIT 1").fetchone()
 
     emi_counts = {"paid": 0, "pending": 0, "overdue": 0, "partially_paid": 0, "other": 0}
@@ -737,6 +721,8 @@ def dashboard(request: Request, _: Principal = require("viewer")):
             "scheduled_today": due_today, "due_today_open": due_today_open, "upcoming_7_days": upcoming,
             "by_status": job_status,
         },
+        "escalations": {"total": escalations_total, "open": escalations_open},
+        "voice_messages_total": voice_count,
         "deliveries_by_channel": channels,
         "failed_deliveries": sum(c.get("failed", 0) for c in channels.values()),
         "retry_attempts": retries,
@@ -901,3 +887,115 @@ def audit_log(request: Request, entity_type: str | None = None, entity_id: str |
 @router.get("/automation/me")
 def whoami(principal: Principal = require("viewer")):
     return {"success": True, "name": principal.name, "role": principal.role}
+
+
+class EscalationAction(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    note: str | None = None
+    assigned_to: str | None = None
+    status: Literal["open", "under_review", "resolved", "written_off"] | None = None
+
+
+@router.get("/escalations")
+def list_escalations(request: Request, status: str | None = None, customer_id: str | None = None,
+                     page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=100),
+                     _: Principal = require("viewer")):
+    service = svc(request)
+    where, params = [], []
+    if status:
+        where.append("e.status = ?")
+        params.append(status)
+    if customer_id:
+        where.append("e.customer_id = ?")
+        params.append(customer_id)
+    clause = ("WHERE " + " AND ".join(where)) if where else ""
+    with service.db.read() as conn:
+        total = conn.execute(f"SELECT COUNT(*) FROM escalation_cases e {clause}", params).fetchone()[0]
+        rows = conn.execute(
+            f"""SELECT e.*, c.name AS customer_name, c.phone, c.email, c.human_takeover
+                FROM escalation_cases e
+                LEFT JOIN customers c ON c.customer_id = e.customer_id
+                {clause} ORDER BY e.id DESC LIMIT ? OFFSET ?""",
+            params + [page_size, (page - 1) * page_size],
+        ).fetchall()
+    cases = [{
+        "id": r["id"], "emi_id": r["emi_id"], "customer_id": r["customer_id"],
+        "customer_name": r["customer_name"], "phone": mask_phone(r["phone"]),
+        "email": mask_email(r["email"]), "loan_id": r["loan_id"],
+        "stage_reached": r["stage_reached"], "overdue_days": r["overdue_days"],
+        "outstanding_amount": r["outstanding_amount"], "status": r["status"],
+        "assigned_to": r["assigned_to"], "escalated_at": r["escalated_at"],
+        "notes": r["notes"], "human_takeover": bool(r["human_takeover"]),
+        "created_at": r["created_at"], "resolved_at": r["resolved_at"],
+    } for r in rows]
+    return {"success": True, "escalations": cases, "pagination": _page(page, page_size, total)}
+
+
+@router.post("/escalations/{case_id}/resolve")
+def resolve_escalation(case_id: int, body: EscalationAction, request: Request,
+                       principal: Principal = require("operator")):
+    service = svc(request)
+    now_s = iso(utcnow())
+    with service.db.write() as conn:
+        row = conn.execute("SELECT * FROM escalation_cases WHERE id = ?", (case_id,)).fetchone()
+        if not row:
+            raise APIError(404, "not_found", "Escalation case not found.")
+        note = f"{row['notes'] or ''}\nResolved by {principal.name}: {body.note or ''}".strip()
+        conn.execute(
+            """UPDATE escalation_cases SET status = 'resolved', notes = ?,
+                   resolved_at = ?, updated_at = ? WHERE id = ?""",
+            (note, now_s, now_s, case_id),
+        )
+        from automation.audit import audit
+        audit(conn, principal.name, "escalation.resolved", "escalation_case", str(case_id), {"note": body.note})
+    return {"success": True, "message": "Escalation case marked as resolved."}
+
+
+@router.post("/escalations/{case_id}/takeover")
+def toggle_human_takeover(case_id: int, body: EscalationAction, request: Request,
+                          principal: Principal = require("operator")):
+    service = svc(request)
+    now_s = iso(utcnow())
+    with service.db.write() as conn:
+        row = conn.execute("SELECT * FROM escalation_cases WHERE id = ?", (case_id,)).fetchone()
+        if not row:
+            raise APIError(404, "not_found", "Escalation case not found.")
+        cust = conn.execute("SELECT human_takeover FROM customers WHERE customer_id = ?", (row["customer_id"],)).fetchone()
+        new_takeover = 0 if cust and cust["human_takeover"] else 1
+        conn.execute("UPDATE customers SET human_takeover = ?, updated_at = ? WHERE customer_id = ?",
+                     (new_takeover, now_s, row["customer_id"]))
+        assigned = body.assigned_to or (principal.name if new_takeover else None)
+        conn.execute("UPDATE escalation_cases SET assigned_to = ?, status = 'under_review', updated_at = ? WHERE id = ?",
+                     (assigned, now_s, case_id))
+        from automation.audit import audit
+        audit(conn, principal.name, "escalation.takeover", "escalation_case", str(case_id), {
+            "human_takeover": bool(new_takeover), "assigned_to": assigned,
+        })
+    return {"success": True, "human_takeover": bool(new_takeover), "assigned_to": assigned}
+
+
+@router.get("/media/voice/{filename}")
+def get_voice_audio(filename: str, request: Request):
+    from fastapi.responses import FileResponse
+    service = svc(request)
+    path = service.config.voice_media_dir / filename
+    if not path.is_file():
+        raise APIError(404, "not_found", "Audio file not found.")
+    return FileResponse(path, media_type="audio/mpeg")
+
+
+@router.get("/voice-messages")
+def list_voice_messages(request: Request, customer_id: str | None = None,
+                        page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=100),
+                        _: Principal = require("viewer")):
+    service = svc(request)
+    where, params = [], []
+    if customer_id:
+        where.append("customer_id = ?")
+        params.append(customer_id)
+    clause = ("WHERE " + " AND ".join(where)) if where else ""
+    with service.db.read() as conn:
+        total = conn.execute(f"SELECT COUNT(*) FROM voice_messages {clause}", params).fetchone()[0]
+        rows = conn.execute(f"SELECT * FROM voice_messages {clause} ORDER BY id DESC LIMIT ? OFFSET ?",
+                            params + [page_size, (page - 1) * page_size]).fetchall()
+    return {"success": True, "voice_messages": [dict(r) for r in rows], "pagination": _page(page, page_size, total)}

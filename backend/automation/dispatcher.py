@@ -154,7 +154,7 @@ class Dispatcher:
                 problem = self.providers[ch].configuration_problem()
                 if problem:
                     reason = "provider_not_configured"
-                elif self.config.mode == "test" and self.config.test_recipients:
+                elif self.config.test_recipients:
                     if ch == "email":
                         allowed_emails = {r.lower().strip() for r in self.config.test_recipients if "@" in r}
                         if not allowed_emails or recipient.lower().strip() not in allowed_emails:
@@ -223,8 +223,10 @@ class Dispatcher:
             self._finish(job_id, "skipped", f"no_eligible_channel ({summary})", now)
             return "skipped"
 
+        stg = job["stage"] if "stage" in job.keys() else 1
+        stg_name = job["stage_name"] if "stage_name" in job.keys() else "friendly"
         content = render_reminder(self.config, customer["name"], emi["loan_id"], snap.outstanding,
-                                  snap.due_date, local_now)
+                                  snap.due_date, local_now, stage=stg, stage_name=stg_name)
         if policy.channel_strategy == "fallback":
             self._run_fallback(job, eligible, deliveries, content, customer, now)
         else:
@@ -319,12 +321,48 @@ class Dispatcher:
             attempt_no = row["attempt_count"] + 1
             delivery_id = row["id"]
 
+        media_type = "text"
+        media_url = None
+        voice_script = None
+        policy = self.policy_store.get()
+        if ch == "whatsapp" and self.config.voice_enabled and policy.voice_reminders_enabled:
+            try:
+                from automation.voice_service import VoiceService, generate_voice_script
+                vs = VoiceService(self.config)
+                stg = job["stage"] if "stage" in job.keys() else 1
+                due_d = date.fromisoformat(job["due_date"])
+                with self.db.read() as conn_snap:
+                    emi_row = conn_snap.execute("SELECT * FROM emis WHERE id = ?", (job["emi_id"],)).fetchone()
+                    out_amt = max(Decimal("0.00"), Decimal(emi_row["emi_amount"]) - Decimal(emi_row["amount_paid"])) if emi_row else Decimal("0.00")
+                voice_script = generate_voice_script(
+                    customer_name=customer["name"],
+                    loan_id=job["loan_id"],
+                    outstanding=out_amt,
+                    due_date=due_d,
+                    stage=stg,
+                    language=customer["preferred_language"] or self.config.voice_language,
+                )
+                _, dur, afile = vs.synthesize(voice_script, voice_id=self.config.openai_tts_voice, language=self.config.voice_language)
+                media_type = "audio"
+                media_url = f"/api/media/voice/{afile}"
+                if self.config.public_media_base_url:
+                    media_url = f"{self.config.public_media_base_url.rstrip('/')}/api/media/voice/{afile}"
+                with self.db.write() as conn_v:
+                    vs.record_voice_message(
+                        conn_v, job_id, delivery_id, job["customer_id"], job["loan_id"],
+                        voice_script, media_url, dur, language=customer["preferred_language"] or self.config.voice_language,
+                        voice_id=self.config.openai_tts_voice, status="generated", created_at=now_s,
+                    )
+            except Exception as exc:
+                logger.warning("Voice synthesis skipped: %s", exc)
+
         message = OutboundMessage(
             channel=ch, recipient=decision.recipient, idempotency_key=key,
             text=content.sms_text if ch == "sms" else content.text,
             subject=content.subject if ch == "email" else None,
             html=content.html if ch == "email" else None,
             language=customer["preferred_language"], template_params=content.template_params,
+            media_type=media_type, media_url=media_url, voice_script=voice_script,
         )
         if ch == "email" and self.config.email_provider == "google_apps_script":
             message.subject, message.text, message.html = apps_script_content(content.template_params)
@@ -341,8 +379,9 @@ class Dispatcher:
             if result.accepted:
                 conn.execute(
                     """UPDATE message_deliveries SET status = 'accepted', provider_message_id = ?, accepted_at = ?,
+                           media_type = ?, media_url = ?, voice_script = ?,
                            error_code = NULL, error_message = NULL, updated_at = ? WHERE id = ?""",
-                    (result.provider_message_id, done_s, done_s, delivery_id))
+                    (result.provider_message_id, done_s, media_type, media_url, voice_script, done_s, delivery_id))
                 conn.execute(
                     """INSERT INTO communications (customer_id, loan_id, channel, direction, kind, job_id, delivery_id,
                            provider_message_id, identifier, subject, content, status, created_at)
@@ -381,6 +420,52 @@ class Dispatcher:
                     result.accepted, result.error_code)
         return result
 
+    def _check_and_escalate(self, job_id: str, now: datetime) -> None:
+        from datetime import date
+        now_s = iso(now)
+        with self.db.write() as conn:
+            job = conn.execute("SELECT * FROM reminder_jobs WHERE id = ?", (job_id,)).fetchone()
+            if not job:
+                return
+            stg = job["stage"] if "stage" in job.keys() else 1
+            if stg < 3:
+                return
+            emi = conn.execute("SELECT * FROM emis WHERE id = ?", (job["emi_id"],)).fetchone()
+            if not emi or emi["payment_status"] in ("paid", "cancelled", "waived"):
+                return
+            outstanding = max(Decimal("0.00"), Decimal(emi["emi_amount"]) - Decimal(emi["amount_paid"]))
+            if outstanding <= 0:
+                return
+
+            existing = conn.execute("SELECT id FROM escalation_cases WHERE emi_id = ?", (emi["id"],)).fetchone()
+            if not existing:
+                try:
+                    due_d = date.fromisoformat(emi["due_date"])
+                    dpd = max(0, (now.date() - due_d).days)
+                except Exception:
+                    dpd = 0
+                cur = conn.execute(
+                    """INSERT INTO escalation_cases (
+                           emi_id, customer_id, loan_id, stage_reached, overdue_days,
+                           outstanding_amount, status, escalated_at, notes, created_at, updated_at
+                       ) VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?)""",
+                    (emi["id"], emi["customer_id"], emi["loan_id"], stg, dpd,
+                     str(outstanding), now_s, "Auto-escalated to recovery team after Stage 3 final reminder.", now_s, now_s),
+                )
+                esc_id = cur.lastrowid
+                conn.execute(
+                    """INSERT INTO followup_tasks (
+                           customer_id, loan_id, emi_id, kind, priority, status,
+                           reason, created_at
+                       ) VALUES (?, ?, ?, 'escalation_recovery', 'high', 'open', ?, ?)""",
+                    (emi["customer_id"], emi["loan_id"], emi["id"],
+                     f"Escalated Case #{esc_id}: Stage 3 completed with outstanding INR {outstanding}", now_s),
+                )
+                audit(conn, "system", "reminder.escalated", "escalation_case", str(esc_id), {
+                    "loan_id": emi["loan_id"], "emi_id": emi["id"], "stage": stg, "outstanding": str(outstanding)
+                })
+                logger.info("Case escalated for EMI %s (Loan %s) after Stage 3", emi["id"], emi["loan_id"])
+
     def _finalize(self, job_id: str, eligible_channels: list[str], policy: ReminderPolicy, now: datetime) -> str:
         with self.db.read() as conn:
             rows = {r["channel"]: r for r in conn.execute(
@@ -407,6 +492,8 @@ class Dispatcher:
         else:
             status, reason = ("dead_letter" if exhausted else "failed"), "all eligible channels failed"
         self._finish(job_id, status, reason, now, error=errors or None)
+        if status in ("completed", "partially_completed"):
+            self._check_and_escalate(job_id, now)
         return status
 
     # ------------------------------------------------------------------ loop entry

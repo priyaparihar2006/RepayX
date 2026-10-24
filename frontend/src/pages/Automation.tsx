@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, AlertTriangle, BellRing, CalendarClock, CheckCircle2, Download, Edit3, FileUp, KeyRound, ListChecks, LogOut,
+  Activity, AlertTriangle, ShieldAlert, BellRing, CalendarClock, CheckCircle2, Download, Edit3, FileUp, KeyRound, ListChecks, LogOut,
   MessageSquareReply, PauseCircle, PlayCircle, Plus, RefreshCw, RotateCcw, Settings2, Trash2, Users, Wallet, XCircle, Zap, Send, Mail,
 } from 'lucide-react';
 import { ApiError } from '../services/api';
 import {
   AuthError, automationApi, getAutomationKey, setAutomationKey,
   type Channel, type Communication, type Dashboard, type Emi, type FollowUp, type ImportPreview,
-  type ImportSummary, type Pagination, type Policy, type Reminder,
+  type ImportSummary, type Pagination, type Policy, type Reminder, type EscalationCase, type VoiceMessage,
 } from '../services/automation';
 import { EmptyState, ErrorState, LoadingState } from '../components/common/RequestState';
 import { EmailTestPanel } from '../components/automation/EmailTestPanel';
@@ -15,7 +15,7 @@ import { CsvDropzone } from '../components/common/CsvDropzone';
 import { MetricCard } from '../components/analytics/MetricCard';
 
 type Role = 'viewer' | 'operator' | 'admin';
-type Tab = 'overview' | 'import' | 'reminders' | 'payments' | 'replies' | 'settings';
+type Tab = 'overview' | 'import' | 'reminders' | 'escalations' | 'payments' | 'replies' | 'settings';
 const RANK: Record<Role, number> = { viewer: 0, operator: 1, admin: 2 };
 const CHANNELS: Channel[] = ['whatsapp', 'sms', 'email'];
 const providerLabel = (name: string) => name === 'google_apps_script' ? 'Google Apps Script' : name;
@@ -210,10 +210,10 @@ const Overview: React.FC<{ role: Role; onOpenTab: (t: Tab) => void }> = ({ role,
           detail={data.last_import ? `Last import: ${data.last_import.filename}` : 'No imports yet'} />
         <MetricCard label="Reminders scheduled" value={String(data.reminders.scheduled_open)} icon={CalendarClock}
           detail={`${data.reminders.upcoming_7_days} in the next 7 days`} />
-        <MetricCard label="Due today" value={String(data.reminders.due_today_open)} icon={BellRing}
-          detail={`${data.reminders.scheduled_today} scheduled for today in total`} />
-        <MetricCard label="Failed deliveries" value={String(data.failed_deliveries)} icon={AlertTriangle}
-          detail={`${data.retry_attempts} retry attempts`} />
+        <MetricCard label="Open Escalations" value={String(data.escalation_cases_open ?? 0)} icon={ShieldAlert}
+          detail="Cases requiring human recovery intervention" />
+        <MetricCard label="Voice Reminders" value={String(data.voice_messages_sent ?? 0)} icon={Zap}
+          detail="AI-synthesized WhatsApp voice notes" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -1247,6 +1247,207 @@ const ReminderDetail: React.FC<{ id: string; role: Role; onChanged: () => void; 
   );
 };
 
+
+// ====================================================================== escalations (3-Stage Workflow)
+
+const EscalationsTab: React.FC<{ role: Role }> = ({ role }) => {
+  const [status, setStatus] = useState<string>('open,under_review');
+  const [resolvingId, setResolvingId] = useState<number | null>(null);
+  const [resolveNote, setResolveNote] = useState<string>('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const { data, error, reload } = useLoader(
+    () => automationApi.escalations(status),
+    [status],
+    5_000
+  );
+
+  const handleTakeover = async (id: number) => {
+    try {
+      await automationApi.takeoverEscalation(id, 'Recovery Officer');
+      reload();
+    } catch (err) {
+      alert(errText(err));
+    }
+  };
+
+  const handleResolve = async (id: number) => {
+    if (!resolveNote.trim()) {
+      alert('Please enter a resolution note before resolving.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await automationApi.resolveEscalation(id, resolveNote.trim());
+      setResolvingId(null);
+      setResolveNote('');
+      reload();
+    } catch (err) {
+      alert(errText(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className={`${card} p-4 flex flex-wrap gap-3 items-end justify-between`}>
+        <div className="flex flex-wrap gap-3 items-end">
+          <label className="text-[11px] text-slate-600">Escalation Status
+            <select
+              className={`${input} block mt-1`}
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="open,under_review">Active (Open & Under Review)</option>
+              <option value="">All Statuses</option>
+              <option value="open">Open</option>
+              <option value="under_review">Under Review / Paused</option>
+              <option value="resolved">Resolved</option>
+            </select>
+          </label>
+        </div>
+        <div className="text-xs text-slate-500">
+          Showing automated escalations after exactly 3 exhausted reminder stages.
+        </div>
+      </div>
+
+      <section className={card}>
+        {error && !data ? (
+          <ErrorState error={error} onRetry={reload} />
+        ) : !data ? (
+          <LoadingState />
+        ) : !data.escalations || data.escalations.length === 0 ? (
+          <EmptyState
+            title="No escalation cases"
+            message="Borrowers who complete all 3 reminder stages without payment or valid dispute will automatically appear here for human recovery intervention."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-slate-500 border-b border-slate-100">
+                  <th className="py-2.5 px-4 font-medium">Customer</th>
+                  <th className="px-2 font-medium">Loan ID</th>
+                  <th className="px-2 font-medium">Overdue Days</th>
+                  <th className="px-2 font-medium">Outstanding</th>
+                  <th className="px-2 font-medium">Stage Reached</th>
+                  <th className="px-2 font-medium">Status</th>
+                  <th className="px-2 font-medium">Human Takeover</th>
+                  <th className="px-2 font-medium">Escalated At (IST)</th>
+                  <th className="px-2 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.escalations.map((esc: EscalationCase) => (
+                  <tr key={esc.id} className="border-b border-slate-50 hover:bg-slate-50">
+                    <td className="py-2.5 px-4">
+                      <span className="font-semibold text-slate-800">{esc.customer_name ?? esc.customer_id}</span>
+                      <br />
+                      <span className="text-[10px] text-slate-500">{esc.phone ?? esc.customer_id}</span>
+                    </td>
+                    <td className="px-2 font-mono font-medium text-slate-700">{esc.loan_id}</td>
+                    <td className="px-2">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                        {esc.overdue_days} days
+                      </span>
+                    </td>
+                    <td className="px-2 font-semibold text-slate-900">{money(esc.outstanding_amount)}</td>
+                    <td className="px-2">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                        Stage {esc.stage_reached} (Final)
+                      </span>
+                    </td>
+                    <td className="px-2">
+                      <Badge value={esc.status} />
+                    </td>
+                    <td className="px-2">
+                      {esc.human_takeover ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                          Assigned ({esc.assigned_to ?? 'Officer'})
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">Unassigned</span>
+                      )}
+                    </td>
+                    <td className="px-2 text-slate-500">{fmtTime(esc.escalated_at)}</td>
+                    <td className="px-2 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {role !== 'viewer' && esc.status !== 'resolved' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleTakeover(esc.id)}
+                              className={`${btnGhost} text-[11px] py-1 px-2`}
+                              title="Toggle manual human takeover for this borrower"
+                            >
+                              <Users className="w-3 h-3" />
+                              <span>{esc.human_takeover ? 'Release' : 'Take Over'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setResolvingId(esc.id);
+                                setResolveNote('');
+                              }}
+                              className={`${btnPrimary} text-[11px] py-1 px-2 bg-emerald-700 hover:bg-emerald-600`}
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Resolve</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Resolution Modal */}
+      {resolvingId !== null && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-md w-full shadow-xl space-y-4">
+            <h3 className="text-sm font-bold text-slate-900">Resolve Escalation Case #{resolvingId}</h3>
+            <p className="text-xs text-slate-500">
+              Provide an audit note documenting the recovery agreement, restructured installment, or verified settlement.
+            </p>
+            <textarea
+              className="w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              rows={3}
+              placeholder="e.g. Borrower visited branch; agreed to restructured payment plan starting 15th."
+              value={resolveNote}
+              onChange={(e) => setResolveNote(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className={btnGhost}
+                onClick={() => setResolvingId(null)}
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`${btnPrimary} bg-emerald-700 hover:bg-emerald-600`}
+                onClick={() => handleResolve(resolvingId)}
+                disabled={submitting}
+              >
+                {submitting ? 'Resolving...' : 'Confirm Resolution'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 const RemindersTab: React.FC<{ role: Role }> = ({ role }) => {
   const [status, setStatus] = useState('pending,retry,processing');
   const [type, setType] = useState('');
@@ -1281,13 +1482,33 @@ const RemindersTab: React.FC<{ role: Role }> = ({ role }) => {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead><tr className="text-left text-slate-500 border-b border-slate-100">
-                <th className="py-2 px-4 font-medium">Customer</th><th className="px-2 font-medium">Loan</th><th className="px-2 font-medium">Type</th>
+                <th className="py-2 px-4 font-medium">Customer</th><th className="px-2 font-medium">Loan</th><th className="px-2 font-medium">Stage</th><th className="px-2 font-medium">Voice Audio</th>
                 <th className="px-2 font-medium">Scheduled (IST)</th><th className="px-2 font-medium">Status</th><th className="px-2 font-medium">Channels</th><th className="px-2 font-medium">Attempts</th><th className="px-2 font-medium text-right">Action</th>
               </tr></thead>
               <tbody>{data.reminders.map((r: Reminder) => (
                 <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer" onClick={() => setSelected(r.id)}>
                   <td className="py-2 px-4"><span className="font-semibold text-slate-800">{r.customer_name ?? r.customer_id}</span><br /><span className="text-[10px] text-slate-500">{r.customer_id}</span></td>
-                  <td className="px-2">{r.loan_id}</td><td className="px-2">{r.reminder_type.replace('_', ' ')}</td>
+                  <td className="px-2">{r.loan_id}</td>
+                  <td className="px-2">
+                    {r.stage ? (
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
+                        r.stage === 1 ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                        r.stage === 2 ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                        'bg-rose-50 text-rose-700 border-rose-200'
+                      }`}>
+                        Stage {r.stage} ({r.stage_name ?? (r.stage === 1 ? 'Friendly' : r.stage === 2 ? 'Firm' : 'Final')})
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-500 capitalize">{r.reminder_type.replace('_', ' ')}</span>
+                    )}
+                  </td>
+                  <td className="px-2" onClick={(e) => e.stopPropagation()}>
+                    {r.media_url ? (
+                      <audio controls className="h-6 w-32" src={r.media_url.startsWith('http') ? r.media_url : `${import.meta.env.VITE_API_BASE_URL ?? ''}${r.media_url}`} />
+                    ) : (
+                      <span className="text-[10px] text-slate-400">None (Text)</span>
+                    )}
+                  </td>
                   <td className="px-2">{fmtTime(r.scheduled_at_utc)} IST</td>
                   <td className="px-2"><Badge value={r.display_status ?? r.status} title={r.outcome_reason ?? undefined} /></td>
                   <td className="px-2"><div className="flex flex-wrap gap-1">{(r.deliveries?.length ? r.deliveries : r.channels.map((c) => ({ channel: c, status: 'queued' }))).map((d) => (
@@ -1518,6 +1739,7 @@ const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
   { id: 'overview', label: 'Overview', icon: Activity, minRole: 'viewer' },
   { id: 'import', label: 'Import CSV', icon: FileUp, minRole: 'operator' },
   { id: 'reminders', label: 'Reminders', icon: ListChecks, minRole: 'viewer' },
+  { id: 'escalations', label: 'Escalations', icon: ShieldAlert, minRole: 'viewer' },
   { id: 'payments', label: 'Payments', icon: Wallet, minRole: 'viewer' },
   { id: 'replies', label: 'Replies & follow-ups', icon: MessageSquareReply, minRole: 'viewer' },
   { id: 'settings', label: 'Policy', icon: Settings2, minRole: 'viewer' },
@@ -1563,6 +1785,7 @@ export const AutomationPage: React.FC = () => {
       {tab === 'overview' && <Overview role={user.role} onOpenTab={setTab} />}
       {tab === 'import' && <ImportTab />}
       {tab === 'reminders' && <RemindersTab role={user.role} />}
+      {tab === 'escalations' && <EscalationsTab role={user.role} />}
       {tab === 'payments' && <PaymentsTab role={user.role} />}
       {tab === 'replies' && <RepliesTab role={user.role} />}
       {tab === 'settings' && <div className="space-y-6"><SettingsTab role={user.role} />{user.role === 'admin' && <EmailTestPanel />}</div>}

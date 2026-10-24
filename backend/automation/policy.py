@@ -43,6 +43,8 @@ class PlannedReminder:
     reminder_type: str
     scheduled_at: datetime  # UTC, after contact-window adjustment
     note: str | None
+    stage: int = 1
+    stage_name: str = "friendly"
 
 
 def ineligibility_reason(emi: EmiSnapshot) -> str | None:
@@ -117,7 +119,15 @@ def plan_reminders(emi: EmiSnapshot, policy: ReminderPolicy) -> list[PlannedRemi
             candidates.append((f"overdue:{days}:{due}", "overdue", _local(emi.due_date + timedelta(days=days), at, tz)))
 
     planned: list[PlannedReminder] = []
-    for key, rtype, local in candidates:
+    # Exactly three stages in standard sequence
+    stage_names = ["friendly", "firm", "final"]
+    if getattr(policy, "max_stages", 0) > 0:
+        candidates = candidates[: policy.max_stages]
+    elif getattr(policy, "three_stage_workflow", False):
+        candidates = candidates[:3]
+    for i, (key, rtype, local) in enumerate(candidates):
+        st_num = i + 1
+        st_name = stage_names[min(i, len(stage_names) - 1)]
         adjusted = next_contact_time(local, policy)
         note = None
         if adjusted != local:
@@ -125,7 +135,7 @@ def plan_reminders(emi: EmiSnapshot, policy: ReminderPolicy) -> list[PlannedRemi
                 f"Moved from {local.strftime('%Y-%m-%d %H:%M')} to {adjusted.strftime('%Y-%m-%d %H:%M')} "
                 f"({emi.timezone}) to respect the contact window"
             )
-        planned.append(PlannedReminder(key, rtype, adjusted.astimezone(UTC), note))
+        planned.append(PlannedReminder(key, rtype, adjusted.astimezone(UTC), note, stage=st_num, stage_name=st_name))
     return planned
 
 

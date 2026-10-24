@@ -45,6 +45,13 @@ class ReminderPolicy(BaseModel):
     overdue_days: list[int] = Field(default_factory=lambda: [3, 7])
     overdue_repeat_every_days: int = Field(default=7, ge=0, le=60)
     overdue_max_reminders: int = Field(default=4, ge=0, le=20)
+    stage1_offset_days: int = Field(default=-2, ge=-90, le=90)
+    stage2_offset_days: int = Field(default=0, ge=-90, le=90)
+    stage3_offset_days: int = Field(default=4, ge=-90, le=90)
+    max_stages: int = Field(default=0, ge=0, le=20)
+    escalation_auto_create: bool = Field(default=True)
+    voice_reminders_enabled: bool = Field(default=True)
+    three_stage_workflow: bool = Field(default=False)
 
     contact_window_start: str = "09:00"
     contact_window_end: str = "19:00"

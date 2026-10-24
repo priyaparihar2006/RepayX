@@ -47,7 +47,7 @@ class SmtpEmailProvider(Provider):
         msg["From"] = formataddr((c.email_from_name, c.email_from_address))
         msg["To"] = message.recipient
         msg["Subject"] = message.subject or "Payment reminder"
-        domain = "repayx.ai"
+        domain = c.email_from_address.split("@")[-1] if "@" in c.email_from_address else "repayx.ai"
         msg["Message-ID"] = make_msgid(idstring=message.idempotency_key.replace(":", "."), domain=domain)
         if c.email_reply_to:
             msg["Reply-To"] = c.email_reply_to

@@ -91,6 +91,12 @@ def handle_inbound(
         audit(conn, "system", "inbound.unmatched", "communication", comm_id, {"channel": channel, "from": masked})
         return InboundResult(comm_id, None, intent, None, channel, identifier, ["followup:unmatched_reply"])
 
+    if customer["human_takeover"] and intent != "OPT_OUT":
+        _task(conn, customer["customer_id"], emi["loan_id"] if emi else None, emi["id"] if emi else None,
+              "human_agent_message", "high", f"Customer under human takeover sent message: {text[:200]}", comm_id, now)
+        audit(conn, "system", "inbound.human_active", "communication", comm_id, {"customer_id": customer["customer_id"]})
+        return InboundResult(comm_id, customer["customer_id"], intent, None, channel, identifier, ["human_takeover_active"])
+
     cid = customer["customer_id"]
     loan_id = emi["loan_id"] if emi else None
     emi_id = emi["id"] if emi else None
@@ -101,7 +107,26 @@ def handle_inbound(
     help_line = f" You can also reach us at {support}." if support else ""
     reply: str | None = None
 
-    if intent == "OPT_OUT":
+    if intent == "HUMAN_AGENT":
+        conn.execute("UPDATE customers SET human_takeover = 1, updated_at = ? WHERE customer_id = ?", (iso(now), cid))
+        _task(conn, cid, loan_id, emi_id, "human_agent_requested", "high",
+              "Customer requested human agent / executive", comm_id, now)
+        actions += ["human_takeover_enabled", "followup:human_agent_requested"]
+        reply = (f"Namaste {name} ji, humne aapka request note kar liya hai. Ek customer care executive "
+                 f"aapse jald hi WhatsApp ya phone par connect karega.{help_line}")
+    elif intent == "DUE_DATE":
+        if emi is not None:
+            outstanding = max(Decimal("0"), Decimal(emi["emi_amount"]) - Decimal(emi["amount_paid"]))
+            due = datetime.fromisoformat(emi["due_date"]).strftime("%d %b %Y")
+            reply = (f"Namaste {name} ji, aapke loan {loan_id} ki due date {due} hai aur outstanding balance "
+                     f"{format_inr(outstanding)} hai.")
+            link = payment_link(config, loan_id)
+            if link:
+                reply += f" Pay securely: {link}"
+            reply += help_line
+        else:
+            reply = f"Hello {name}, our records show no pending EMI on your account.{help_line}"
+    elif intent == "OPT_OUT":
         conn.execute(
             """INSERT OR IGNORE INTO suppressions (channel, identifier, customer_id, reason, source, created_at)
                VALUES (?, ?, ?, 'customer_opt_out', ?, ?)""", (channel, identifier, cid, f"inbound:{comm_id}", iso(now)))
@@ -114,6 +139,8 @@ def handle_inbound(
         reconcile_customer(conn, cid, policy, now, "system")
         _task(conn, cid, loan_id, emi_id, "dispute", "high", "Customer disputed the loan or raised a complaint",
               comm_id, now)
+        if emi_id:
+            conn.execute("UPDATE escalation_cases SET status = 'under_review', updated_at = ? WHERE emi_id = ? AND status = 'open'", (iso(now), emi_id))
         actions += ["customer_on_hold", "followup:dispute"]
         reply = ("Thank you for letting us know. We have paused automated reminders and a member of our team "
                  f"will review your concern and contact you.{help_line}")

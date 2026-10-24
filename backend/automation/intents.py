@@ -21,7 +21,16 @@ DISPUTE = re.compile(
 PAID_CLAIM = re.compile(
     r"\b(already paid|have paid|i paid|paid it|paid already|payment (is )?(done|made|completed|successful)|"
     r"made the payment|paid (yesterday|today|this morning)|kar diya|kr diya|bhar diya|"
-    r"payment ho gaya|ho gaya payment|jama kar diya)\b|^\s*paid\s*[.!]*\s*$", re.I)
+    r"maine payment kar di|maine pay kar diya|payment ho gaya|ho gaya payment|jama kar diya|transfer kar diya|bhej diya)\b|^\s*paid\s*[.!]*\s*$", re.I)
+
+HUMAN_AGENT = re.compile(
+    r"\b(speak to (a )?(person|human)|talk to (a )?(person|human)|human agent|customer care|executive|agent se baat|insan se baat|call me)\b", re.I)
+
+DUE_DATE = re.compile(
+    r"\b(due date|due on|kab tak|last date|tarikh|tareekh|when (is it )?due)\b", re.I)
+
+FEE_DISPUTE = re.compile(
+    r"\b(late fee|penalty|extra charges?|charges? kyu|penalty kyu)\b", re.I)
 HARDSHIP = re.compile(
     r"\b(lost (my )?job|job loss|unemployed|medical|hospital\w*|can'?t afford|cannot afford|no money|"
     r"salary (not|delayed|late)|financial (problem|difficulty|crisis)|accident|illness)\b", re.I)
@@ -45,7 +54,9 @@ def classify(text: str) -> str:
     t = text.strip()
     if OPT_OUT.search(t):
         return "OPT_OUT"
-    if DISPUTE.search(t):
+    if HUMAN_AGENT.search(t):
+        return "HUMAN_AGENT"
+    if DISPUTE.search(t) or FEE_DISPUTE.search(t):
         return "DISPUTE"
     if PAID_CLAIM.search(t):
         return "PAID_CLAIM"
@@ -55,6 +66,8 @@ def classify(text: str) -> str:
         return "PROMISE_TO_PAY"
     if MORE_TIME.search(t):
         return "MORE_TIME"
+    if DUE_DATE.search(t):
+        return "DUE_DATE"
     if PAYMENT_DETAILS.search(t):
         return "PAYMENT_DETAILS"
     if BALANCE.search(t):

@@ -30,19 +30,21 @@ RepayX estimates each borrower's risk of default with a machine-learning model, 
 18. [Limitations](#18-limitations)
 19. [Future improvements](#19-future-improvements)
 
-Also: [Testing](#testing) · [Security and data privacy](#security-and-data-privacy) · [Product requirements (PRD.md)](PRD.md) · [Backend notes](backend/README.md)
+Also: [Production Runbook & WhatsApp Setup](docs/PRODUCTION_DEPLOYMENT_AND_RUNBOOK.md) · [Testing](#testing) · [Security and data privacy](#security-and-data-privacy) · [Product requirements (PRD.md)](PRD.md) · [Backend notes](backend/README.md)
 
 ---
 
 ## 1. Project overview
 
-For the optional Meta Cloud API messaging screen, see the [WhatsApp setup guide](docs/WHATSAPP.md). Sender setup is required before real messages can be sent.
+For production cloud deployment, Meta WhatsApp Business Cloud API, voice synthesis, and persistent worker execution, see the [Production Deployment & Operations Runbook](docs/PRODUCTION_DEPLOYMENT_AND_RUNBOOK.md).
 
-RepayX combines four things in one application:
+RepayX combines five core systems in one production application:
 
+- **AI-Powered EMI Reminder & Recovery Automation.** Automatically schedules and dispatches progressive 3-stage reminders (Stage 1 Friendly, Stage 2 Firm, Stage 3 Final) via Meta WhatsApp Business Cloud API with AI-generated voice notes and independent background worker execution.
+- **Two-Way Conversational Recovery.** Context-aware AI assistant in Hindi, Hinglish, and English grounded in real-time loan databases with automatic payment claim holds, dispute management, and human takeover.
 - **Default-risk prediction.** A logistic-regression model trained on the Home Credit Default Risk data estimates each customer's probability of default. The probability becomes a 0–100 risk score and a Low / Medium / High risk category.
 - **Repayment analytics.** Historical installment records are aggregated into per-customer behaviour: lateness, underpayment, unpaid amounts, and payment ratio.
-- **Portfolio dashboard.** Risk and repayment distributions, segment breakdowns, and ranked customer tables, all served by a FastAPI backend.
+- **Portfolio & Escalation Dashboard.** Real-time operational monitoring of reminder jobs, delivery states, conversational messages, audio voice playback, and human recovery escalations.
 - **Natural-language questions.** A hybrid query router answers questions such as *"How many high-risk customers are there?"* or *"Which customers frequently pay late?"*. Numeric questions are calculated with pandas; only descriptive questions use TF-IDF text retrieval. No language model writes the answers.
 
 The scored portfolio is the 20% held-out split of the training data: **61,503 customers** that the model never saw while training.

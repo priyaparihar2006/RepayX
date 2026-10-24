@@ -96,6 +96,10 @@ def reconcile_emi(
     stop_reason = ineligibility_reason(snap)
     if stop_reason is None and customer["reminders_on_hold"]:
         stop_reason = "customer_on_hold"
+    if stop_reason is None:
+        esc = conn.execute("SELECT id FROM escalation_cases WHERE emi_id = ? AND status IN ('open', 'under_review')", (emi_id,)).fetchone()
+        if esc:
+            stop_reason = "case_escalated"
     planned: dict[str, PlannedReminder] = (
         {} if stop_reason else {p.key: p for p in plan_reminders(snap, policy)}
     )
@@ -151,7 +155,7 @@ def reconcile_emi(
             if job is None:
                 tz = ZoneInfo(snap.timezone)
                 if plan.scheduled_at.astimezone(tz).date() >= now.astimezone(tz).date():
-                    plan = PlannedReminder(plan.key, plan.reminder_type, now, "Scheduled for immediate dispatch")
+                    plan = PlannedReminder(plan.key, plan.reminder_type, now, "Scheduled for immediate dispatch", stage=plan.stage, stage_name=plan.stage_name)
                 else:
                     result.skipped_past += 1
                     continue
@@ -163,12 +167,12 @@ def reconcile_emi(
             conn.execute(
                 """INSERT INTO reminder_jobs (id, emi_id, customer_id, loan_id, reminder_key, reminder_type,
                        due_date, scheduled_at_utc, run_at_utc, timezone, schedule_note, channels_json,
-                       status, created_at, updated_at, channel_strategy)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+                       status, created_at, updated_at, channel_strategy, stage, stage_name)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)
                    ON CONFLICT (emi_id, reminder_key) DO NOTHING""",
                 (job_id, emi_id, emi["customer_id"], emi["loan_id"], key, plan.reminder_type,
                  snap.due_date.isoformat(), new_at, new_at, snap.timezone, plan.note, channels, now_s, now_s,
-                 policy.channel_strategy),
+                 policy.channel_strategy, plan.stage, plan.stage_name),
             )
             audit(conn, actor, "reminder.scheduled", "reminder_job", job_id,
                   {"type": plan.reminder_type, "at": new_at, "loan_id": emi["loan_id"]})

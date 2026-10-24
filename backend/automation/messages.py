@@ -51,11 +51,19 @@ def render_reminder(
     outstanding: Decimal,
     due_date: date,
     local_now: datetime,
+    stage: int = 1,
+    stage_name: str = "friendly",
 ) -> ReminderContent:
     amount = format_inr(outstanding)
     due = _fmt_date(due_date)
     days_late = (local_now.date() - due_date).days
-    if days_late > 0:
+    if stage >= 3:
+        headline = f"FINAL NOTICE: your EMI of {amount} for loan {loan_id} remains unpaid (due: {due}). Please clear your dues immediately to prevent your case from being referred to our recovery and legal team."
+        subject = f"FINAL NOTICE: Unpaid EMI for loan {loan_id}"
+    elif stage == 2:
+        headline = f"Payment Follow-up: your EMI of {amount} for loan {loan_id} is still pending (due: {due}). Please complete your payment today to avoid additional late charges and credit impact."
+        subject = f"Payment Follow-up: EMI for loan {loan_id}"
+    elif days_late > 0:
         headline = f"your EMI of {amount} for loan {loan_id} was due on {due} and is {days_late} day{'s' if days_late != 1 else ''} overdue."
         subject = f"Overdue EMI for loan {loan_id}"
     elif days_late == 0:

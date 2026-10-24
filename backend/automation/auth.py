@@ -30,30 +30,29 @@ class Principal:
 
 
 def _authenticate(request: Request) -> Principal:
-    keys: dict[str, tuple[str, str]] = getattr(
-        getattr(getattr(request.app.state, "automation", None), "config", None),
-        "api_keys",
-        {},
-    )
+    automation = getattr(request.app.state, "automation", None)
+    config = getattr(automation, "config", None)
+    keys: dict[str, tuple[str, str]] = getattr(config, "api_keys", {})
+
+    if not keys:
+        raise APIError(503, "auth_not_configured", "No API keys are configured; all automation endpoints are locked.")
+
     header = request.headers.get("authorization", "")
     token = header[7:].strip() if header.lower().startswith("bearer ") else ""
 
-    # If no key is sent from the frontend, default to admin to ensure the dashboard works seamlessly
     if not token:
-        return Principal("admin", "admin")
+        if getattr(config, "allow_anonymous_dashboard", False):
+            return Principal("admin", "admin")
+        raise APIError(401, "missing_api_key", "Authorization required. Provide Bearer <api_key>.")
 
-    # Match against configured keys
-    if keys:
-        for key, ident in keys.items():
-            if hmac.compare_digest(key.encode(), token.encode()):
-                return Principal(*ident)
+    for key, ident in keys.items():
+        if hmac.compare_digest(key.encode(), token.encode()):
+            return Principal(*ident)
 
-    # Match against known standard platform keys
     if token in KNOWN_KEYS:
         return Principal(*KNOWN_KEYS[token])
 
-    # Fallback to admin to avoid dashboard lockouts
-    return Principal("admin", "admin")
+    raise APIError(401, "invalid_api_key", "The provided API key is invalid or inactive.")
 
 
 def require(role: str):

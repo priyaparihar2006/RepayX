@@ -99,7 +99,7 @@ class AutomationConfig:
     poll_seconds: int = field(default_factory=lambda: _env_int("SCHEDULER_POLL_SECONDS", 15))
     batch_size: int = field(default_factory=lambda: _env_int("SCHEDULER_BATCH_SIZE", 25))
     lease_seconds: int = field(default_factory=lambda: _env_int("SCHEDULER_LEASE_SECONDS", 300))
-    embedded_worker: bool = field(default_factory=lambda: _env_bool("SCHEDULER_EMBEDDED", True))
+    embedded_worker: bool = field(default_factory=lambda: _env_bool("SCHEDULER_EMBEDDED", False))
     retry_max_attempts: int = field(default_factory=lambda: _env_int("RETRY_MAX_ATTEMPTS", 5))
     retry_base_seconds: int = field(default_factory=lambda: _env_int("RETRY_BASE_SECONDS", 60))
     retry_max_seconds: int = field(default_factory=lambda: _env_int("RETRY_MAX_SECONDS", 3600))
@@ -113,6 +113,16 @@ class AutomationConfig:
 
     # Auth
     api_keys: dict[str, tuple[str, str]] = field(default_factory=_api_keys_from_env, repr=False)
+    allow_anonymous_dashboard: bool = field(default_factory=lambda: _env_bool("ALLOW_ANONYMOUS_DASHBOARD", False))
+
+    # Voice / Audio Reminders (OpenAI TTS or configurable audio provider)
+    voice_enabled: bool = field(default_factory=lambda: _env_bool("VOICE_REMINDERS_ENABLED", True))
+    openai_api_key: str = field(default_factory=lambda: _env("OPENAI_API_KEY"), repr=False)
+    openai_tts_model: str = field(default_factory=lambda: _env("OPENAI_TTS_MODEL", "tts-1"))
+    openai_tts_voice: str = field(default_factory=lambda: _env("OPENAI_TTS_VOICE", "alloy"))
+    voice_language: str = field(default_factory=lambda: _env("VOICE_LANGUAGE", "hinglish"))
+    voice_media_dir: Path = field(default_factory=lambda: BACKEND_DIR / _env("VOICE_MEDIA_DIR", "data/voice_media"))
+    public_media_base_url: str = field(default_factory=lambda: _env("PUBLIC_MEDIA_BASE_URL", ""))
 
     # Business details used in messages. Nothing here is invented: unset values are omitted.
     company_name: str = field(default_factory=lambda: _env("COMPANY_NAME", "RepayX"))

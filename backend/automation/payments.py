@@ -66,8 +66,13 @@ def update_payment(
     if status in ("paid", "waived", "cancelled"):
         conn.execute(
             """UPDATE followup_tasks SET status = 'resolved', resolved_at = ?, resolved_by = ?,
-                   resolution_note = 'EMI marked ' || ? WHERE emi_id = ? AND kind = 'verify_payment' AND status = 'open'""",
+                   resolution_note = 'EMI marked ' || ? WHERE emi_id = ? AND kind IN ('verify_payment', 'escalation_recovery') AND status = 'open'""",
             (now_s, actor, status, emi_id),
+        )
+        conn.execute(
+            """UPDATE escalation_cases SET status = 'resolved', resolved_at = ?, notes = coalesce(notes || '; ', '') || 'Auto-resolved: EMI marked ' || ?, updated_at = ?
+               WHERE emi_id = ? AND status IN ('open', 'under_review')""",
+            (now_s, status, now_s, emi_id),
         )
     return reconcile_emi(conn, emi_id, policy, now, actor)
 

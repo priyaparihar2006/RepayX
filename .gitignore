@@ -21,9 +21,12 @@ loan-history-demo.tar.gz
 # Raw and derived data (Home Credit dataset terms; regenerate with the ml pipeline)
 datasets/**
 !datasets/.gitkeep
+!datasets/repayx_sample_fictional_test_data.csv
 backend/data/whatsapp_contacts.json
 backend/data/whatsapp.sqlite3*
 backend/data/automation.sqlite3*
+backend/data/voice_media/*.mp3
+!backend/data/voice_media/.gitkeep
 models/holdout_customer_ids.npy
 backend/data/*.env
 extracted_loanflow/

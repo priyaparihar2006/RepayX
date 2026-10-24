@@ -13,7 +13,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -274,6 +274,42 @@ CREATE TABLE IF NOT EXISTS webhook_events (
     received_at TEXT NOT NULL,
     PRIMARY KEY (provider, event_id)
 );
+
+CREATE TABLE IF NOT EXISTS escalation_cases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    emi_id INTEGER NOT NULL REFERENCES emis(id),
+    customer_id TEXT NOT NULL REFERENCES customers(customer_id),
+    loan_id TEXT NOT NULL,
+    stage_reached INTEGER NOT NULL DEFAULT 3,
+    overdue_days INTEGER NOT NULL DEFAULT 0,
+    outstanding_amount TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('open','under_review','resolved','written_off')),
+    assigned_to TEXT,
+    escalated_at TEXT NOT NULL,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    resolved_at TEXT,
+    UNIQUE (emi_id)
+);
+CREATE INDEX IF NOT EXISTS idx_escalation_status ON escalation_cases(status);
+CREATE INDEX IF NOT EXISTS idx_escalation_customer ON escalation_cases(customer_id);
+
+CREATE TABLE IF NOT EXISTS voice_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT REFERENCES reminder_jobs(id),
+    delivery_id INTEGER REFERENCES message_deliveries(id),
+    customer_id TEXT NOT NULL,
+    loan_id TEXT NOT NULL,
+    language TEXT NOT NULL DEFAULT 'hinglish',
+    voice_id TEXT NOT NULL DEFAULT 'alloy',
+    script_text TEXT NOT NULL,
+    audio_url TEXT NOT NULL,
+    duration_seconds REAL,
+    status TEXT NOT NULL DEFAULT 'generated',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_voice_job ON voice_messages(job_id);
 """
 
 
@@ -293,11 +329,22 @@ def init_db(db_path: Path) -> None:
         conn.executescript(SCHEMA_SQL)
         # Additive, transactional migration; safe when API and worker start together.
         conn.execute("BEGIN IMMEDIATE")
-        for table, column in (("emis", "reminder_datetime_utc"), ("emis", "channel_strategy"),
-                              ("reminder_jobs", "channel_strategy"), ("message_deliveries", "last_attempt_at")):
+        for table, column, col_type in (
+            ("emis", "reminder_datetime_utc", "TEXT"),
+            ("emis", "channel_strategy", "TEXT"),
+            ("reminder_jobs", "channel_strategy", "TEXT"),
+            ("reminder_jobs", "stage", "INTEGER DEFAULT 1"),
+            ("reminder_jobs", "stage_name", "TEXT DEFAULT 'friendly'"),
+            ("message_deliveries", "last_attempt_at", "TEXT"),
+            ("message_deliveries", "media_type", "TEXT DEFAULT 'text'"),
+            ("message_deliveries", "media_url", "TEXT"),
+            ("message_deliveries", "voice_script", "TEXT"),
+            ("customers", "human_takeover", "INTEGER DEFAULT 0"),
+            ("customers", "opt_out_at", "TEXT"),
+        ):
             columns = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
             if column not in columns:
-                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
         conn.execute(
             "INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, datetime('now'))",
             (SCHEMA_VERSION,),

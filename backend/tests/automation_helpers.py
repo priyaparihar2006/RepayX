@@ -42,6 +42,7 @@ def make_config(tmp_path: Path, **overrides) -> AutomationConfig:
         mode="live",
         test_recipients=(),
         app_timezone="Asia/Kolkata",
+        embedded_worker=False,
         api_keys={ADMIN_KEY: ("asha", "admin"), OPERATOR_KEY: ("omar", "operator"), VIEWER_KEY: ("vik", "viewer")},
         retry_max_attempts=3,
         retry_base_seconds=60,
