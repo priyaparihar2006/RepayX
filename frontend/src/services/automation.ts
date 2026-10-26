@@ -249,10 +249,23 @@ export interface EmailTestStatus {
   enabled: boolean; ready: boolean; problem: string | null; allowlisted_count: number; runs: EmailTestRun[];
 }
 
+export interface SmsTestRun {
+  request_id: string; recipient: string; actor: string; real_send: number; status: string;
+  attempted_at: string; provider_message_id: string | null; error_code: string | null;
+}
+export interface SmsTestStatus {
+  provider: string; enabled: boolean; ready: boolean; problem: string | null;
+  sender_id?: string | null; allowlisted_count: number; runs: SmsTestRun[];
+}
+
 export const automationApi = {
   emailTestStatus: () => call<EmailTestStatus>('/api/automation/email-test'),
   testEmail: (body: { request_id: string; recipient: string; send_real: boolean; authorized: boolean }) =>
     call<{ run: EmailTestRun }>('/api/automation/email-test', { method: 'POST', json: body }),
+  smsTestStatus: () => call<SmsTestStatus>('/api/automation/sms-test'),
+  testSms: (body: { request_id: string; recipient: string; send_real: boolean; authorized: boolean }) =>
+    call<{ run: SmsTestRun }>('/api/automation/sms-test', { method: 'POST', json: body }),
+  smsHistory: (limit = 50) => call<{ runs: SmsTestRun[]; deliveries: any[] }>(`/api/sms/history?limit=${limit}`),
   me: () => call<{ name: string; role: 'viewer' | 'operator' | 'admin' }>('/api/automation/me'),
   dashboard: () => call<Dashboard>('/api/automation/dashboard'),
   health: () => call<Health>('/api/automation/health'),

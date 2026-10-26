@@ -26,6 +26,11 @@ backend/data/whatsapp_contacts.json
 backend/data/whatsapp.sqlite3*
 backend/data/automation.sqlite3*
 backend/data/voice_media/*.mp3
+backend/data/voice_media/*.ogg
+backend/data/voice_media/*.opus
+backend/data/voice_media/*.wav
+backend/data/media/
+backend/scratch/
 !backend/data/voice_media/.gitkeep
 models/holdout_customer_ids.npy
 backend/data/*.env

@@ -981,7 +981,8 @@ def get_voice_audio(filename: str, request: Request):
     path = service.config.voice_media_dir / filename
     if not path.is_file():
         raise APIError(404, "not_found", "Audio file not found.")
-    return FileResponse(path, media_type="audio/mpeg")
+    media_type = "audio/ogg" if filename.endswith((".ogg", ".opus")) else "audio/mpeg"
+    return FileResponse(path, media_type=media_type)
 
 
 @router.get("/voice-messages")

@@ -39,13 +39,24 @@ class PairCodeRequest(BaseModel):
 
 
 class SendSingleMessage(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
     recipient: str = Field(min_length=8, max_length=20)
     message: str = Field(min_length=1, max_length=2000)
-    customer_id: int | None = None
+    customer_id: int | str | None = None
     customer_name: str | None = None
     template_name: str = "custom"
     request_id: str | None = None
+    send_voice: bool = True
+    audio_path: str | None = None
+
+class VoiceTestRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    phone: str = Field(min_length=8, max_length=20)
+    customer_name: str | None = "Priya"
+    loan_id: str | None = "LN-2026-7891"
+    unpaid_amount: float | None = 6500.0
+    language: str | None = "hinglish"
+    custom_script: str | None = None
 
 
 class AutoDispatchRequest(BaseModel):
@@ -134,8 +145,45 @@ def send_message(body: SendSingleMessage, messaging: WhatsAppService = Depends(s
         customer_name=body.customer_name,
         template_name=body.template_name,
         request_id=body.request_id,
+        audio_path=body.audio_path,
+        send_voice=body.send_voice,
     )
     return {"success": True, **result}
+
+@router.post("/voice/test-send")
+def test_send_voice(body: VoiceTestRequest, messaging: WhatsAppService = Depends(service)):
+    """Generate girl voice note and send alongside text message to recipient."""
+    from automation.voice_service import VoiceService, generate_conversational_voice_script
+    from automation.config import get_automation_config
+    cfg = get_automation_config()
+    vs = VoiceService(cfg)
+    script = body.custom_script or generate_conversational_voice_script(
+        customer_name=body.customer_name,
+        loan_id=body.loan_id,
+        unpaid_amount=body.unpaid_amount,
+        days_past_due=5,
+        language=body.language or "hinglish",
+    )
+    a_path, dur, a_fn = vs.synthesize(script, voice_id="shimmer", language=body.language or "hinglish")
+    if not a_path.is_file():
+        raise APIError(500, "voice_generation_failed", "Could not synthesize girl voice audio.")
+    res = messaging.send(
+        recipient=body.phone,
+        message_text=f"🚨 *RepayX Recovery Notice* 🚨\n\nDear *{body.customer_name or 'Priya'}*, your loan account *#{body.loan_id or 'LN-2026-7891'}* has an unpaid balance of *₹{body.unpaid_amount or 6500:,.2f}* (5 days past due).\n\nPlease clear your pending payment using your secure RepayX portal:\n👉 https://repay-x.vercel.app/pay/{body.loan_id or 'LN-2026-7891'}\n\n🎙️ *Voice Note from Recovery Officer attached below.* Reply to this chat for assistance.",
+        customer_name=body.customer_name,
+        loan_id=body.loan_id,
+        unpaid_amount=body.unpaid_amount,
+        days_past_due=5,
+        audio_path=str(a_path.resolve()),
+        send_voice=True,
+    )
+    return {
+        "success": True,
+        "script_spoken": script,
+        "duration_seconds": dur,
+        "audio_url": f"/api/media/voice/{a_fn}",
+        "whatsapp_result": res,
+    }
 
 
 @router.post("/auto-dispatch")

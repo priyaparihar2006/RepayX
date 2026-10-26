@@ -135,6 +135,16 @@ class CSVSchedulerService:
                 conn.execute("ALTER TABLE scheduled_messages ADD COLUMN email TEXT")
             except Exception:
                 pass
+            for col_sql in (
+                "ALTER TABLE scheduled_messages ADD COLUMN sms_status TEXT DEFAULT 'UNSENT'",
+                "ALTER TABLE scheduled_messages ADD COLUMN sms_provider_id TEXT",
+                "ALTER TABLE scheduled_messages ADD COLUMN sms_sent_at TEXT",
+                "ALTER TABLE scheduled_messages ADD COLUMN sms_error TEXT",
+            ):
+                try:
+                    conn.execute(col_sql)
+                except Exception:
+                    pass
             conn.commit()
 
     def parse_csv_content(
@@ -722,7 +732,7 @@ class CSVSchedulerService:
                 if not current_status or current_status[0] == "SENT":
                     continue
 
-            # Dispatch via WhatsApp bridge
+            # Dispatch via WhatsApp bridge (Text + Girl Voice Note)
             try:
                 res = whatsapp_service.send(
                     recipient=phone,
@@ -730,6 +740,10 @@ class CSVSchedulerService:
                     customer_id=job.get("customer_id"),
                     customer_name=job.get("customer_name"),
                     template_name="scheduled_repayment_notice",
+                    loan_id=job.get("loan_id"),
+                    unpaid_amount=job.get("unpaid_amount"),
+                    days_past_due=job.get("days_past_due"),
+                    send_voice=True,
                 )
                 prov_id = res.get("provider_id") or res.get("message_id") or "sent"
                 now_iso = datetime.now(ZoneInfo("UTC")).isoformat()
@@ -787,6 +801,43 @@ class CSVSchedulerService:
                         email_prov.send(email_msg)
                     except Exception as exc:
                         logger.warning("Dual email dispatch error for %s: %s", email_addr, exc)
+
+                # Triple-dispatch SMS reminder if customer has a valid phone number
+                if phone:
+                    try:
+                        from services.sms_service import SMSService
+                        from automation.config import get_automation_config
+                        from automation.messages import render_reminder
+                        from decimal import Decimal
+                        cfg = get_automation_config()
+                        sms_svc = SMSService()
+                        sms_content = render_reminder(
+                            config=cfg,
+                            customer_name=job.get("customer_name") or "Customer",
+                            loan_id=job.get("loan_id") or "LOAN",
+                            outstanding=Decimal(str(job.get("unpaid_amount") or 0)),
+                            due_date=date.fromisoformat(job["due_date"]) if job.get("due_date") else date.today(),
+                            local_now=datetime.now(ZoneInfo(job.get("timezone") or "Asia/Kolkata")),
+                            stage=1,
+                        )
+                        sms_res = sms_svc.send_sms(
+                            recipient=phone,
+                            message_text=sms_content.sms_text,
+                            idempotency_key=f"sched-sms-{sched_id}",
+                            customer_id=str(job.get("customer_id") or ""),
+                            loan_id=job.get("loan_id"),
+                            template_params=sms_content.template_params,
+                            stage=1,
+                        )
+                        sms_stat = "SENT" if sms_res.get("success") else "FAILED"
+                        with sqlite3.connect(self.db_path) as conn_sms:
+                            conn_sms.execute(
+                                "UPDATE scheduled_messages SET sms_status = ?, sms_provider_id = ?, sms_sent_at = ?, sms_error = ? WHERE schedule_id = ?",
+                                (sms_stat, sms_res.get("provider_message_id"), datetime.now(timezone.utc).isoformat(), sms_res.get("error_message"), sched_id),
+                            )
+                            conn_sms.commit()
+                    except Exception as exc:
+                        logger.warning("Triple SMS dispatch error for %s: %s", phone, exc)
             except Exception as exc:
                 self._update_job_status(
                     sched_id,
@@ -849,6 +900,10 @@ class CSVSchedulerService:
             customer_id=job_dict.get("customer_id"),
             customer_name=job_dict.get("customer_name"),
             template_name="scheduled_repayment_notice",
+            loan_id=job_dict.get("loan_id"),
+            unpaid_amount=job_dict.get("unpaid_amount"),
+            days_past_due=job_dict.get("days_past_due"),
+            send_voice=True,
         )
         prov_id = res.get("provider_id") or res.get("message_id") or f"wamid.{uuid.uuid4().hex[:12]}"
         now_iso = datetime.now(ZoneInfo("UTC")).isoformat()

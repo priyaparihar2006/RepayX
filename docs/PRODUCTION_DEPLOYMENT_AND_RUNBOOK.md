@@ -237,3 +237,60 @@ Upload CSVs via **Dashboard > Import CSV** or `POST /api/imports/csv`.
 
 Sample test file available at: `datasets/repayx_sample_fictional_test_data.csv`.
 
+---
+
+## 8. Multi-Channel SMS Service & Delivery Tracking
+
+RepayX integrates SMS as a first-class, independent communication channel alongside WhatsApp and Email.
+
+### Architecture & Isolation
+- **Channel Isolation**: Each channel (WhatsApp, SMS, Email) operates independently. An API error, timeout, or invalid number in SMS never prevents WhatsApp or Email reminders from firing.
+- **Provider Support**:
+  - `twilio`: Global SMS gateway utilizing Twilio REST API with status callbacks and webhook signature validation (`X-Twilio-Signature`).
+  - `msg91`: Enterprise Indian SMS gateway with DLT template flow dispatching.
+  - `sandbox`: Safe development simulation that records payloads to the database without sending outbound traffic.
+- **Delivery State Tracking**:
+  - In adherence to messaging guidelines, messages are recorded as `accepted` (provider acknowledged receipt) and **never** marked `delivered` until a cryptographically verified carrier delivery receipt callback is received.
+  - Delivery states: `scheduled`, `pending`, `accepted`, `delivered`, `failed`, `retrying`, `skipped`.
+
+### Environment Configuration (`.env`)
+```bash
+# SMS Gateway Selection (twilio | msg91 | none)
+SMS_PROVIDER=twilio
+
+# Twilio Credentials (Required if SMS_PROVIDER=twilio)
+TWILIO_ACCOUNT_SID=ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_FROM_NUMBER=+15551234567
+TWILIO_MESSAGING_SERVICE_SID=MGXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+TWILIO_STATUS_CALLBACK_URL=https://repayx.yourdomain.com/api/webhooks/sms
+
+# MSG91 (India DLT)
+MSG91_AUTH_KEY=your_msg91_auth_key
+MSG91_FLOW_ID=your_dlt_approved_flow_id
+MSG91_TEMPLATE_VARS=name,amount,due_date,loan_id
+
+# Webhook Security
+SMS_WEBHOOK_SECRET=your_random_hmac_secret
+```
+
+### India TRAI & DLT Compliance Guidelines
+For deployments targeting Indian mobile numbers (+91):
+1. **Principal Entity Registration**: Register your business on an authorized Indian telecom DLT portal (e.g. Jio, Airtel, Vodafone Idea, BSNL).
+2. **Sender ID (Header)**: Obtain an approved 6-character header (e.g., `RPAYEX`, `RPAYIN`) mapped to the transactional or service-implicit category.
+3. **Template Approval**: Register the 3-stage reminder templates on the DLT portal and obtain the corresponding Template/Flow ID.
+4. **TRAI Quiet Hours**: By default, RepayX enforces `CONTACT_WINDOW_START=09:00` and `CONTACT_WINDOW_END=19:00` in `APP_TIMEZONE=Asia/Kolkata` to prevent off-hours commercial communications.
+5. **Opt-Out & Suppression**: Any recipient replying `STOP` or requesting suppression is recorded in the `suppressions` table and bypassed in subsequent dispatches.
+
+### Safe Testing Protocol
+1. Navigate to **Automation Dashboard > Settings > SMS Test Panel**.
+2. Ensure the recipient number is listed in `AUTOMATION_TEST_RECIPIENTS`.
+3. Provide explicit admin authorization and submit a simulated or live test dispatch.
+4. Verify execution logs in the delivery log table or via `GET /api/sms/history`.
+
+### Troubleshooting
+- **`provider_not_configured`**: Verify `SMS_PROVIDER` and corresponding gateway credentials in `.env`.
+- **`test_mode_recipient_not_allowlisted`**: When `AUTOMATION_MODE != live`, messages are restricted to numbers explicitly listed in `AUTOMATION_TEST_RECIPIENTS`.
+- **`recipient_suppressed`**: The phone number has opted out (`STOP`). View or clear suppressions from the database if requested by customer consent.
+- **`undelivered` / `carrier_rejected`**: Review carrier rejection error codes in `message_deliveries.error_code`. Common reasons include DND (Do Not Disturb) blocking for promotional headers or unverified DLT template variables.
+

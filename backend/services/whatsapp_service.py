@@ -11,6 +11,10 @@ import csv
 import hashlib
 import hmac
 import json
+import shutil
+import subprocess
+import logging
+from urllib.parse import urlparse
 import os
 import random
 import re
@@ -30,6 +34,7 @@ from services.customer_service import CustomerService
 from services.csv_scheduler_service import CSVSchedulerService
 
 ROOT = Path(__file__).resolve().parents[2]
+logger = logging.getLogger('whatsapp_service')
 EXPECTED_SENDER = "+918650629360"
 PHONE_REGEX = re.compile(r"\+[1-9]\d{7,14}$")
 
@@ -108,6 +113,11 @@ class WhatsAppService:
             name="WhatsAppSchedulerWorker",
         )
         self._scheduler_thread.start()
+        threading.Thread(
+            target=self.ensure_local_bridge,
+            daemon=True,
+            name="WhatsAppBridgeSupervisor",
+        ).start()
 
     def _run_scheduler_worker(self) -> None:
         """Background thread executing scheduled customer WhatsApp jobs."""
@@ -162,6 +172,56 @@ class WhatsAppService:
             if "ai_reply_text" not in cols:
                 conn.execute("ALTER TABLE inbox ADD COLUMN ai_reply_text TEXT")
             conn.commit()
+
+    def ensure_local_bridge(self) -> bool:
+        """If configured to use a local bridge URL, verify it is running or attempt to launch it."""
+        base_url = self.settings.bridge_url.rstrip("/")
+        try:
+            parsed = urlparse(base_url)
+            hostname = parsed.hostname or "127.0.0.1"
+            if hostname not in ("127.0.0.1", "localhost", "0.0.0.0"):
+                return False
+
+            try:
+                req = Request(f"{base_url}/health")
+                with urlopen(req, timeout=1.5):
+                    return True
+            except Exception:
+                pass
+
+            node_bin = shutil.which("node")
+            if not node_bin:
+                return False
+
+            bridge_dir = ROOT / "backend" / "whatsapp-bridge"
+            server_js = bridge_dir / "server.js"
+            if not server_js.exists():
+                return False
+
+            port = str(parsed.port or 8005)
+            env = os.environ.copy()
+            env["PORT"] = port
+            env["WHATSAPP_BRIDGE_PORT"] = port
+
+            subprocess.Popen(
+                [node_bin, str(server_js)],
+                cwd=str(bridge_dir),
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            for _ in range(25):
+                time.sleep(0.2)
+                try:
+                    req = Request(f"{base_url}/health")
+                    with urlopen(req, timeout=1.0):
+                        return True
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.warning("Error checking/launching local WhatsApp bridge: %s", e)
+        return False
 
     def _bridge(self, path: str, payload: dict | None = None) -> dict:
         data = None if payload is None else json.dumps(payload).encode()
@@ -232,13 +292,18 @@ class WhatsAppService:
         try:
             return self._bridge("qr/generate", {})
         except APIError as exc:
+            if self.ensure_local_bridge():
+                try:
+                    return self._bridge("qr/generate", {})
+                except APIError as retry_exc:
+                    exc = retry_exc
             return {
                 "success": False,
                 "ready": False,
                 "connected": False,
                 "status": "OFFLINE",
                 "qr_code": None,
-                "error": f"WhatsApp bridge is temporarily offline ({exc.message}). Please wait ~30s for Render to wake up and try again.",
+                "error": f"WhatsApp bridge is temporarily offline ({exc.message}). Please wait a few seconds and try again.",
             }
 
     def pair_by_code(self, phone: str) -> dict:
@@ -389,10 +454,15 @@ class WhatsAppService:
         self,
         recipient: str,
         message_text: str,
-        customer_id: int | None = None,
+        customer_id: int | str | None = None,
         customer_name: str | None = None,
         template_name: str = "custom",
         request_id: str | None = None,
+        audio_path: str | None = None,
+        loan_id: str | None = None,
+        unpaid_amount: float | str | None = None,
+        days_past_due: int | None = None,
+        send_voice: bool = True,
     ) -> dict:
         if os.getenv("AUTOMATION_MODE", "sandbox").strip().lower() != "live":
             raise APIError(403, "sandbox_mode", "Sandbox mode: live WhatsApp sending is disabled.")
@@ -403,16 +473,69 @@ class WhatsAppService:
         delivery_status = "delivered"
         error_msg = None
 
+        # Generate female / girl voice note if requested
+        voice_audio_path = audio_path
+        voice_sent = False
+        if send_voice and not voice_audio_path:
+            try:
+                from automation.voice_service import VoiceService, generate_conversational_voice_script
+                from automation.config import get_automation_config
+                cfg = get_automation_config()
+                if cfg.voice_enabled:
+                    vs = VoiceService(cfg)
+                    voice_script = generate_conversational_voice_script(
+                        customer_name=customer_name,
+                        customer_id=str(customer_id) if customer_id is not None else None,
+                        loan_id=loan_id,
+                        unpaid_amount=unpaid_amount,
+                        days_past_due=days_past_due,
+                        message_text=message_text,
+                        language=cfg.voice_language,
+                    )
+                    a_path, dur, a_fn = vs.synthesize(
+                        text=voice_script,
+                        voice_id="shimmer",
+                        language=cfg.voice_language,
+                    )
+                    if a_path and a_path.is_file():
+                        voice_audio_path = str(a_path.resolve())
+                        # Record in voice_messages table for dashboard audit
+                        try:
+                            with sqlite3.connect("backend/data/automation.sqlite3") as a_conn:
+                                vs.record_voice_message(
+                                    a_conn,
+                                    job_id=req_id,
+                                    delivery_id=None,
+                                    customer_id=str(customer_id or "CUST"),
+                                    loan_id=str(loan_id or "LOAN"),
+                                    script_text=voice_script,
+                                    audio_url=f"/api/media/voice/{a_fn}",
+                                    duration=dur,
+                                    language=cfg.voice_language,
+                                    voice_id="hi-IN-SwaraNeural",
+                                    status="sent",
+                                )
+                        except Exception as db_err:
+                            logger.warning("Could not record voice_message in db: %s", db_err)
+            except Exception as v_err:
+                logger.warning("Girl voice synthesis warning: %s", v_err)
+
         # Dispatch via Baileys bridge
         try:
-            res = self._bridge("send", {
+            bridge_payload = {
                 "phone": recipient,
                 "recipient": recipient,
                 "message": message_text,
                 "customer_id": customer_id,
                 "customer_name": customer_name,
                 "template_id": template_name,
-            })
+            }
+            if voice_audio_path:
+                bridge_payload["audio_path"] = voice_audio_path
+                bridge_payload["send_voice"] = True
+            res = self._bridge("send", bridge_payload)
+            if res.get("voice_sent"):
+                voice_sent = True
             if res.get("message_id") or res.get("provider_id"):
                 provider_id = res.get("message_id") or res.get("provider_id")
             delivery_status = "delivered"
@@ -458,6 +581,8 @@ class WhatsAppService:
             "recipient": recipient,
             "customer_id": customer_id,
             "sent_at": sent_time,
+            "voice_sent": voice_sent,
+            "audio_path": voice_audio_path,
             "error": error_msg,
         }
 

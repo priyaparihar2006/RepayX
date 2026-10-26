@@ -40,7 +40,7 @@ For production cloud deployment, Meta WhatsApp Business Cloud API, voice synthes
 
 RepayX combines five core systems in one production application:
 
-- **AI-Powered EMI Reminder & Recovery Automation.** Automatically schedules and dispatches progressive 3-stage reminders (Stage 1 Friendly, Stage 2 Firm, Stage 3 Final) via Meta WhatsApp Business Cloud API with AI-generated voice notes and independent background worker execution.
+- **AI-Powered Multi-Channel EMI Reminder & Recovery Automation.** Automatically schedules and dispatches progressive 3-stage reminders (Stage 1 Friendly, Stage 2 Firm, Stage 3 Final) across WhatsApp (Meta Cloud API), SMS (Twilio / MSG91), and Email with independent channel isolation, AI-generated voice notes, and persistent background worker execution.
 - **Two-Way Conversational Recovery.** Context-aware AI assistant in Hindi, Hinglish, and English grounded in real-time loan databases with automatic payment claim holds, dispute management, and human takeover.
 - **Default-risk prediction.** A logistic-regression model trained on the Home Credit Default Risk data estimates each customer's probability of default. The probability becomes a 0–100 risk score and a Low / Medium / High risk category.
 - **Repayment analytics.** Historical installment records are aggregated into per-customer behaviour: lateness, underpayment, unpaid amounts, and payment ratio.

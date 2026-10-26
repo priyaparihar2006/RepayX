@@ -108,8 +108,14 @@ class BaileysBridgeProvider(Provider):
         return None if self.base else "Missing WHATSAPP_BRIDGE_URL."
 
     def send(self, message: OutboundMessage) -> SendResult:
-        payload = json.dumps({"recipient": message.recipient, "phone": message.recipient,
-                              "message": message.text}).encode()
+        data_dict = {
+            "recipient": message.recipient,
+            "phone": message.recipient,
+            "message": message.text,
+        }
+        if message.media_type == "audio" and message.media_url:
+            data_dict["media_url"] = message.media_url
+        payload = json.dumps(data_dict).encode()
         try:
             resp = http_request("POST", f"{self.base}/send", {"Content-Type": "application/json"}, payload, self.timeout)
         except TransportError as exc:

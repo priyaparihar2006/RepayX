@@ -31,7 +31,9 @@ from api import (
     routes_query,
     routes_webhooks,
     routes_whatsapp,
+    routes_sms,
 )
+from services.sms_service import SMSService, SMSSettings
 from api.errors import register_error_handlers
 from automation.service import AutomationService
 from config import API_VERSION, Settings, get_settings
@@ -85,6 +87,7 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
     app.state.whatsapp = WhatsAppService(WhatsAppSettings())
     app.state.omnichannel = OmnichannelService()
     app.state.automation = automation or AutomationService()
+    app.state.sms = SMSService(SMSSettings(), config=app.state.automation.config)
 
     app.add_middleware(
         CORSMiddleware,
@@ -116,6 +119,7 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
         routes_omnichannel.router,
         routes_automation.router,
         routes_email_test.router,
+        routes_sms.router,
         routes_webhooks.router,
     ):
         app.include_router(router)

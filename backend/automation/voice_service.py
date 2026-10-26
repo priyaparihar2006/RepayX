@@ -84,6 +84,56 @@ def generate_voice_script(
                 f"Please pay now using your secure WhatsApp link or reply immediately. Thank you."
             )
 
+def generate_conversational_voice_script(
+    customer_name: str | None = None,
+    customer_id: str | None = None,
+    loan_id: str | None = None,
+    unpaid_amount: float | str | None = None,
+    days_past_due: int | None = None,
+    message_text: str | None = None,
+    language: str = "hinglish",
+) -> str:
+    """Generate a warm, respectful Hindi/Hinglish/English voice script for a girl/female voice."""
+    first_name = (customer_name or "").strip().split()[0] if customer_name else "Customer"
+    loan_ref = loan_id or customer_id or "account"
+
+    if unpaid_amount is not None:
+        try:
+            amt_num = float(str(unpaid_amount).replace(",", "").replace("₹", ""))
+            amt_str = f"{amt_num:,.2f}".replace(".00", "")
+        except Exception:
+            amt_str = str(unpaid_amount)
+    else:
+        amt_str = "due"
+
+    lang = (language or "hinglish").lower()
+    if lang in ("hinglish", "hindi", "hi"):
+        if days_past_due and int(days_past_due) > 0:
+            return (
+                f"Namaste {first_name} ji. Yeh RepayX ki taraf se zaroori payment notice hai. "
+                f"Aapke loan account {loan_ref} ka {amt_str} rupaye ka installment overdue chal raha hai. "
+                f"Kripya diye gaye secure portal link se turant payment complete karein ya kisi bhi sahayata ke liye WhatsApp par reply karein. Dhanyavaad."
+            )
+        else:
+            return (
+                f"Namaste {first_name} ji. Yeh RepayX ki taraf se ek payment reminder hai. "
+                f"Aapke loan account {loan_ref} ki EMI {amt_str} rupaye due hai. "
+                f"Kripya WhatsApp par diye gaye portal link se apna payment complete karein. Agar aap bhugtan kar chuke hain toh kripya WhatsApp par reply karein. Dhanyavaad."
+            )
+    else:
+        if days_past_due and int(days_past_due) > 0:
+            return (
+                f"Hello {first_name}. This is an urgent payment notice from RepayX. "
+                f"Your loan account {loan_ref} has an overdue balance of {amt_str} rupees. "
+                f"Please clear your pending payment today using your secure link on WhatsApp or reply for settlement assistance. Thank you."
+            )
+        else:
+            return (
+                f"Hello {first_name}. This is a payment reminder from RepayX. "
+                f"Your installment of {amt_str} rupees for loan account {loan_ref} is due. "
+                f"Please use your secure portal link on WhatsApp to complete payment. Thank you."
+            )
+
 
 def _generate_synthetic_mp3(duration_seconds: float = 3.0) -> bytes:
     """Generate a valid, compact MP3 audio file containing valid MPEG audio frames (silence/tone)."""
@@ -102,6 +152,31 @@ class VoiceService:
         self.config = config
         self.media_dir = config.voice_media_dir
         self.media_dir.mkdir(parents=True, exist_ok=True)
+    def _convert_to_ogg_opus(self, mp3_path: Path) -> Path:
+        """Convert MP3 audio to WhatsApp-compliant OGG Opus format (48kHz, mono, 32kbps)."""
+        ogg_path = mp3_path.with_suffix(".ogg")
+        try:
+            import imageio_ffmpeg
+            import subprocess
+            ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+            cmd = [
+                ffmpeg_exe,
+                "-y",
+                "-i", str(mp3_path),
+                "-c:a", "libopus",
+                "-b:a", "32k",
+                "-vbr", "on",
+                "-ar", "48000",
+                "-ac", "1",
+                str(ogg_path),
+            ]
+            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=12)
+            if res.returncode == 0 and ogg_path.is_file() and ogg_path.stat().st_size > 500:
+                logger.info("Converted audio to WhatsApp native OGG Opus voice note: %s (%d bytes)", ogg_path.name, ogg_path.stat().st_size)
+                return ogg_path
+        except Exception as exc:
+            logger.warning("Could not convert audio to Ogg Opus: %s", exc)
+        return mp3_path
 
     def synthesize(
         self,
@@ -109,20 +184,57 @@ class VoiceService:
         voice_id: str | None = None,
         language: str = "hinglish",
     ) -> tuple[Path, float, str]:
-        """Synthesize audio speech for the given text.
+        """Synthesize natural girl/female speech audio.
 
-        Returns (file_path, duration_seconds, audio_filename).
+        Priority order:
+        1. Edge TTS neural girl voices ('hi-IN-SwaraNeural' or 'en-IN-NeerjaNeural')
+        2. OpenAI Audio API ('shimmer' or 'nova' female voices)
+        3. Google TTS (gTTS female voice)
+        4. Offline synthetic MP3
         """
         voice = voice_id or self.config.openai_tts_voice
         filename = f"voice_{uuid.uuid4().hex[:12]}.mp3"
         out_path = self.media_dir / filename
+        lang = (language or "hinglish").lower()
 
-        # 1. If OpenAI API key is configured, synthesize via OpenAI Audio API
+        # 1. Edge-TTS neural girl voice (high-definition natural voice)
+        try:
+            import edge_tts
+            import asyncio
+            import concurrent.futures
+
+            chosen_voice = "hi-IN-SwaraNeural" if lang in ("hinglish", "hindi", "hi") else "en-IN-NeerjaNeural"
+
+            async def _synthesize_edge():
+                communicate = edge_tts.Communicate(text, chosen_voice)
+                await communicate.save(str(out_path))
+
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                        pool.submit(lambda: asyncio.run(_synthesize_edge())).result(timeout=12.0)
+                else:
+                    loop.run_until_complete(_synthesize_edge())
+            except RuntimeError:
+                asyncio.run(_synthesize_edge())
+
+            if out_path.is_file() and out_path.stat().st_size > 1000:
+                words = len(text.split())
+                duration = max(2.5, round((words / 140.0) * 60.0, 1))
+                logger.info("Synthesized Edge-TTS neural girl voice (%s) to %s (%s s)", chosen_voice, filename, duration)
+                final_path = self._convert_to_ogg_opus(out_path)
+                return final_path, duration, final_path.name
+        except Exception as edge_err:
+            logger.warning("Edge-TTS synthesis error: %s, checking OpenAI/gTTS", edge_err)
+
+        # 2. OpenAI Audio API (if OPENAI_API_KEY is configured)
         if self.config.openai_api_key:
             try:
+                female_voice = voice if voice in ("shimmer", "nova") else "shimmer"
                 req_data = json.dumps({
                     "model": self.config.openai_tts_model,
-                    "voice": voice,
+                    "voice": female_voice,
                     "input": text[:4096],
                     "response_format": "mp3",
                 }).encode("utf-8")
@@ -138,21 +250,37 @@ class VoiceService:
                 with urllib.request.urlopen(req, timeout=15.0) as resp:
                     audio_bytes = resp.read()
                     out_path.write_bytes(audio_bytes)
-                    # Approximate duration: ~150 words per minute
                     words = len(text.split())
                     duration = max(2.5, round((words / 150.0) * 60.0, 1))
-                    logger.info("Synthesized OpenAI speech to %s (%s s)", filename, duration)
-                    return out_path, duration, filename
+                    logger.info("Synthesized OpenAI female voice (%s) to %s (%s s)", female_voice, filename, duration)
+                    final_path = self._convert_to_ogg_opus(out_path)
+                    return final_path, duration, final_path.name
             except Exception as exc:
-                logger.warning("OpenAI speech synthesis failed, falling back to local synthesis: %s", exc)
+                logger.warning("OpenAI speech synthesis failed: %s, falling back to gTTS", exc)
 
-        # 2. Offline / Mock fallback: generate valid MP3 audio stream
+        # 3. Google TTS (gTTS female voice)
+        try:
+            from gtts import gTTS
+            lang_code = "hi" if lang in ("hinglish", "hindi", "hi") else "en"
+            tts = gTTS(text=text, lang=lang_code, slow=False)
+            tts.save(str(out_path))
+            if out_path.is_file() and out_path.stat().st_size > 1000:
+                words = len(text.split())
+                duration = max(2.5, round((words / 130.0) * 60.0, 1))
+                logger.info("Synthesized gTTS girl voice (%s) to %s (%s s)", lang_code, filename, duration)
+                final_path = self._convert_to_ogg_opus(out_path)
+                return final_path, duration, final_path.name
+        except Exception as gtts_err:
+            logger.warning("gTTS synthesis error: %s, falling back to synthetic", gtts_err)
+
+        # 4. Offline / Mock fallback: generate valid MP3 audio stream
         words = len(text.split())
         duration = max(3.0, round((words / 130.0) * 60.0, 1))
         audio_bytes = _generate_synthetic_mp3(duration)
         out_path.write_bytes(audio_bytes)
         logger.info("Generated fallback voice audio file %s (%s s)", filename, duration)
-        return out_path, duration, filename
+        final_path = self._convert_to_ogg_opus(out_path)
+        return final_path, duration, final_path.name
 
     def record_voice_message(
         self,

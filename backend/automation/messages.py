@@ -86,7 +86,27 @@ def render_reminder(
     lines.append(f"- {config.company_name}")
     text = "\n".join(lines)
 
-    sms_parts = [f"{config.company_name}: Dear {customer_name}, {headline}"]
+    company = config.company_name or "RepayX"
+    if stage >= 3:
+        sms_body = (
+            f"Hello {customer_name}, our records indicate that your EMI of {amount} for loan {loan_id} remains outstanding. "
+            f"Please review your account and contact {company} support if you need assistance. "
+            f"If you have already paid, please notify us so we can verify your payment."
+        )
+    elif stage == 2:
+        sms_body = (
+            f"Hello {customer_name}, our records indicate that your EMI of {amount} for loan {loan_id} remains outstanding (due: {due}). "
+            f"Please review your payment status and settle any amount due through the official {company} payment channel. "
+            f"If you have already paid, contact support for verification."
+        )
+    else:
+        sms_body = (
+            f"Hello {customer_name}, your EMI of {amount} for loan {loan_id} is due on {due}. "
+            f"Please make your payment through the official {company} payment channel. "
+            f"If you have already paid, please disregard this reminder."
+        )
+
+    sms_parts = [sms_body]
     if link:
         sms_parts.append(f"Pay: {link}")
     sms_parts.append("Reply STOP to opt out.")

@@ -119,7 +119,7 @@ class AutomationConfig:
     voice_enabled: bool = field(default_factory=lambda: _env_bool("VOICE_REMINDERS_ENABLED", True))
     openai_api_key: str = field(default_factory=lambda: _env("OPENAI_API_KEY"), repr=False)
     openai_tts_model: str = field(default_factory=lambda: _env("OPENAI_TTS_MODEL", "tts-1"))
-    openai_tts_voice: str = field(default_factory=lambda: _env("OPENAI_TTS_VOICE", "alloy"))
+    openai_tts_voice: str = field(default_factory=lambda: _env("OPENAI_TTS_VOICE", "shimmer"))
     voice_language: str = field(default_factory=lambda: _env("VOICE_LANGUAGE", "hinglish"))
     voice_media_dir: Path = field(default_factory=lambda: BACKEND_DIR / _env("VOICE_MEDIA_DIR", "data/voice_media"))
     public_media_base_url: str = field(default_factory=lambda: _env("PUBLIC_MEDIA_BASE_URL", ""))

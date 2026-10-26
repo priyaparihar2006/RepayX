@@ -428,7 +428,7 @@ export function WhatsAppPage() {
 
   const acceptStatus = (value: WhatsAppStatus) => {
     setStatus(value);
-    setQrDeadline(value.qr_code ? Date.now() + (value.qr_expires_in || 0) * 1000 : 0);
+    setQrDeadline(value.qr_code ? Date.now() + (value.qr_expires_in || 60) * 1000 : 0);
     if (value.connected) setPairCode('');
   };
 
@@ -550,8 +550,17 @@ export function WhatsAppPage() {
     setGenerating(true);
     setError('');
     try {
-      await whatsapp.generateQR();
-      acceptStatus(await whatsapp.getStatus());
+      const res = await whatsapp.generateQR();
+      if (res && res.qr_code) {
+        acceptStatus(res);
+      } else if (res && !res.success && (res as any).error) {
+        setError((res as any).error);
+      }
+      const latest = await whatsapp.getStatus();
+      acceptStatus(latest);
+      if (!latest.qr_code && !latest.connected && (latest.error_message || (latest as any).error)) {
+        setError(latest.error_message || (latest as any).error);
+      }
       setNotice('Open WhatsApp on +91 8650629360 → Linked devices → Link a device, then scan the QR.');
     } catch (err) {
       setError(messageOf(err));
@@ -754,6 +763,13 @@ export function WhatsAppPage() {
                 <div className="text-xs font-bold text-slate-600 flex items-center justify-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-amber-500" /> QR expires in {qrRemaining}s
                 </div>
+                <button
+                  onClick={generateQR}
+                  disabled={generating}
+                  className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 underline block mx-auto transition"
+                >
+                  {generating ? 'Refreshing QR...' : 'Regenerate QR'}
+                </button>
               </div>
             ) : (
               <div className="space-y-3">
@@ -1146,18 +1162,21 @@ export function WhatsAppPage() {
                       : 'Confirm & Activate Schedule'}
                   </span>
                 </button>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-800 font-bold text-xs shadow-xs">
+                  🎙️ AI Girl Voice Note Attached
+                </span>
                 <button
                   onClick={handleDispatchAll}
                   disabled={dispatchingAll || scheduledRecords.length === 0}
                   className="px-4 py-2 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white font-black text-xs rounded-xl flex items-center gap-1.5 transition shadow-md hover:shadow-lg disabled:opacity-50 active:scale-95 cursor-pointer ring-2 ring-indigo-300"
-                  title="Send instant WhatsApp message to all customers in the list at once"
+                  title="Send instant WhatsApp message and girl voice note to all customers in the list at once"
                 >
                   {dispatchingAll ? (
                     <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
                   ) : (
                     <Zap className="w-4 h-4 fill-amber-300 text-amber-300" />
                   )}
-                  <span>{dispatchingAll ? 'Sending to All...' : '⚡ Instant Send to All'}</span>
+                  <span>{dispatchingAll ? 'Sending to All...' : '⚡ Instant Send All (Text + Voice)'}</span>
                 </button>
               </div>
             </div>
@@ -1352,7 +1371,7 @@ export function WhatsAppPage() {
                                 ) : (
                                   <Send className="w-3 h-3" />
                                 )}
-                                <span>{dispatchingId === r.schedule_id ? 'Sending...' : 'Send & Deliver'}</span>
+                                <span>{dispatchingId === r.schedule_id ? 'Sending Text + Voice...' : '🎙️ Send Text + Voice Note'}</span>
                               </button>
                               <button
                                 onClick={() => handleMarkDelivered(r)}

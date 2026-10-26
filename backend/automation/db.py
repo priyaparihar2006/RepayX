@@ -268,6 +268,18 @@ CREATE TABLE IF NOT EXISTS email_test_runs (
     error_code TEXT
 );
 
+CREATE TABLE IF NOT EXISTS sms_test_runs (
+    request_id TEXT PRIMARY KEY,
+    recipient TEXT NOT NULL,
+    recipient_hash TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    real_send INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    attempted_at TEXT NOT NULL,
+    provider_message_id TEXT,
+    error_code TEXT
+);
+
 CREATE TABLE IF NOT EXISTS webhook_events (
     provider TEXT NOT NULL,
     event_id TEXT NOT NULL,

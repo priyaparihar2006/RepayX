@@ -31,6 +31,17 @@ async function createBridge(deps = {}) {
   let initializing = false, reconnectTimer, reconnects = 0, error = null, pairingReady = false, generation = 0;
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+  // In-memory store for sent & received messages to fulfill getMessage retry requests (eliminates "Waiting for this message")
+  const messageStore = new Map();
+  function storeMessage(keyId, message) {
+    if (!keyId || !message) return;
+    if (messageStore.size > 3000) {
+      const oldestKey = messageStore.keys().next().value;
+      messageStore.delete(oldestKey);
+    }
+    messageStore.set(keyId, message);
+  }
+
   function snapshot() {
     const connected = state === 'CONNECTED' && !!socket?.user && !!user;
     const validQR = qrImage && qrExpires > Date.now();
@@ -55,16 +66,34 @@ async function createBridge(deps = {}) {
       const { state: auth, saveCreds } = await baileys.useMultiFileAuthState(authDir);
       if (currentGeneration !== generation) return;
       const current = baileys.default({
-        auth, logger: pino({ level: 'silent' }),
+        auth,
+        logger: pino({ level: 'silent' }),
         browser: baileys.Browsers.ubuntu('Chrome'),
-        connectTimeoutMs: 20000, defaultQueryTimeoutMs: 15000,
-        qrTimeout: 60000, syncFullHistory: false, markOnlineOnConnect: false,
+        connectTimeoutMs: 30000,
+        defaultQueryTimeoutMs: 20000,
+        qrTimeout: 60000,
+        syncFullHistory: false,
+        markOnlineOnConnect: true,
+        getMessage: async (key) => {
+          if (key && key.id) {
+            const stored = messageStore.get(key.id);
+            if (stored) {
+              return stored.message || stored;
+            }
+          }
+          return undefined;
+        },
       });
       socket = current;
       current.ev.on('creds.update', saveCreds);
 
       // Listen for incoming WhatsApp messages for Two-Way AI Autonomous Conversations
       current.ev.on('messages.upsert', async ({ messages: incomingMsgs, type }) => {
+        for (const msg of incomingMsgs) {
+          if (msg.key?.id && msg.message) {
+            storeMessage(msg.key.id, msg.message);
+          }
+        }
         if (type !== 'notify') return;
         for (const msg of incomingMsgs) {
           if (!msg.message || msg.key.fromMe) continue;
@@ -92,7 +121,10 @@ async function createBridge(deps = {}) {
             const data = await res.json();
             if (isLive() && data?.auto_reply && data?.reply_text) {
               console.log(`[WhatsApp] AI Auto-Reply to +${senderPhone}: "${data.reply_text.substring(0, 60)}..."`);
-              await current.sendMessage(remoteJid, { text: data.reply_text });
+              const replyRes = await current.sendMessage(remoteJid, { text: data.reply_text });
+              if (replyRes?.key?.id) {
+                storeMessage(replyRes.key.id, replyRes.message || replyRes);
+              }
             }
           } catch (webhookErr) {
             console.warn('[WhatsApp] Webhook/AI dispatch error:', webhookErr.message);
@@ -158,7 +190,13 @@ async function createBridge(deps = {}) {
     res.json(snapshot());
   });
   app.post('/qr/generate', async (_req, res) => {
-    if (!socket) { reconnects = 0; await connect(); }
+    if (!socket || state === 'DISCONNECTED' || state === 'ERROR') {
+      reconnects = 0;
+      await connect();
+    }
+    for (let i = 0; i < 40 && !qrImage && state !== 'CONNECTED'; i++) {
+      await wait(250);
+    }
     res.json({ ...snapshot(), expires_in: snapshot().qr_expires_in });
   });
   app.post('/pair-code', async (req, res) => {
@@ -194,14 +232,161 @@ async function createBridge(deps = {}) {
         if (onWa?.exists && onWa?.jid) targetJid = onWa.jid;
       } catch {}
 
+      // Step 1: Presence warmup & Signal ratchet sync
+      try {
+        await socket.presenceSubscribe(targetJid);
+        await socket.sendPresenceUpdate('composing', targetJid);
+      } catch {}
+      await wait(800);
+
+      // Step 2: Send text message
       console.log(`[WhatsApp] Sending message to ${targetJid}...`);
       const result = await socket.sendMessage(targetJid, { text: message });
       if (!result?.key?.id) throw new Error('Missing provider message ID');
-      console.log(`[WhatsApp] ✅ Sent successfully: ${result.key.id}`);
-      res.json({ success: true, message_id: result.key.id, provider_id: result.key.id, recipient: '+' + phone, status: 'sent' });
+      storeMessage(result.key.id, result.message || result);
+      console.log(`[WhatsApp] ✅ Sent text successfully: ${result.key.id}`);
+
+      let voiceSent = false;
+      let voiceMessageId = null;
+      const audioPath = req.body.audio_path;
+      const audioUrl = req.body.audio_url || req.body.media_url;
+
+      // Step 3: Send girl voice note if provided
+      if (audioPath && fs.existsSync(audioPath)) {
+        try {
+          // Pacing delay allows phone to ratchet the session for message 1 before receiving audio message 2
+          try {
+            await socket.sendPresenceUpdate('recording', targetJid);
+          } catch {}
+          await wait(1800);
+
+          console.log(`[WhatsApp] 🎙️ Sending girl voice note from file: ${audioPath} to ${targetJid}...`);
+          const audioBuffer = fs.readFileSync(audioPath);
+          const isOgg = audioPath.endsWith('.ogg') || audioPath.endsWith('.opus');
+          const voiceRes = await socket.sendMessage(targetJid, {
+            audio: audioBuffer,
+            mimetype: isOgg ? 'audio/ogg; codecs=opus' : 'audio/mpeg',
+            ptt: isOgg,
+          });
+          if (voiceRes?.key?.id) {
+            storeMessage(voiceRes.key.id, voiceRes.message || voiceRes);
+            voiceSent = true;
+            voiceMessageId = voiceRes.key.id;
+            console.log(`[WhatsApp] 🎙️ ✅ Voice note delivered: ${voiceMessageId}`);
+          }
+        } catch (vErr) {
+          console.warn(`[WhatsApp] ⚠️ Voice note dispatch warning:`, vErr.message);
+        } finally {
+          try { await socket.sendPresenceUpdate('paused', targetJid); } catch {}
+        }
+      } else if (audioUrl) {
+        try {
+          try {
+            await socket.sendPresenceUpdate('recording', targetJid);
+          } catch {}
+          await wait(1800);
+
+          console.log(`[WhatsApp] 🎙️ Sending girl voice note from URL: ${audioUrl} to ${targetJid}...`);
+          const isOgg = audioUrl.includes('.ogg') || audioUrl.includes('.opus');
+          const voiceRes = await socket.sendMessage(targetJid, {
+            audio: { url: audioUrl },
+            mimetype: isOgg ? 'audio/ogg; codecs=opus' : 'audio/mpeg',
+            ptt: isOgg,
+          });
+          if (voiceRes?.key?.id) {
+            storeMessage(voiceRes.key.id, voiceRes.message || voiceRes);
+            voiceSent = true;
+            voiceMessageId = voiceRes.key.id;
+            console.log(`[WhatsApp] 🎙️ ✅ Voice note delivered: ${voiceMessageId}`);
+          }
+        } catch (vErr) {
+          console.warn(`[WhatsApp] ⚠️ Voice note dispatch warning:`, vErr.message);
+        } finally {
+          try { await socket.sendPresenceUpdate('paused', targetJid); } catch {}
+        }
+      } else {
+        try { await socket.sendPresenceUpdate('paused', targetJid); } catch {}
+      }
+
+      res.json({
+        success: true,
+        message_id: result.key.id,
+        provider_id: result.key.id,
+        recipient: '+' + phone,
+        status: 'sent',
+        voice_sent: voiceSent,
+        voice_message_id: voiceMessageId,
+      });
     } catch (err) {
       console.error('[WhatsApp] Send failed:', err.message);
       res.status(502).json({ success: false, error: 'WhatsApp send failed: ' + err.message });
+    }
+  });
+
+  app.post('/send-voice', async (req, res) => {
+    if (!isLive()) return res.status(403).json({ success: false, error: 'Sandbox mode: live WhatsApp sending is disabled.' });
+    let phone = String(req.body.phone || req.body.recipient || '').replace(/\D/g, '');
+    if (phone.length === 10) phone = '91' + phone;
+    const audioPath = req.body.audio_path;
+    const audioUrl = req.body.audio_url || req.body.media_url;
+
+    if (!phone || phone.length < 10) {
+      return res.status(400).json({ success: false, error: 'Enter a valid phone number.' });
+    }
+    if (!snapshot().connected) return res.status(409).json({ success: false, error: 'Link WhatsApp before sending.' });
+    if (!audioPath && !audioUrl) {
+      return res.status(400).json({ success: false, error: 'Provide audio_path or audio_url.' });
+    }
+
+    try {
+      let targetJid = phone + '@s.whatsapp.net';
+      try {
+        const [onWa] = await socket.onWhatsApp(phone);
+        if (onWa?.exists && onWa?.jid) targetJid = onWa.jid;
+      } catch {}
+
+      // Presence warmup
+      try {
+        await socket.presenceSubscribe(targetJid);
+        await socket.sendPresenceUpdate('recording', targetJid);
+      } catch {}
+      await wait(600);
+
+      let voiceRes = null;
+      if (audioPath && fs.existsSync(audioPath)) {
+        console.log(`[WhatsApp] 🎙️ Sending standalone girl voice note from ${audioPath} to ${targetJid}...`);
+        const audioBuf = fs.readFileSync(audioPath);
+        const isOgg = audioPath.endsWith('.ogg') || audioPath.endsWith('.opus');
+        voiceRes = await socket.sendMessage(targetJid, {
+          audio: audioBuf,
+          mimetype: isOgg ? 'audio/ogg; codecs=opus' : 'audio/mpeg',
+          ptt: isOgg,
+        });
+      } else if (audioUrl) {
+        console.log(`[WhatsApp] 🎙️ Sending standalone girl voice note from URL ${audioUrl} to ${targetJid}...`);
+        const isOgg = audioUrl.includes('.ogg') || audioUrl.includes('.opus');
+        voiceRes = await socket.sendMessage(targetJid, {
+          audio: { url: audioUrl },
+          mimetype: isOgg ? 'audio/ogg; codecs=opus' : 'audio/mpeg',
+          ptt: isOgg,
+        });
+      }
+      if (!voiceRes?.key?.id) throw new Error('Missing voice message ID');
+      storeMessage(voiceRes.key.id, voiceRes.message || voiceRes);
+      try { await socket.sendPresenceUpdate('paused', targetJid); } catch {}
+
+      console.log(`[WhatsApp] 🎙️ ✅ Voice message sent successfully: ${voiceRes.key.id}`);
+      res.json({
+        success: true,
+        message_id: voiceRes.key.id,
+        provider_id: voiceRes.key.id,
+        recipient: '+' + phone,
+        status: 'sent',
+        voice_sent: true,
+      });
+    } catch (err) {
+      console.error('[WhatsApp] Standalone voice send failed:', err.message);
+      res.status(502).json({ success: false, error: 'WhatsApp voice send failed: ' + err.message });
     }
   });
 
@@ -229,7 +414,21 @@ async function createBridge(deps = {}) {
 
 if (require.main === module) {
   createBridge().then(({ app, connect }) => {
-    const port = Number(process.env.PORT || process.env.WHATSAPP_BRIDGE_PORT || 10000);
+    let port = 8005;
+    if (process.env.WHATSAPP_BRIDGE_PORT) {
+      port = Number(process.env.WHATSAPP_BRIDGE_PORT);
+    } else if (process.env.PORT) {
+      port = Number(process.env.PORT);
+    } else {
+      try {
+        const envPath = path.resolve(__dirname, '../../.env');
+        if (fs.existsSync(envPath)) {
+          const envContent = fs.readFileSync(envPath, 'utf8');
+          const match = envContent.match(/^WHATSAPP_BRIDGE_URL\s*=\s*https?:\/\/[^:]+:(\d+)/m);
+          if (match && match[1]) port = Number(match[1]);
+        }
+      } catch {}
+    }
     const host = '0.0.0.0';
     app.listen(port, host, () => {
       console.log(`[WhatsApp] Bridge listening on ${host}:${port}`);

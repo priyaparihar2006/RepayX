@@ -11,6 +11,7 @@ import {
 } from '../services/automation';
 import { EmptyState, ErrorState, LoadingState } from '../components/common/RequestState';
 import { EmailTestPanel } from '../components/automation/EmailTestPanel';
+import { SmsTestPanel } from '../components/automation/SmsTestPanel';
 import { CsvDropzone } from '../components/common/CsvDropzone';
 import { MetricCard } from '../components/analytics/MetricCard';
 
@@ -855,15 +856,6 @@ const ImportTab: React.FC = () => {
           Optional channel_strategy is all or fallback; blank uses policy. Do not combine reminder_datetime with reminder_date/reminder_time.
           Import schedules automatically; the server worker continues with the browser closed.
         </p>
-        <button className={btnGhost} onClick={() => {
-          const tomorrow = new Date(Date.now() + 86_400_000);
-          const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(tomorrow);
-          const csv = 'customer_id,customer_name,phone_number,email,loan_id,emi_amount,due_date,reminder_datetime,channel_strategy,payment_status,timezone\n'
-            + `SAMPLE-1,Sample Customer,,sample@example.invalid,SAMPLE-LOAN-1,8500,${date},${date} 16:00:00,all,pending,Asia/Kolkata\n`;
-          const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-          const link = document.createElement('a'); link.href = url; link.download = 'exact_reminders_sample.csv'; link.click();
-          URL.revokeObjectURL(url);
-        }}>Download sample CSV</button>
         <div className="flex flex-wrap items-end gap-3">
           <label className="max-w-full text-xs font-medium text-slate-700">Import type
             <select className={`${input} block mt-1 max-w-full`} disabled={busy} value={importType} onChange={(e) => { setImportType(e.target.value); if (file) doPreview(file, e.target.value); }}>
@@ -1788,7 +1780,17 @@ export const AutomationPage: React.FC = () => {
       {tab === 'escalations' && <EscalationsTab role={user.role} />}
       {tab === 'payments' && <PaymentsTab role={user.role} />}
       {tab === 'replies' && <RepliesTab role={user.role} />}
-      {tab === 'settings' && <div className="space-y-6"><SettingsTab role={user.role} />{user.role === 'admin' && <EmailTestPanel />}</div>}
+      {tab === 'settings' && (
+        <div className="space-y-6">
+          <SettingsTab role={user.role} />
+          {user.role === 'admin' && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <SmsTestPanel />
+              <EmailTestPanel />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
