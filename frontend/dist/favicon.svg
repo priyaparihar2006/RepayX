@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="repayx-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="url(#repayx-grad)" />
+  <path d="M9 7h7a5 5 0 0 1 0 10h-4l5.5 8h-3.8L8.5 17H12a2.5 2.5 0 0 0 0-5H9v13H6V7h3z" fill="#ffffff" />
+  <circle cx="23" cy="9" r="2.5" fill="#10b981" />
+</svg>
+

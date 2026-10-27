@@ -18,8 +18,10 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 import env_loader  # noqa: F401
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from api import (
     routes_analytics,
@@ -99,8 +101,8 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
     )
     register_error_handlers(app)
 
-    @app.get("/")
-    def root():
+    @app.get("/api")
+    def api_info():
         return {
             "success": True,
             "name": "RepayX API",
@@ -132,6 +134,7 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
     ):
         app.include_router(router)
 
+    # Cloud Keep-Alive Supervisor
     def _start_keepalive() -> None:
         import threading, time, urllib.request
         def _loop() -> None:
@@ -152,6 +155,40 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
         threading.Thread(target=_loop, daemon=True, name="RepayXKeepAliveSupervisor").start()
 
     _start_keepalive()
+
+    # Serve production frontend SPA if built
+    frontend_dist = BACKEND_DIR.parent / "frontend" / "dist"
+    if not frontend_dist.exists():
+        frontend_dist = Path("/app/frontend/dist")
+
+    if frontend_dist.exists() and (frontend_dist / "index.html").is_file():
+        assets_dir = frontend_dist / "assets"
+        if assets_dir.exists():
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+        @app.get("/")
+        async def serve_root():
+            return FileResponse(frontend_dist / "index.html")
+
+        @app.get("/{full_path:path}")
+        async def serve_spa(full_path: str):
+            if full_path.startswith("api/") or full_path == "api":
+                raise HTTPException(status_code=404, detail="API route not found")
+            target_file = frontend_dist / full_path
+            if target_file.is_file():
+                return FileResponse(target_file)
+            return FileResponse(frontend_dist / "index.html")
+    else:
+        @app.get("/")
+        def root():
+            return {
+                "success": True,
+                "name": "RepayX API",
+                "version": API_VERSION,
+                "status": "online",
+                "documentation": "/docs",
+                "health": "/api/health",
+            }
 
     return app
 

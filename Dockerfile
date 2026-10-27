@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application files
 COPY backend ./backend
 COPY models ./models
+COPY frontend/dist ./frontend/dist
 
 # Set environment
 ENV PYTHONUNBUFFERED=1
