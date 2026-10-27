@@ -114,7 +114,7 @@ class WhatsAppService:
         )
         self._scheduler_thread.start()
         threading.Thread(
-            target=self.ensure_local_bridge,
+            target=self.supervise_bridge,
             daemon=True,
             name="WhatsAppBridgeSupervisor",
         ).start()
@@ -172,6 +172,29 @@ class WhatsAppService:
             if "ai_reply_text" not in cols:
                 conn.execute("ALTER TABLE inbox ADD COLUMN ai_reply_text TEXT")
             conn.commit()
+
+    def supervise_bridge(self) -> None:
+        """Ensure local bridge is started or keep remote cloud bridge warm with keep-alive pings."""
+        base_url = self.settings.bridge_url.rstrip("/")
+        parsed = urlparse(base_url)
+        hostname = parsed.hostname or "127.0.0.1"
+
+        if hostname in ("127.0.0.1", "localhost", "0.0.0.0"):
+            self.ensure_local_bridge()
+            return
+
+        # Remote cloud bridge (Render free tier): ping every 8 minutes to prevent inactivity sleep
+        while getattr(self, "_scheduler_running", True):
+            try:
+                req = Request(f"{base_url}/health")
+                with urlopen(req, timeout=15):
+                    pass
+            except Exception as e:
+                logger.debug("Remote bridge keep-alive ping: %s", e)
+            for _ in range(48):
+                if not getattr(self, "_scheduler_running", True):
+                    return
+                time.sleep(10)
 
     def ensure_local_bridge(self) -> bool:
         """If configured to use a local bridge URL, verify it is running or attempt to launch it."""
@@ -232,39 +255,54 @@ class WhatsAppService:
             url, data=data,
             headers={"Content-Type": "application/json"} if data is not None else {},
         )
-        try:
-            with urlopen(request, timeout=20) as response:
-                result = json.load(response)
-        except HTTPError as exc:
-            body_text = ""
+
+        is_cloud = "onrender.com" in base_url or "render.com" in base_url
+        max_attempts = 3 if is_cloud else 1
+
+        for attempt in range(max_attempts):
             try:
-                body_text = exc.read().decode("utf-8", errors="replace")
-                parsed = json.loads(body_text)
-                message = parsed.get("error", parsed.get("message", f"HTTP {exc.code}"))
-            except Exception:
-                if "<html" in body_text.lower() or "<!doctype" in body_text.lower():
-                    message = f"WhatsApp bridge at {base_url} is currently offline or waking up (HTTP {exc.code})."
-                else:
-                    message = f"HTTP {exc.code} from {base_url}: {body_text[:120] if body_text else exc.reason}"
-            raise APIError(exc.code, "whatsapp_error", str(message)) from exc
-        except (URLError, TimeoutError, OSError, ValueError) as exc:
-            raise APIError(503, "bridge_unavailable", f"Cannot reach WhatsApp bridge at {base_url} ({exc}).") from exc
-        if result.get("success") is not True:
-            raise APIError(502, "whatsapp_error", "WhatsApp did not confirm the request.")
-        return result
+                with urlopen(request, timeout=30) as response:
+                    result = json.load(response)
+                    if result.get("success") is not True:
+                        raise APIError(502, "whatsapp_error", "WhatsApp did not confirm the request.")
+                    return result
+            except HTTPError as exc:
+                if exc.code in (502, 503, 504) and attempt < max_attempts - 1:
+                    logger.info("Render WhatsApp bridge waking up (HTTP %d). Retrying in 4s (attempt %d/%d)...", exc.code, attempt + 1, max_attempts)
+                    time.sleep(4)
+                    continue
+                body_text = ""
+                try:
+                    body_text = exc.read().decode("utf-8", errors="replace")
+                    parsed = json.loads(body_text)
+                    message = parsed.get("error", parsed.get("message", f"HTTP {exc.code}"))
+                except Exception:
+                    if "<html" in body_text.lower() or "<!doctype" in body_text.lower():
+                        message = f"WhatsApp bridge at {base_url} is currently offline or waking up (HTTP {exc.code})."
+                    else:
+                        message = f"HTTP {exc.code} from {base_url}: {body_text[:120] if body_text else exc.reason}"
+                raise APIError(exc.code, "whatsapp_error", str(message)) from exc
+            except (URLError, TimeoutError, OSError, ValueError) as exc:
+                if attempt < max_attempts - 1:
+                    logger.info("WhatsApp bridge connection timeout/error (%s). Retrying in 4s (attempt %d/%d)...", exc, attempt + 1, max_attempts)
+                    time.sleep(4)
+                    continue
+                raise APIError(503, "bridge_unavailable", f"Cannot reach WhatsApp bridge at {base_url} ({exc}).") from exc
 
     def configuration(self) -> dict:
         try:
             live = self._bridge("status")
         except APIError as exc:
+            is_waking_up = "waking up" in (exc.message or "").lower() or exc.status_code in (502, 503, 504)
             live = {
                 "ready": False,
                 "connected": False,
-                "status": "OFFLINE",
+                "status": "WAKING_UP" if is_waking_up else "OFFLINE",
                 "qr_code": None,
                 "qr_expires_in": 0,
                 "session_info": None,
                 "error_message": exc.message,
+                "is_waking_up": is_waking_up,
             }
         with sqlite3.connect(self.settings.db_path) as conn:
             counts = dict(conn.execute(

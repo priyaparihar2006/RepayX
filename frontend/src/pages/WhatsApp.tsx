@@ -346,7 +346,7 @@ export function WhatsAppPage() {
         if (confRes.schedules && confRes.schedules.length > 0) {
           setScheduledRecords(confRes.schedules);
           const found = confRes.schedules.find(
-            (s) => s.row_number === record.row_number || s.phone_number === record.phone_number
+            (s: ScheduledRecord) => s.row_number === record.row_number || s.phone_number === record.phone_number
           );
           if (found) targetId = found.schedule_id;
         }
@@ -384,7 +384,7 @@ export function WhatsAppPage() {
         if (confRes.schedules && confRes.schedules.length > 0) {
           setScheduledRecords(confRes.schedules);
           const found = confRes.schedules.find(
-            (s) => s.row_number === record.row_number || s.phone_number === record.phone_number
+            (s: ScheduledRecord) => s.row_number === record.row_number || s.phone_number === record.phone_number
           );
           if (found) targetId = found.schedule_id;
         }
@@ -430,6 +430,9 @@ export function WhatsAppPage() {
     setStatus(value);
     setQrDeadline(value.qr_code ? Date.now() + (value.qr_expires_in || 60) * 1000 : 0);
     if (value.connected) setPairCode('');
+    if (value.connected || value.qr_code || value.status === 'SCAN_QR_CODE' || value.status === 'CONNECTED') {
+      setError((prev) => (prev && (prev.includes('waking up') || prev.includes('offline') || prev.includes('502')) ? '' : prev));
+    }
   };
 
   const refreshHistory = async () => {
@@ -560,6 +563,8 @@ export function WhatsAppPage() {
       acceptStatus(latest);
       if (!latest.qr_code && !latest.connected && (latest.error_message || (latest as any).error)) {
         setError(latest.error_message || (latest as any).error);
+      } else {
+        setError('');
       }
       setNotice('Open WhatsApp on +91 8650629360 → Linked devices → Link a device, then scan the QR.');
     } catch (err) {
@@ -711,7 +716,25 @@ export function WhatsAppPage() {
           <span className="font-semibold">{notice}</span>
         </div>
       )}
-      {error && (
+      {(status?.status === 'WAKING_UP' || (error && (error.includes('waking up') || error.includes('502')))) && (
+        <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs flex items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <RefreshCw className="w-5 h-5 text-amber-600 animate-spin shrink-0" />
+            <div>
+              <p className="font-bold text-amber-950">WhatsApp Bridge is Waking Up on Render</p>
+              <p className="text-amber-700 mt-0.5">Free-tier cloud containers sleep after 15m of inactivity. Spinning up now (~15-30s) and will connect automatically.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => void generateQR()}
+            className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold transition shrink-0 flex items-center gap-1.5 shadow-sm"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      )}
+      {error && !error.includes('waking up') && !error.includes('502') && (
         <div className="p-4 bg-rose-50 border border-rose-200 text-rose-900 rounded-2xl text-xs flex items-center gap-3 animate-in fade-in">
           <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
           <span className="font-semibold">{error}</span>

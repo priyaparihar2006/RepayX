@@ -19,7 +19,8 @@ export interface WhatsAppStatus {
   enabled: boolean;
   ready: boolean;
   connected: boolean;
-  status: 'DISCONNECTED' | 'SCAN_QR_CODE' | 'CONNECTING' | 'CONNECTED' | 'OFFLINE' | 'ERROR';
+  status: 'DISCONNECTED' | 'SCAN_QR_CODE' | 'CONNECTING' | 'CONNECTED' | 'OFFLINE' | 'ERROR' | 'WAKING_UP';
+  is_waking_up?: boolean;
   error_message?: string | null;
   expected_sender?: string;
   qr_code?: string;
@@ -275,7 +276,7 @@ export const whatsapp = {
   },
 
   confirmSchedule: (records: ScheduledRecord[], campaignId = 'default') =>
-    request<{ success: boolean; saved_count: number; skipped_sent_count: number; stats: SchedulingSummary }>('/api/whatsapp/scheduled/confirm-schedule', {
+    request<{ success: boolean; saved_count: number; skipped_sent_count: number; stats: SchedulingSummary; schedules?: ScheduledRecord[] }>('/api/whatsapp/scheduled/confirm-schedule', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ records, campaign_id: campaignId }),
