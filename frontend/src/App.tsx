@@ -229,7 +229,7 @@ function AppContent() {
           conversations={conversations}
         />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 overflow-y-auto">
           <Suspense fallback={<LoadingState />}>
           <Routes>
             {/* Connected to the RepayX API */}
