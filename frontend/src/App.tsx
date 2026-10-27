@@ -136,6 +136,16 @@ function AppContent() {
   const [followups, setFollowups] = useState<FollowUpItem[]>(INITIAL_FOLLOWUPS);
   const [activeConversationId, setActiveConversationId] = useState<string>('CONV001');
 
+  // Cloud Keep-Alive: Ping backend periodically to keep free-tier instances warm while tab is open
+  React.useEffect(() => {
+    const keepWarm = () => {
+      fetch('/api/health').catch(() => {});
+    };
+    keepWarm();
+    const timer = setInterval(keepWarm, 4 * 60 * 1000); // every 4 minutes
+    return () => clearInterval(timer);
+  }, []);
+
   const openDemoCustomer = (customerId: string) => navigate(`/demo-customers/${encodeURIComponent(customerId)}`);
 
   const openConversation = (conversationId?: string) => {

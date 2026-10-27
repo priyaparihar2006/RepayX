@@ -110,6 +110,14 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
             "health": "/api/health",
         }
 
+    @app.get("/health")
+    def health_alias():
+        return {
+            "status": "ok",
+            "service": "RepayX API",
+            "version": API_VERSION,
+        }
+
     for router in (
         routes_health.router,
         routes_customer.router,
@@ -123,6 +131,27 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
         routes_webhooks.router,
     ):
         app.include_router(router)
+
+    def _start_keepalive() -> None:
+        import threading, time, urllib.request
+        def _loop() -> None:
+            time.sleep(20)
+            targets = [
+                "https://repayx-backend.onrender.com/health",
+                "https://repayx-whatsapp-bridge.onrender.com/status",
+            ]
+            while True:
+                for url in targets:
+                    try:
+                        req = urllib.request.Request(url, headers={"User-Agent": "RepayX-KeepAlive/1.0"})
+                        with urllib.request.urlopen(req, timeout=15):
+                            pass
+                    except Exception:
+                        pass
+                time.sleep(480)
+        threading.Thread(target=_loop, daemon=True, name="RepayXKeepAliveSupervisor").start()
+
+    _start_keepalive()
 
     return app
 

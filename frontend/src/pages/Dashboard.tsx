@@ -27,9 +27,25 @@ export const AnalyticsPage: React.FC<{
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">{description}</p>
         </div>
         {result.data?.model_version && (
-          <p className="text-[11px] text-slate-400">
-            Scored by <span className="font-mono">{result.data.model_version}</span>
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                result.isFallback
+                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  result.isFallback ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
+                }`}
+              />
+              {result.isFallback ? '⚡ Warming Cloud API...' : 'Live Engine Connected'}
+            </span>
+            <p className="text-[11px] text-slate-400">
+              Scored by <span className="font-mono">{result.data.model_version}</span>
+            </p>
+          </div>
         )}
       </div>
       {result.status === 'error' && !result.data ? (
