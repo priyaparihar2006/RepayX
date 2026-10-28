@@ -49,8 +49,19 @@ async function call<T>(path: string, init: { method?: string; json?: unknown; fo
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let response: Response;
+  const base = baseUrl();
+  const primaryUrl = `${base}${path}`;
+  const isTest = import.meta.env.MODE === 'test';
   try {
-    response = await fetch(`${baseUrl()}${path}`, { method: init.method ?? 'GET', headers, body, signal: controller.signal });
+    try {
+      response = await fetch(primaryUrl, { method: init.method ?? 'GET', headers, body, signal: controller.signal });
+    } catch (primErr) {
+      if (!isTest && (base.includes('localhost') || base.includes('127.0.0.1'))) {
+        response = await fetch(`https://repayx-backend.onrender.com${path}`, { method: init.method ?? 'GET', headers, body, signal: controller.signal });
+      } else {
+        throw primErr;
+      }
+    }
   } catch {
     throw new ApiError(controller.signal.aborted ? 'timeout' : 'network',
       controller.signal.aborted ? 'The request timed out.' : 'Cannot reach the RepayX API. Check that the backend is running.');

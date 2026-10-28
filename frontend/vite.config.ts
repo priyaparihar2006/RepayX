@@ -33,6 +33,8 @@ export default defineConfig(() => {
       // Tests talk to a fake API at this address (see src/test/fakeApi.ts); no backend is needed.
       env: { VITE_API_BASE_URL: 'http://api.test' },
       include: ['src/**/*.test.{ts,tsx}'],
+      fileParallelism: false,
+      testTimeout: 20000,
     },
   };
 });

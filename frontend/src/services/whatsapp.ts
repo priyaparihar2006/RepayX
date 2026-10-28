@@ -117,20 +117,58 @@ export interface DemoContact {
   message?: string;
 }
 
-function apiUrl(path: string): string {
-  const base = import.meta.env.VITE_API_BASE_URL;
-  if (!base || path.startsWith('http')) return path;
+const CLOUD_API_BASE_URL = 'https://repayx-backend.onrender.com';
+let resolvedBaseUrl: string | null = null;
+
+function isLocalhost(url: string): boolean {
+  return url.includes('localhost') || url.includes('127.0.0.1');
+}
+
+function getBaseUrl(): string {
+  if (resolvedBaseUrl) return resolvedBaseUrl;
+  const envBase = import.meta.env.VITE_API_BASE_URL;
+  if (envBase) return envBase.replace(/\/+$/, '');
+  if (typeof window !== 'undefined' && window.location) {
+    return '';
+  }
+  return CLOUD_API_BASE_URL;
+}
+
+function apiUrl(path: string, baseOverride?: string): string {
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  const base = baseOverride !== undefined ? baseOverride : getBaseUrl();
   const cleanBase = base.replace(/\/+$/, '');
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   return `${cleanBase}${cleanPath}`;
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  let response: Response;
+  const isTest = import.meta.env.MODE === 'test';
+  let response: Response | undefined;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 90_000);
+  const primaryUrl = apiUrl(path);
+
   try {
-    response = await fetch(apiUrl(path), { ...options, signal: options?.signal || controller.signal });
+    try {
+      response = await fetch(primaryUrl, { ...options, signal: options?.signal || controller.signal });
+    } catch (primaryError) {
+      if (options?.signal?.aborted || controller.signal.aborted) {
+        throw primaryError;
+      }
+      // If primary was localhost and unreachable, fallback to cloud backend on Render
+      if (!isTest && isLocalhost(primaryUrl) && !path.startsWith('http')) {
+        try {
+          const fallbackUrl = apiUrl(path, CLOUD_API_BASE_URL);
+          response = await fetch(fallbackUrl, { ...options, signal: options?.signal || controller.signal });
+          resolvedBaseUrl = CLOUD_API_BASE_URL;
+        } catch {
+          throw primaryError;
+        }
+      } else {
+        throw primaryError;
+      }
+    }
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       throw new ApiError('timeout', 'The RepayX API took too long to respond. The server may be waking up from sleep; please try again.');

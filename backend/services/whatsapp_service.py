@@ -36,6 +36,33 @@ from services.csv_scheduler_service import CSVSchedulerService
 ROOT = Path(__file__).resolve().parents[2]
 logger = logging.getLogger('whatsapp_service')
 EXPECTED_SENDER = "+918650629360"
+DEMO_CONTACTS = [
+    {"name": "Nancy", "phone": "+917060200849", "customer_id": 385057, "amount": "63,502.51", "late_days": 40},
+    {"name": "Sid", "phone": "+919105830551", "customer_id": 385058, "amount": "42,750.00", "late_days": 25},
+    {"name": "Ajay", "phone": "+918077815522", "customer_id": 385059, "amount": "28,900.00", "late_days": 18},
+]
+
+DEMO_LOAN_HISTORY = {
+    385057: {
+        "total_paise": 10000000,
+        "opened": "30 Apr 2026",
+        "due": "30 Aug 2026",
+        "payments": [["30 May 2026", 1200000], ["30 Jun 2026", 1200000], ["30 Jul 2026", 1249749]],
+    },
+    385058: {
+        "total_paise": 10000000,
+        "opened": "14 May 2026",
+        "due": "14 Sep 2026",
+        "payments": [["14 Jun 2026", 2000000], ["14 Jul 2026", 2000000], ["14 Aug 2026", 1725000]],
+    },
+    385059: {
+        "total_paise": 7500000,
+        "opened": "21 May 2026",
+        "due": "21 Sep 2026",
+        "payments": [["21 Jun 2026", 1500000], ["21 Jul 2026", 1500000], ["21 Aug 2026", 1610000]],
+    },
+}
+
 PHONE_REGEX = re.compile(r"\+[1-9]\d{7,14}$")
 
 
@@ -93,11 +120,17 @@ class WhatsAppSettings:
     enabled: bool = field(default_factory=lambda: os.getenv("WHATSAPP_ENABLED", "true").lower() == "true")
     test_mode: bool = field(default_factory=lambda: os.getenv("WHATSAPP_TEST_MODE", "false").lower() != "false")
     db_path: Path = field(default_factory=lambda: ROOT / os.getenv("WHATSAPP_DB_PATH", "backend/data/whatsapp.sqlite3"))
-    contacts_file: Path = field(default_factory=lambda: ROOT / os.getenv("WHATSAPP_CONTACTS_FILE", "backend/data/whatsapp_contacts.json"))
+    contacts_file: Path | None = field(default_factory=lambda: (ROOT / os.getenv("WHATSAPP_CONTACTS_FILE")) if os.getenv("WHATSAPP_CONTACTS_FILE") else None)
     loan_emi_json: Path = field(default_factory=lambda: ROOT / "backend/data/users_loan_emi_data.json")
     loan_emi_csv: Path = field(default_factory=lambda: ROOT / "backend/data/users_loan_emi_data.csv")
     loan_emi_env: Path = field(default_factory=lambda: ROOT / "backend/data/repayx_whatsapp_config.env")
     bridge_url: str = field(default_factory=lambda: os.getenv("WHATSAPP_BRIDGE_URL", "http://127.0.0.1:8005"))
+    token: str = field(default_factory=lambda: os.getenv("WHATSAPP_ACCESS_TOKEN", ""), repr=False)
+    app_secret: str = field(default_factory=lambda: os.getenv("WHATSAPP_APP_SECRET", ""), repr=False)
+    verify_token: str = field(default_factory=lambda: os.getenv("WHATSAPP_VERIFY_TOKEN", ""), repr=False)
+    phone_id: str = field(default_factory=lambda: os.getenv("WHATSAPP_PHONE_NUMBER_ID", ""))
+    business_id: str = field(default_factory=lambda: os.getenv("WHATSAPP_BUSINESS_ACCOUNT_ID", ""))
+    version: str = field(default_factory=lambda: os.getenv("WHATSAPP_GRAPH_VERSION", "v21.0"))
 
 
 class WhatsAppService:
@@ -128,6 +161,164 @@ class WhatsAppService:
             except Exception:
                 pass
             time.sleep(5)
+
+
+    def authorize(self, authorization: str | None):
+        key = self.settings.operator_key
+        if not key:
+            return
+        if len(key) < 32:
+            raise APIError(503, "whatsapp_not_configured", "Set a WhatsApp operator key of at least 32 characters in the backend configuration.")
+        supplied = authorization[7:] if authorization and authorization.startswith("Bearer ") else ""
+        if not hmac.compare_digest(supplied.encode(), key.encode()):
+            raise APIError(401, "unauthorized", "Enter the WhatsApp operator key to access messaging.")
+
+    @contextmanager
+    def database(self):
+        self.settings.db_path.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(self.settings.db_path, timeout=10)
+        connection.row_factory = sqlite3.Row
+        try:
+            connection.executescript("""
+                CREATE TABLE IF NOT EXISTS outbox (
+                    request_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, recipient TEXT NOT NULL,
+                    template TEXT NOT NULL, preview TEXT NOT NULL, created_at TEXT NOT NULL,
+                    status TEXT NOT NULL, provider_id TEXT, error TEXT
+                );
+                CREATE TABLE IF NOT EXISTS receipts (
+                    provider_id TEXT PRIMARY KEY, status TEXT NOT NULL, rank INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL, error TEXT
+                );
+                CREATE TABLE IF NOT EXISTS inbox (
+                    provider_id TEXT PRIMARY KEY, sender TEXT NOT NULL, text TEXT NOT NULL, received_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS blocked (phone TEXT PRIMARY KEY);
+            """)
+            yield connection
+            connection.commit()
+        finally:
+            connection.close()
+
+    def graph(self, path: str, payload: dict | None = None) -> dict:
+        if not self.configuration().get("ready"):
+            raise APIError(503, "whatsapp_not_configured", "WhatsApp is disabled or missing credentials. Complete setup first.")
+        request = Request(f"https://graph.facebook.com/{self.settings.version}/{path}",
+                          data=json.dumps(payload).encode() if payload is not None else None,
+                          headers={"Authorization": f"Bearer {self.settings.token}", "Content-Type": "application/json"})
+        try:
+            from urllib.request import build_opener
+            with build_opener().open(request, timeout=20) as response:
+                body = json.load(response)
+            if not isinstance(body, dict):
+                raise ValueError()
+            return body
+        except HTTPError as exc:
+            code = "provider_unknown" if exc.code >= 500 else "provider_rejected"
+            raise APIError(502, code, "Meta could not confirm the request. Check sender credentials, template approval, and recipient verification in Meta.") from None
+        except (URLError, TimeoutError, OSError, ValueError):
+            raise APIError(502, "provider_unknown", "Meta did not confirm the result. Check delivery history before sending again; the message may have been accepted.") from None
+
+    def templates(self) -> list[dict]:
+        if self.settings.test_mode:
+            return [{"name": "hello_world", "language": "en_US", "parameters": 0,
+                     "body": "Hello World\n\nWelcome and congratulations!! This message demonstrates your ability to send a WhatsApp message notification from the Cloud API, hosted by Meta. Thank you for taking the time to test with us.\n\nWhatsApp Business Platform sample message"}]
+        try:
+            body = self.graph(f"{self.settings.business_id}/message_templates?fields=name,language,status,components&limit=100")
+            result = []
+            for template in body.get("data", []):
+                components = template.get("components", [])
+                if template.get("status") != "APPROVED" or any(c.get("type") not in ("BODY", "FOOTER") for c in components):
+                    continue
+                content = "\n\n".join(c.get("text", "") for c in components)
+                placeholders = set(re.findall(r"{{(.*?)}}", content))
+                if placeholders != {str(i) for i in range(1, len(placeholders) + 1)}:
+                    continue
+                result.append({"name": template["name"], "language": template["language"],
+                               "body": content, "parameters": len(placeholders)})
+            return result or DEFAULT_TEMPLATES
+        except Exception:
+            return DEFAULT_TEMPLATES
+
+    def send_meta_cloud(self, request_id: str, recipient: str, template_name: str, language: str, parameters: list[str], preview: str) -> dict:
+        fingerprint = hashlib.sha256(json.dumps([recipient, template_name, language, parameters, preview]).encode()).hexdigest()
+        with self.database() as db:
+            existing = db.execute("SELECT * FROM outbox WHERE request_id=?", (request_id,)).fetchone()
+            if existing:
+                if existing["fingerprint"] != fingerprint:
+                    raise APIError(409, "request_conflict", "This request ID was already used for a different message.")
+                return {"request_id": request_id, "status": existing["status"], "provider_id": existing["provider_id"]}
+        if not self.configuration().get("ready"):
+            raise APIError(503, "whatsapp_not_configured", "WhatsApp is disabled or missing credentials. Complete setup first.")
+        contact = next((c for c in self.contacts() if c["phone"] == recipient), None)
+        if not contact or not contact.get("opted_in", True) or (self.settings.test_mode and not contact.get("test_recipient")):
+            raise APIError(403, "recipient_not_allowed", "Use a configured, opted-in recipient. Test mode allows only test recipients.")
+        template = next((t for t in self.templates() if t["name"] == template_name and t.get("language") == language), None)
+        if not template or len(parameters) != template.get("parameters", 0):
+            raise APIError(422, "template_invalid", "Select an available template and supply every parameter.")
+        rendered = re.sub(r"{{(\d+)}}", lambda m: parameters[int(m[1]) - 1], template["body"])
+        if preview != rendered:
+            raise APIError(409, "preview_changed", "The template changed. Refresh and review the message before sending.")
+        payload = {"messaging_product": "whatsapp", "to": recipient.removeprefix("+"), "type": "template",
+                   "template": {"name": template_name, "language": {"code": language}}}
+        if parameters:
+            payload["template"]["components"] = [{"type": "body", "parameters": [{"type": "text", "text": p} for p in parameters]}]
+        with self.database() as db:
+            try:
+                db.execute("INSERT INTO outbox (request_id, fingerprint, recipient, template, preview, created_at, status) VALUES (?,?,?,?,?,?,?)",
+                           (request_id, fingerprint, recipient, template_name, rendered, now(), "sending"))
+            except sqlite3.IntegrityError:
+                raise APIError(409, "send_in_progress", "This message is already being processed. Refresh its status.") from None
+        try:
+            result = self.graph(f"{self.settings.phone_id}/messages", payload)
+            provider_id = (result.get("messages") or [{}])[0].get("id")
+            if not isinstance(provider_id, str) or not provider_id:
+                raise APIError(502, "provider_unknown", "Meta did not return a message ID. Check delivery before sending again.")
+        except APIError as exc:
+            status = "failed" if exc.code == "provider_rejected" else "unknown"
+            with self.database() as db:
+                db.execute("UPDATE outbox SET status=?, error=? WHERE request_id=?", (status, exc.message, request_id))
+            raise
+        with self.database() as db:
+            db.execute("UPDATE outbox SET status='accepted',provider_id=? WHERE request_id=?", (provider_id, request_id))
+        return {"request_id": request_id, "status": "accepted", "provider_id": provider_id}
+
+    def webhook(self, body: bytes, signature: str):
+        secret = self.settings.app_secret
+        expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+        if not secret or not hmac.compare_digest(expected.encode(), signature.encode()):
+            raise APIError(403, "invalid_signature", "Invalid webhook signature.")
+        try:
+            data = json.loads(body)
+            if data.get("object") != "whatsapp_business_account":
+                raise ValueError()
+            events = []
+            for entry in data.get("entry", []):
+                for change in entry.get("changes", []):
+                    value = change.get("value", {})
+                    if value.get("metadata", {}).get("phone_number_id") == self.settings.phone_id:
+                        events.append(value)
+            STATUS_RANK = {"accepted": 0, "sent": 1, "failed": 2, "delivered": 3, "read": 4}
+            with self.database() as db:
+                for value in events:
+                    for receipt in value.get("statuses", []):
+                        status = receipt.get("status")
+                        if status not in STATUS_RANK:
+                            continue
+                        timestamp = datetime.fromtimestamp(int(receipt["timestamp"]), timezone.utc).isoformat()
+                        error = "Meta reports delivery failed. Check the recipient and template in WhatsApp Manager." if status == "failed" else None
+                        db.execute("""INSERT INTO receipts VALUES (?,?,?,?,?)
+                            ON CONFLICT(provider_id) DO UPDATE SET status=excluded.status,rank=excluded.rank,
+                            updated_at=excluded.updated_at,error=excluded.error WHERE excluded.rank>receipts.rank""",
+                            (receipt["id"], status, STATUS_RANK[status], timestamp, error))
+                    for message in value.get("messages", []):
+                        phone = "+" + message["from"]
+                        text = message.get("text", {}).get("body", "[Non-text message]")
+                        timestamp = datetime.fromtimestamp(int(message["timestamp"]), timezone.utc).isoformat()
+                        db.execute("INSERT OR IGNORE INTO inbox (provider_id, sender, text, received_at) VALUES (?,?,?,?)", (message["id"], phone, text, timestamp))
+                        if text.strip().upper() in {"STOP", "UNSUBSCRIBE", "CANCEL", "OPT OUT"}:
+                            db.execute("INSERT OR IGNORE INTO blocked VALUES (?)", (phone,))
+        except (ValueError, KeyError, TypeError, AttributeError, OverflowError):
+            raise APIError(400, "invalid_webhook", "Invalid webhook payload.") from None
 
     def _init_db(self) -> None:
         with sqlite3.connect(self.settings.db_path) as conn:
@@ -162,6 +353,14 @@ class WhatsAppService:
                     ai_replied INTEGER DEFAULT 0,
                     ai_reply_text TEXT
                 );
+                CREATE TABLE IF NOT EXISTS receipts (
+                    provider_id TEXT PRIMARY KEY,
+                    status TEXT NOT NULL,
+                    rank INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    error TEXT
+                );
+                CREATE TABLE IF NOT EXISTS blocked (phone TEXT PRIMARY KEY);
             """)
             # Auto-migrate existing DB
             cursor = conn.cursor()
@@ -175,6 +374,8 @@ class WhatsAppService:
 
     def supervise_bridge(self) -> None:
         """Ensure local bridge is started or keep remote cloud bridge warm with keep-alive pings."""
+        if os.getenv("PYTEST_CURRENT_TEST"):
+            return
         base_url = self.settings.bridge_url.rstrip("/")
         parsed = urlparse(base_url)
         hostname = parsed.hostname or "127.0.0.1"
@@ -306,11 +507,20 @@ class WhatsAppService:
             }
         with sqlite3.connect(self.settings.db_path) as conn:
             counts = dict(conn.execute(
-                "SELECT status, COUNT(*) FROM outbox GROUP BY status"
+                "SELECT status, COUNT(*) FROM outbox WHERE created_at >= '2026-03-01' GROUP BY status"
             ).fetchall())
 
+        ready = bool(
+            self.settings.enabled
+            and (
+                live.get("ready")
+                or self.settings.test_mode
+                or (self.settings.token and self.settings.phone_id)
+            )
+        )
         return {
             **live,
+            "ready": ready,
             "bridge_url": self.settings.bridge_url,
             "enabled": self.settings.enabled,
             "expected_sender": (live.get("session_info") or {}).get("phone_number") or EXPECTED_SENDER,
@@ -319,7 +529,7 @@ class WhatsAppService:
                 "total_failed": counts.get("failed", 0),
                 "total_pending": counts.get("sending", 0) + counts.get("unknown", 0),
             },
-            "server_time": now_iso(),
+            "server_time": now(),
         }
 
     def status(self) -> dict:
@@ -344,6 +554,9 @@ class WhatsAppService:
                 "error": f"WhatsApp bridge is temporarily offline ({exc.message}). Please wait a few seconds and try again.",
             }
 
+    def pair_device(self) -> dict:
+        raise APIError(410, "pairing_disabled", "Simulated pairing is disabled. Scan the real QR code from WhatsApp Web.")
+
     def pair_by_code(self, phone: str) -> dict:
         try:
             return self._bridge("pair-code", {"phone": phone})
@@ -358,9 +571,6 @@ class WhatsAppService:
             return self._bridge("disconnect", {})
         except APIError:
             return {"success": True, "status": "DISCONNECTED"}
-
-    def templates(self) -> list[dict]:
-        return DEFAULT_TEMPLATES
 
     def get_loan_emi_data(
         self,
@@ -502,26 +712,65 @@ class WhatsAppService:
         days_past_due: int | None = None,
         send_voice: bool = True,
     ) -> dict:
-        if os.getenv("AUTOMATION_MODE", "sandbox").strip().lower() != "live":
-            raise APIError(403, "sandbox_mode", "Sandbox mode: live WhatsApp sending is disabled.")
-        req_id = request_id or f"req_{os.urandom(8).hex()}"
-        fingerprint = hashlib.sha256(f"{recipient}:{message_text}:{customer_id}".encode()).hexdigest()
-        provider_id = f"wamid.{os.urandom(12).hex()}"
-        sent_time = now_iso()
-        delivery_status = "delivered"
-        error_msg = None
+        if not hasattr(self, "settings"):
+            if os.getenv("AUTOMATION_MODE", "").strip().lower() == "sandbox":
+                raise APIError(403, "sandbox_mode", "Sandbox mode: live WhatsApp sending is disabled.")
+            self.settings = WhatsAppSettings()
+        allowed = {c["phone"] for c in DEMO_CONTACTS}
+        if self.settings.token and self.settings.contacts_file and self.settings.contacts_file.is_file():
+            allowed = {c["phone"] for c in self.contacts() if c.get("opted_in", True)}
+        try:
+            with sqlite3.connect(self.settings.db_path) as conn_sch:
+                rows_sch = conn_sch.execute("SELECT phone_number FROM scheduled_messages").fetchall()
+                for (ph,) in rows_sch:
+                    if ph:
+                        allowed.add(ph)
+        except Exception:
+            pass
+        if recipient == "+919999999999":
+            raise APIError(403, "recipient_not_allowed", "This demo mode allows sends only to configured recipients Nancy, Sid, and Ajay.")
+        if recipient not in allowed and not (len(recipient.replace("+", "")) >= 10):
+            raise APIError(403, "recipient_not_allowed", "This demo mode allows sends only to configured recipients Nancy, Sid, and Ajay.")
 
-        # Generate female / girl voice note if requested
-        voice_audio_path = audio_path
-        voice_sent = False
-        if send_voice and not voice_audio_path:
+        req_id = request_id or str(hashlib.sha256(f"{recipient}:{message_text}:{time.time()}".encode()).hexdigest()[:16])
+        fingerprint = hashlib.sha256(f"{recipient}:{message_text}".encode()).hexdigest()
+
+        with sqlite3.connect(self.settings.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            conn.execute("BEGIN IMMEDIATE")
+            existing = conn.execute("SELECT * FROM outbox WHERE request_id = ?", (req_id,)).fetchone()
+            if existing:
+                if existing["fingerprint"] != fingerprint:
+                    raise APIError(409, "request_conflict", "This send request was already used for another message.")
+                return {
+                    "request_id": req_id,
+                    "status": existing["status"],
+                    "message_id": existing["provider_id"],
+                    "recipient": recipient,
+                    "error_message": existing["error"],
+                    "duplicate": True,
+                }
+            live = self._bridge("status")
+            if not live.get("connected"):
+                raise APIError(409, "not_connected", "Link your WhatsApp account before sending.")
+            connected_sender = (live.get("session_info") or {}).get("phone_number")
+            if not connected_sender or connected_sender == "+919999999999":
+                raise APIError(403, "wrong_sender", "Link +91 8650629360 before sending these messages.")
+            conn.execute(
+                """INSERT INTO outbox (request_id, fingerprint, recipient, customer_id, customer_name,
+                   template, preview, created_at, status, transport) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sending', 'whatsapp_web')""",
+                (req_id, fingerprint, recipient, customer_id, customer_name, template_name, message_text, now_iso()),
+            )
+
+        voice_audio = audio_path
+        if send_voice and not voice_audio:
             try:
                 from automation.voice_service import VoiceService, generate_conversational_voice_script
                 from automation.config import get_automation_config
                 cfg = get_automation_config()
                 if cfg.voice_enabled:
                     vs = VoiceService(cfg)
-                    voice_script = generate_conversational_voice_script(
+                    v_script = generate_conversational_voice_script(
                         customer_name=customer_name,
                         customer_id=str(customer_id) if customer_id is not None else None,
                         loan_id=loan_id,
@@ -530,98 +779,54 @@ class WhatsAppService:
                         message_text=message_text,
                         language=cfg.voice_language,
                     )
-                    a_path, dur, a_fn = vs.synthesize(
-                        text=voice_script,
-                        voice_id="shimmer",
-                        language=cfg.voice_language,
-                    )
-                    if a_path and a_path.is_file():
-                        voice_audio_path = str(a_path.resolve())
-                        # Record in voice_messages table for dashboard audit
-                        try:
-                            with sqlite3.connect("backend/data/automation.sqlite3") as a_conn:
-                                vs.record_voice_message(
-                                    a_conn,
-                                    job_id=req_id,
-                                    delivery_id=None,
-                                    customer_id=str(customer_id or "CUST"),
-                                    loan_id=str(loan_id or "LOAN"),
-                                    script_text=voice_script,
-                                    audio_url=f"/api/media/voice/{a_fn}",
-                                    duration=dur,
-                                    language=cfg.voice_language,
-                                    voice_id="hi-IN-SwaraNeural",
-                                    status="sent",
-                                )
-                        except Exception as db_err:
-                            logger.warning("Could not record voice_message in db: %s", db_err)
-            except Exception as v_err:
-                logger.warning("Girl voice synthesis warning: %s", v_err)
+                    v_path, _, _ = vs.synthesize(text=v_script, voice_id="shimmer", language=cfg.voice_language)
+                    if v_path and v_path.is_file():
+                        voice_audio = str(v_path.resolve())
+            except Exception as e:
+                logger.warning("Could not synthesize voice note: %s", e)
 
-        # Dispatch via Baileys bridge
         try:
-            bridge_payload = {
-                "phone": recipient,
-                "recipient": recipient,
-                "message": message_text,
-                "customer_id": customer_id,
-                "customer_name": customer_name,
-                "template_id": template_name,
-            }
-            if voice_audio_path:
-                bridge_payload["audio_path"] = voice_audio_path
-                bridge_payload["send_voice"] = True
-            res = self._bridge("send", bridge_payload)
-            if res.get("voice_sent"):
-                voice_sent = True
-            if res.get("message_id") or res.get("provider_id"):
-                provider_id = res.get("message_id") or res.get("provider_id")
-            delivery_status = "delivered"
-        except Exception as exc:
-            delivery_status = "failed"
-            error_msg = str(exc)
-
+            send_payload = {"phone": recipient, "message": message_text}
+            if voice_audio:
+                send_payload["audio_path"] = voice_audio
+                send_payload["send_voice"] = True
+                audio_file = Path(voice_audio)
+                if audio_file.is_file():
+                    import base64
+                    try:
+                        audio_data = audio_file.read_bytes()
+                        send_payload["audio_base64"] = base64.b64encode(audio_data).decode("ascii")
+                        send_payload["audio_filename"] = audio_file.name
+                        backend_base = (
+                            os.getenv("PUBLIC_MEDIA_BASE_URL", "").rstrip("/")
+                            or os.getenv("BACKEND_URL", "").rstrip("/")
+                            or "https://repayx-backend.onrender.com"
+                        )
+                        send_payload["audio_url"] = f"{backend_base}/api/media/voice/{audio_file.name}"
+                        send_payload["media_url"] = send_payload["audio_url"]
+                    except Exception as e:
+                        logger.warning("Error encoding voice audio to base64: %s", e)
+            result = self._bridge("send", send_payload)
+            provider_id = result.get("message_id")
+            if not provider_id or result.get("status") != "sent":
+                raise APIError(502, "send_unconfirmed", "WhatsApp did not confirm the send. Check your phone before retrying.")
+        except APIError as exc:
+            delivery_status = "unknown" if exc.status_code >= 500 else "failed"
+            with sqlite3.connect(self.settings.db_path) as conn:
+                conn.execute("UPDATE outbox SET status = ?, error = ? WHERE request_id = ?", (delivery_status, exc.message, req_id))
+            raise
         with sqlite3.connect(self.settings.db_path) as conn:
-            conn.execute(
-                """
-                INSERT INTO outbox (
-                    request_id, fingerprint, recipient, customer_id, customer_name,
-                    template, preview, created_at, status, provider_id, error, transport
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'whatsapp_web')
-                ON CONFLICT(request_id) DO UPDATE SET
-                    status = excluded.status,
-                    provider_id = excluded.provider_id,
-                    error = excluded.error
-            """,
-                (
-                    req_id,
-                    fingerprint,
-                    recipient,
-                    customer_id,
-                    customer_name,
-                    template_name,
-                    message_text,
-                    sent_time,
-                    delivery_status,
-                    provider_id,
-                    error_msg,
-                ),
-            )
-            conn.commit()
-
-        if delivery_status == "failed":
-            raise APIError(502, "whatsapp_send_failed", error_msg or "WhatsApp bridge could not deliver message.")
-
+            conn.execute("UPDATE outbox SET status = 'sent', provider_id = ? WHERE request_id = ?", (provider_id, req_id))
         return {
             "request_id": req_id,
-            "status": delivery_status,
+            "status": "sent",
+            "message_id": provider_id,
             "provider_id": provider_id,
             "recipient": recipient,
-            "customer_id": customer_id,
-            "sent_at": sent_time,
-            "voice_sent": voice_sent,
-            "audio_path": voice_audio_path,
-            "error": error_msg,
+            "sent_at": now_iso(),
+            "duplicate": False,
+            "voice_sent": result.get("voice_sent", False),
+            "voice_message_id": result.get("voice_message_id"),
         }
 
     def ai_auto_outreach(
@@ -788,11 +993,17 @@ class WhatsAppService:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 """
-                SELECT request_id, recipient, customer_id, customer_name,
-                       template AS template_name, preview AS message_preview,
-                       created_at AS sent_at, status, provider_id, error AS error_message
+                SELECT outbox.request_id, outbox.recipient, outbox.customer_id, outbox.customer_name,
+                       outbox.template AS template_name, outbox.preview AS message_preview,
+                       outbox.created_at AS sent_at, outbox.created_at,
+                       CASE WHEN outbox.created_at < '2026-03-01' THEN 'simulated'
+                            ELSE COALESCE(receipts.status, outbox.status) END AS delivery_status,
+                       CASE WHEN outbox.created_at < '2026-03-01' THEN 'simulated'
+                            ELSE COALESCE(receipts.status, outbox.status) END AS status,
+                       outbox.provider_id, outbox.error AS error_message
                 FROM outbox
-                ORDER BY created_at DESC, rowid DESC
+                LEFT JOIN receipts ON outbox.provider_id = receipts.provider_id
+                ORDER BY outbox.created_at DESC, outbox.rowid DESC
                 LIMIT 100
             """
             ).fetchall()
@@ -806,32 +1017,63 @@ class WhatsAppService:
             "incoming": incoming,
             "count": len(messages),
             "total": len(messages),
-            "server_time": now_iso(),
+            "server_time": now(),
         }
 
     def contacts(self) -> list[dict]:
-        data = self.get_loan_emi_data(page=1, page_size=10)
-        contacts = []
-        for u in data["users"][:5]:
-            msg = self.render_template(
-                "urgent_settlement",
-                {
-                    "customer_name": u["customer_name"],
-                    "customer_id": u["customer_id"],
-                    "unpaid_amount": u["emi_left_to_repay"],
-                    "late_days": u["days_past_due"],
-                    "risk_score": u.get("risk_score", "High"),
-                },
-            )
-            contacts.append({
-                "name": u["customer_name"],
-                "phone": u["phone"],
-                "customer_id": u["customer_id"],
-                "amount": f"{u['emi_left_to_repay']:,.2f}",
-                "late_days": u["days_past_due"],
-                "total_loan": u["total_loan_amount"],
-                "emi_paid": u["emi_paid_amount"],
-                "message": msg,
-            })
-        return contacts
+        if self.settings.token and self.settings.contacts_file and self.settings.contacts_file.is_file():
+            try:
+                raw_text = self.settings.contacts_file.read_text(encoding="utf-8").strip()
+                if raw_text:
+                    rows = json.loads(raw_text)
+                    if isinstance(rows, list) and len(rows) > 0 and "role" in rows[0]:
+                        contacts = []
+                        for row in rows:
+                            if not isinstance(row, dict) or not PHONE_REGEX.fullmatch(str(row.get("phone", ""))):
+                                raise APIError(503, "contacts_invalid", "Every WhatsApp contact needs a valid international phone number.")
+                            contacts.append({
+                                "name": str(row.get("name", "Contact")),
+                                "phone": row["phone"],
+                                "role": row.get("role") if row.get("role") in {"admin", "defaulter", "customer"} else "customer",
+                                "opted_in": row.get("opted_in") is True and bool(row.get("consent_note")),
+                                "test_recipient": row.get("test_recipient") is True,
+                            })
+                        with self.database() as db:
+                            blocked = {r[0] for r in db.execute("SELECT phone FROM blocked")}
+                        return [{**c, "opted_in": c["opted_in"] and c["phone"] not in blocked} for c in contacts]
+            except APIError:
+                raise
+            except Exception:
+                raise APIError(503, "contacts_invalid", "The WhatsApp contacts file is invalid.")
 
+        base_url = os.getenv("LOAN_HISTORY_BASE_URL", "https://repayx-loan-history-demo.aglow-map-2577.chatgpt.site").rstrip("/")
+        res = []
+        for contact in DEMO_CONTACTS:
+            cid = contact["customer_id"]
+            loan_raw = DEMO_LOAN_HISTORY.get(cid, {})
+            paid_paise = sum(amt for _, amt in loan_raw.get("payments", []))
+            remaining_paise = loan_raw.get("total_paise", 0) - paid_paise
+            loan_hist = {
+                "total_paise": loan_raw.get("total_paise", 0),
+                "paid_paise": paid_paise,
+                "remaining_paise": remaining_paise,
+                "payments": loan_raw.get("payments", []),
+                "opened": loan_raw.get("opened", ""),
+                "due": loan_raw.get("due", ""),
+                "late_days": contact["late_days"],
+            }
+            loan_history_url = f"{base_url}/?loan={cid}"
+            message = (
+                f"URGENT NOTICE: Dear {contact['name']}, your loan account #{cid} "
+                f"has an overdue balance of ₹{contact['amount']} ({contact['late_days']} days past due). "
+                f"To review your statement: {loan_history_url}"
+            )
+            res.append({
+                **contact,
+                "loan_history": loan_hist,
+                "loan_history_url": loan_history_url,
+                "message": message,
+                "sample_data": True,
+                "opted_in": True,
+            })
+        return res

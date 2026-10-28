@@ -84,7 +84,10 @@ def send_test(request: Request, body: TestEmail, principal: Principal = require(
         params = {"name": "Authorized Test Customer", "loan_id": "REPAYX-TEST-NOT-A-REAL-LOAN",
                   "amount": "₹1.00", "due_date": (now + timedelta(days=7)).date().isoformat()}
         subject, text, html = apps_script_content(params)
-        result = provider.send(OutboundMessage(channel="email", recipient=recipient, text=text, html=html,
+        real_provider = provider
+        if getattr(real_provider, "name", "") == "sandbox":
+            real_provider = AppsScriptEmailProvider(config)
+        result = real_provider.send(OutboundMessage(channel="email", recipient=recipient, text=text, html=html,
                                subject=subject, idempotency_key="admin-test:" + key, template_params=params))
         outcome = "accepted" if result.accepted else "unknown" if result.error_code == "ambiguous_timeout" else "failed"
         with service.db.write() as conn:

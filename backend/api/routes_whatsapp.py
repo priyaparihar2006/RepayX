@@ -21,6 +21,36 @@ router = APIRouter(prefix="/api/whatsapp", tags=["whatsapp"])
 def service(request: Request) -> WhatsAppService:
     return request.app.state.whatsapp
 
+import hmac
+from uuid import UUID
+from typing import Annotated
+from fastapi import Header
+from pydantic import field_validator
+from api.errors import APIError
+
+def operator(request: Request, authorization: str | None = Header(default=None)) -> WhatsAppService:
+    messaging = service(request)
+    messaging.authorize(authorization)
+    return messaging
+
+class SendMetaMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    request_id: UUID
+    recipient: str = Field(pattern=r"^\+[1-9]\d{7,14}$")
+    template: str = Field(pattern=r"^[a-z0-9_]{1,512}$")
+    language: str = Field(pattern=r"^[a-z]{2,3}(?:_[A-Z]{2})?$")
+    parameters: list[Annotated[str, Field(min_length=1, max_length=1024)]] = Field(default_factory=list, max_length=20)
+    preview: str = Field(min_length=1, max_length=20000)
+    confirm_send: Literal[True]
+
+    @field_validator("parameters")
+    @classmethod
+    def not_blank(cls, values):
+        if any(not v.strip() for v in values):
+            raise ValueError("Template parameters must not be blank.")
+        return values
+
+
 
 def get_customer_service(request: Request) -> CustomerService | None:
     return request.app.state.resources.customers
@@ -88,6 +118,16 @@ def generate_qr(messaging: WhatsAppService = Depends(service)):
     return {"success": True, **result}
 
 
+
+@router.post("/qr/pair")
+def qr_pair():
+    raise APIError(410, "pairing_disabled", "Simulated pairing is disabled. Scan the real QR code from WhatsApp Web.")
+
+
+@router.post("/auto-dispatch")
+def auto_dispatch_legacy():
+    raise APIError(410, "demo_directory_only", "The portfolio directory contains generated phone numbers. Use the named demo recipients instead.")
+
 @router.post("/pair-code")
 def pair_code(body: PairCodeRequest, messaging: WhatsAppService = Depends(service)):
     result = messaging.pair_by_code(phone=body.phone)
@@ -101,7 +141,7 @@ def disconnect(messaging: WhatsAppService = Depends(service)):
 
 
 @router.get("/templates")
-def templates(messaging: WhatsAppService = Depends(service)):
+def templates(messaging: WhatsAppService = Depends(operator)):
     return {"success": True, "templates": messaging.templates()}
 
 
@@ -298,12 +338,12 @@ def download_env(messaging: WhatsAppService = Depends(service)):
 
 
 @router.get("/messages")
-def messages(messaging: WhatsAppService = Depends(service)):
+def messages(messaging: WhatsAppService = Depends(operator)):
     return {"success": True, **messaging.history()}
 
 
 @router.get("/contacts")
-def contacts(messaging: WhatsAppService = Depends(service)):
+def contacts(messaging: WhatsAppService = Depends(operator)):
     return {"success": True, "contacts": messaging.contacts()}
 
 
@@ -490,8 +530,10 @@ def scheduled_dispatch_now(
     try:
         res = messaging.scheduler.dispatch_single_now(body.schedule_id, messaging)
         return {"success": True, **res}
+    except APIError:
+        raise
     except Exception as exc:
-        return Response(status_code=400, content=json.dumps({"success": False, "error": str(exc)}), media_type="application/json")
+        raise APIError(400, "dispatch_failed", str(exc))
 
 
 @router.post("/scheduled/mark-delivered")
@@ -558,3 +600,27 @@ def scheduled_download_validation_report(
         headers={"Content-Disposition": f"attachment; filename=repayx_validation_report_{campaign_id or 'all'}.csv"},
     )
 
+
+
+@router.post("/messages")
+def send_meta(body: SendMetaMessage, messaging: WhatsAppService = Depends(operator)):
+    result = messaging.send_meta_cloud(str(body.request_id), body.recipient, body.template, body.language, body.parameters, body.preview)
+    return {"success": True, **result}
+
+@router.get("/webhook", response_class=PlainTextResponse)
+def verify(request: Request, messaging: WhatsAppService = Depends(service)):
+    params = request.query_params
+    token = messaging.settings.verify_token
+    if not token or params.get("hub.mode") != "subscribe" or not hmac.compare_digest(params.get("hub.verify_token", "").encode(), token.encode()):
+        raise APIError(403, "verification_failed", "Webhook verification failed.")
+    return params.get("hub.challenge", "")
+
+@router.post("/webhook")
+async def webhook(request: Request, messaging: WhatsAppService = Depends(service)):
+    data = bytearray()
+    async for chunk in request.stream():
+        data.extend(chunk)
+        if len(data) > 1024 * 1024:
+            raise APIError(413, "payload_too_large", "Webhook payload exceeds the size limit.")
+    messaging.webhook(bytes(data), request.headers.get("x-hub-signature-256", ""))
+    return {"success": True}

@@ -95,7 +95,14 @@ async function request<T>(path: string, validate: Validator<T>, options: Request
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         // Fallback to relative /api via Vercel proxy if remote URL encounters network or 502 error
-        const targetUrl = attempt > 0 && base.startsWith('http') && typeof window !== 'undefined' ? path : url;
+        let targetUrl = url;
+        if (attempt > 0 && typeof window !== 'undefined') {
+          if (base.includes('localhost') || base.includes('127.0.0.1')) {
+            targetUrl = `https://repayx-backend.onrender.com${path}`;
+          } else if (base.startsWith('http')) {
+            targetUrl = path;
+          }
+        }
         response = await fetch(targetUrl, {
           method: options.method ?? 'GET',
           headers: options.body === undefined ? undefined : { 'Content-Type': 'application/json' },

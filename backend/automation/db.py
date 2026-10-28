@@ -322,6 +322,150 @@ CREATE TABLE IF NOT EXISTS voice_messages (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_voice_job ON voice_messages(job_id);
+
+CREATE TABLE IF NOT EXISTS predictions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id TEXT NOT NULL,
+    loan_id TEXT NOT NULL,
+    horizon_days INTEGER NOT NULL,
+    repayment_probability REAL NOT NULL,
+    default_probability REAL NOT NULL,
+    risk_band TEXT NOT NULL,
+    confidence_level TEXT NOT NULL,
+    model_version TEXT NOT NULL,
+    is_fallback INTEGER NOT NULL DEFAULT 0,
+    features_json TEXT NOT NULL DEFAULT '{}',
+    top_factors_json TEXT NOT NULL DEFAULT '[]',
+    recommendation_summary TEXT,
+    predicted_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_predictions_customer ON predictions(customer_id);
+CREATE INDEX IF NOT EXISTS idx_predictions_loan ON predictions(loan_id);
+
+CREATE TABLE IF NOT EXISTS prediction_outcomes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    prediction_id INTEGER NOT NULL REFERENCES predictions(id),
+    settled INTEGER NOT NULL,
+    settled_at TEXT,
+    actual_days INTEGER,
+    brier_score REAL,
+    evaluated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_outcomes_pred ON prediction_outcomes(prediction_id);
+
+CREATE TABLE IF NOT EXISTS repayment_proposals (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL,
+    loan_id TEXT NOT NULL,
+    installment_key TEXT,
+    original_amount REAL NOT NULL,
+    proposed_amount REAL NOT NULL,
+    proposed_date TEXT NOT NULL,
+    reason TEXT,
+    status TEXT NOT NULL CHECK (status IN ('pending_review', 'approved', 'rejected', 'expired')),
+    channel TEXT NOT NULL DEFAULT 'whatsapp',
+    created_by TEXT NOT NULL DEFAULT 'assistant',
+    reviewed_by TEXT,
+    reviewed_at TEXT,
+    review_notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_proposals_cust ON repayment_proposals(customer_id);
+CREATE INDEX IF NOT EXISTS idx_proposals_status ON repayment_proposals(status);
+
+CREATE TABLE IF NOT EXISTS payment_transactions (
+    id TEXT PRIMARY KEY,
+    transaction_ref TEXT UNIQUE NOT NULL,
+    gateway_payment_id TEXT,
+    gateway_order_id TEXT,
+    gateway_signature TEXT,
+    provider TEXT NOT NULL,
+    customer_id TEXT NOT NULL,
+    loan_id TEXT NOT NULL,
+    installment_key TEXT,
+    amount REAL NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'INR',
+    payment_method TEXT,
+    status TEXT NOT NULL CHECK (status IN ('created', 'pending', 'authorized', 'captured', 'failed', 'refunded', 'disputed')),
+    idempotency_key TEXT UNIQUE NOT NULL,
+    raw_payload TEXT,
+    verified_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pay_tx_cust ON payment_transactions(customer_id);
+CREATE INDEX IF NOT EXISTS idx_pay_tx_loan ON payment_transactions(loan_id);
+CREATE INDEX IF NOT EXISTS idx_pay_tx_status ON payment_transactions(status);
+
+CREATE TABLE IF NOT EXISTS voice_calls (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL,
+    loan_id TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    language TEXT NOT NULL DEFAULT 'hinglish',
+    direction TEXT NOT NULL DEFAULT 'outbound',
+    provider TEXT NOT NULL DEFAULT 'mock',
+    provider_call_id TEXT,
+    duration_seconds INTEGER DEFAULT 0,
+    status TEXT NOT NULL CHECK (status IN ('initiated', 'ringing', 'in_progress', 'completed', 'busy', 'failed', 'no_answer')),
+    recording_url TEXT,
+    transcript TEXT,
+    sentiment TEXT,
+    customer_intent TEXT,
+    agreed_to_pay INTEGER DEFAULT 0,
+    handoff_requested INTEGER DEFAULT 0,
+    initiated_at TEXT NOT NULL,
+    ended_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_voice_calls_cust ON voice_calls(customer_id);
+
+CREATE TABLE IF NOT EXISTS nba_recommendations (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL,
+    loan_id TEXT NOT NULL,
+    recommended_action TEXT NOT NULL,
+    recommended_channel TEXT NOT NULL,
+    stage INTEGER NOT NULL,
+    priority TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    rationale TEXT NOT NULL,
+    policy_rule_triggered TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'recommended' CHECK (status IN ('recommended', 'executed', 'overridden', 'dismissed')),
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_nba_cust ON nba_recommendations(customer_id);
+
+CREATE TABLE IF NOT EXISTS compliance_audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    channel TEXT,
+    recipient TEXT,
+    customer_id TEXT,
+    action TEXT NOT NULL,
+    verdict TEXT NOT NULL CHECK (verdict IN ('allowed', 'blocked', 'warning')),
+    reason TEXT NOT NULL,
+    payload_preview TEXT,
+    ip_or_actor TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_comp_cust ON compliance_audit_logs(customer_id);
+CREATE INDEX IF NOT EXISTS idx_comp_verdict ON compliance_audit_logs(verdict);
+
+CREATE TABLE IF NOT EXISTS ab_experiments (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    variant_a TEXT NOT NULL,
+    variant_b TEXT NOT NULL,
+    traffic_split_a REAL NOT NULL DEFAULT 0.5,
+    metrics_a TEXT DEFAULT '{}',
+    metrics_b TEXT DEFAULT '{}',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+
 """
 
 
@@ -353,6 +497,11 @@ def init_db(db_path: Path) -> None:
             ("message_deliveries", "voice_script", "TEXT"),
             ("customers", "human_takeover", "INTEGER DEFAULT 0"),
             ("customers", "opt_out_at", "TEXT"),
+            ("customers", "lender_id", "TEXT DEFAULT 'LENDER_DEFAULT'"),
+            ("emis", "lender_id", "TEXT DEFAULT 'LENDER_DEFAULT'"),
+            ("emis", "reconciled_transaction_id", "TEXT"),
+            ("emis", "reconciled_at", "TEXT"),
+            ("reminder_jobs", "lender_id", "TEXT DEFAULT 'LENDER_DEFAULT'"),
         ):
             columns = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
             if column not in columns:

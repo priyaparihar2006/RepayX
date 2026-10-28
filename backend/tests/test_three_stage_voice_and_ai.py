@@ -225,7 +225,7 @@ def test_voice_generation_and_audio_endpoint(tmp_path):
     with TestClient(create_app(make_settings(tmp_path), automation=svc)) as client:
         media_res = client.get(f"/api/media/voice/{filename}")
         assert media_res.status_code == 200
-        assert media_res.headers["content-type"] == "audio/mpeg"
+        assert media_res.headers["content-type"] in ("audio/mpeg", "audio/ogg")
         assert len(media_res.content) > 0
 
 

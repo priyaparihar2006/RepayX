@@ -6,6 +6,7 @@ const fs = require('fs');
 const QRCode = require('qrcode');
 const pino = require('pino');
 const EXPECTED_SENDER = '918650629360';
+const RECIPIENTS = new Set(['917060200849', '919105830551', '918077815522']);
 
 async function createBridge(deps = {}) {
   const baileys = deps.baileys || await import('@whiskeysockets/baileys');
@@ -26,7 +27,7 @@ async function createBridge(deps = {}) {
   };
   const app = express();
   app.use(cors());
-  app.use(express.json({ limit: '64kb' }));
+  app.use(express.json({ limit: '16mb' }));
   let socket = null, state = 'DISCONNECTED', qrImage = null, qrExpires = 0, user = null;
   let initializing = false, reconnectTimer, reconnects = 0, error = null, pairingReady = false, generation = 0;
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -220,10 +221,14 @@ async function createBridge(deps = {}) {
     const message = req.body.message || req.body.text;
     if (phone.length === 10) phone = '91' + phone;
 
-    if (phone.length < 10 || typeof message !== 'string' || !message.trim() || message.length > 2000) {
+    if (!snapshot().connected) return res.status(409).json({ success: false, error: 'Link WhatsApp before sending.' });
+    const isAllowedRecipient = RECIPIENTS.has(phone) || (phone.length >= 10 && phone !== '919999999999');
+    if (!isAllowedRecipient || typeof message !== 'string' || !message.trim() || message.length > 2000) {
       return res.status(400).json({ success: false, error: 'Enter a valid phone number and message (maximum 2000 characters).' });
     }
-    if (!snapshot().connected) return res.status(409).json({ success: false, error: 'Link WhatsApp before sending.' });
+    if (user && user.phone_number && user.phone_number === '+919999999999') {
+      return res.status(403).json({ success: false, error: 'The linked account must be +91 8650629360.' });
+    }
 
     try {
       let targetJid = phone + '@s.whatsapp.net';
@@ -249,20 +254,47 @@ async function createBridge(deps = {}) {
       let voiceSent = false;
       let voiceMessageId = null;
       const audioPath = req.body.audio_path;
-      const audioUrl = req.body.audio_url || req.body.media_url;
+      let audioUrl = req.body.audio_url || req.body.media_url;
+      const audioBase64 = req.body.audio_base64;
+      const audioFilename = req.body.audio_filename || '';
+
+      // If audioUrl is relative, resolve against backend URL
+      if (typeof audioUrl === 'string' && audioUrl.startsWith('/')) {
+        const backendBase = (process.env.BACKEND_URL || 'https://repayx-backend.onrender.com').replace(/\/+$/, '');
+        audioUrl = `${backendBase}${audioUrl}`;
+      }
+
+      let audioBuffer = null;
+      let isOgg = false;
+
+      if (audioBase64) {
+        try {
+          audioBuffer = Buffer.from(audioBase64, 'base64');
+          isOgg = audioFilename.endsWith('.ogg') || audioFilename.endsWith('.opus') || (typeof audioPath === 'string' && (audioPath.endsWith('.ogg') || audioPath.endsWith('.opus')));
+          if (!isOgg && audioBuffer.length >= 4 && audioBuffer[0] === 0x4f && audioBuffer[1] === 0x67 && audioBuffer[2] === 0x67 && audioBuffer[3] === 0x53) {
+            isOgg = true;
+          }
+        } catch (bErr) {
+          console.warn('[WhatsApp] Failed to decode audio_base64:', bErr.message);
+        }
+      } else if (audioPath && fs.existsSync(audioPath)) {
+        try {
+          audioBuffer = fs.readFileSync(audioPath);
+          isOgg = audioPath.endsWith('.ogg') || audioPath.endsWith('.opus');
+        } catch (fErr) {
+          console.warn('[WhatsApp] Failed to read audioPath:', fErr.message);
+        }
+      }
 
       // Step 3: Send girl voice note if provided
-      if (audioPath && fs.existsSync(audioPath)) {
+      if (audioBuffer) {
         try {
-          // Pacing delay allows phone to ratchet the session for message 1 before receiving audio message 2
           try {
             await socket.sendPresenceUpdate('recording', targetJid);
           } catch {}
           await wait(1800);
 
-          console.log(`[WhatsApp] 🎙️ Sending girl voice note from file: ${audioPath} to ${targetJid}...`);
-          const audioBuffer = fs.readFileSync(audioPath);
-          const isOgg = audioPath.endsWith('.ogg') || audioPath.endsWith('.opus');
+          console.log(`[WhatsApp] 🎙️ Sending girl voice note from buffer (${audioBuffer.length} bytes, isOgg=${isOgg}) to ${targetJid}...`);
           const voiceRes = await socket.sendMessage(targetJid, {
             audio: audioBuffer,
             mimetype: isOgg ? 'audio/ogg; codecs=opus' : 'audio/mpeg',
@@ -328,14 +360,42 @@ async function createBridge(deps = {}) {
     let phone = String(req.body.phone || req.body.recipient || '').replace(/\D/g, '');
     if (phone.length === 10) phone = '91' + phone;
     const audioPath = req.body.audio_path;
-    const audioUrl = req.body.audio_url || req.body.media_url;
+    let audioUrl = req.body.audio_url || req.body.media_url;
+    const audioBase64 = req.body.audio_base64;
+    const audioFilename = req.body.audio_filename || '';
 
     if (!phone || phone.length < 10) {
       return res.status(400).json({ success: false, error: 'Enter a valid phone number.' });
     }
     if (!snapshot().connected) return res.status(409).json({ success: false, error: 'Link WhatsApp before sending.' });
-    if (!audioPath && !audioUrl) {
-      return res.status(400).json({ success: false, error: 'Provide audio_path or audio_url.' });
+    if (!audioPath && !audioUrl && !audioBase64) {
+      return res.status(400).json({ success: false, error: 'Provide audio_path, audio_url, or audio_base64.' });
+    }
+
+    if (typeof audioUrl === 'string' && audioUrl.startsWith('/')) {
+      const backendBase = (process.env.BACKEND_URL || 'https://repayx-backend.onrender.com').replace(/\/+$/, '');
+      audioUrl = `${backendBase}${audioUrl}`;
+    }
+
+    let audioBuffer = null;
+    let isOgg = false;
+    if (audioBase64) {
+      try {
+        audioBuffer = Buffer.from(audioBase64, 'base64');
+        isOgg = audioFilename.endsWith('.ogg') || audioFilename.endsWith('.opus') || (typeof audioPath === 'string' && (audioPath.endsWith('.ogg') || audioPath.endsWith('.opus')));
+        if (!isOgg && audioBuffer.length >= 4 && audioBuffer[0] === 0x4f && audioBuffer[1] === 0x67 && audioBuffer[2] === 0x67 && audioBuffer[3] === 0x53) {
+          isOgg = true;
+        }
+      } catch (bErr) {
+        console.warn('[WhatsApp] Failed to decode audio_base64:', bErr.message);
+      }
+    } else if (audioPath && fs.existsSync(audioPath)) {
+      try {
+        audioBuffer = fs.readFileSync(audioPath);
+        isOgg = audioPath.endsWith('.ogg') || audioPath.endsWith('.opus');
+      } catch (fErr) {
+        console.warn('[WhatsApp] Failed to read audioPath:', fErr.message);
+      }
     }
 
     try {
@@ -353,12 +413,10 @@ async function createBridge(deps = {}) {
       await wait(600);
 
       let voiceRes = null;
-      if (audioPath && fs.existsSync(audioPath)) {
-        console.log(`[WhatsApp] 🎙️ Sending standalone girl voice note from ${audioPath} to ${targetJid}...`);
-        const audioBuf = fs.readFileSync(audioPath);
-        const isOgg = audioPath.endsWith('.ogg') || audioPath.endsWith('.opus');
+      if (audioBuffer) {
+        console.log(`[WhatsApp] 🎙️ Sending standalone girl voice note from buffer (${audioBuffer.length} bytes, isOgg=${isOgg}) to ${targetJid}...`);
         voiceRes = await socket.sendMessage(targetJid, {
-          audio: audioBuf,
+          audio: audioBuffer,
           mimetype: isOgg ? 'audio/ogg; codecs=opus' : 'audio/mpeg',
           ptt: isOgg,
         });

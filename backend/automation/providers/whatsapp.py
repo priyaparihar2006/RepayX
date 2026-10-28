@@ -115,6 +115,17 @@ class BaileysBridgeProvider(Provider):
         }
         if message.media_type == "audio" and message.media_url:
             data_dict["media_url"] = message.media_url
+            data_dict["send_voice"] = True
+            fn = message.media_url.split("/")[-1]
+            local_audio = self.config.voice_media_dir / fn
+            if local_audio.is_file():
+                import base64
+                try:
+                    data_dict["audio_base64"] = base64.b64encode(local_audio.read_bytes()).decode("ascii")
+                    data_dict["audio_filename"] = local_audio.name
+                    data_dict["audio_path"] = str(local_audio.resolve())
+                except Exception:
+                    pass
         payload = json.dumps(data_dict).encode()
         try:
             resp = http_request("POST", f"{self.base}/send", {"Content-Type": "application/json"}, payload, self.timeout)

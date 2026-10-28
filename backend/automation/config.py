@@ -122,7 +122,7 @@ class AutomationConfig:
     openai_tts_voice: str = field(default_factory=lambda: _env("OPENAI_TTS_VOICE", "shimmer"))
     voice_language: str = field(default_factory=lambda: _env("VOICE_LANGUAGE", "hinglish"))
     voice_media_dir: Path = field(default_factory=lambda: BACKEND_DIR / _env("VOICE_MEDIA_DIR", "data/voice_media"))
-    public_media_base_url: str = field(default_factory=lambda: _env("PUBLIC_MEDIA_BASE_URL", ""))
+    public_media_base_url: str = field(default_factory=lambda: _env("PUBLIC_MEDIA_BASE_URL", os.getenv("BACKEND_URL", "https://repayx-backend.onrender.com")))
 
     # Business details used in messages. Nothing here is invented: unset values are omitted.
     company_name: str = field(default_factory=lambda: _env("COMPANY_NAME", "RepayX"))
@@ -169,8 +169,8 @@ class AutomationConfig:
     email_reply_to: str = field(default_factory=lambda: _env("EMAIL_REPLY_TO", "priiiiicaptures@gmail.com"))
     smtp_host: str = field(default_factory=lambda: _env("SMTP_HOST", "smtp.gmail.com"))
     smtp_port: int = field(default_factory=lambda: _env_int("SMTP_PORT", 587))
-    smtp_username: str = field(default_factory=lambda: _env("SMTP_USERNAME", "priiiiicaptures@gmail.com"))
-    smtp_password: str = field(default_factory=lambda: _env("SMTP_PASSWORD", "nzfa armr fuko flzj"), repr=False)
+    smtp_username: str = field(default_factory=lambda: _env("SMTP_USERNAME", ""))
+    smtp_password: str = field(default_factory=lambda: _env("SMTP_PASSWORD", ""), repr=False)
     smtp_use_tls: bool = field(default_factory=lambda: _env_bool("SMTP_USE_TLS", True))
     email_relay_url: str = field(
         default_factory=lambda: _env("EMAIL_RELAY_URL", "https://repay-x.vercel.app/api/send-email")

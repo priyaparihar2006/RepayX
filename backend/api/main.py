@@ -18,7 +18,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 import env_loader  # noqa: F401
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -136,6 +136,9 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
 
     # Cloud Keep-Alive Supervisor
     def _start_keepalive() -> None:
+        import os
+        if os.getenv("PYTEST_CURRENT_TEST"):
+            return
         import threading, time, urllib.request
         def _loop() -> None:
             time.sleep(20)
@@ -170,10 +173,31 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
         async def serve_root():
             return FileResponse(frontend_dist / "index.html")
 
+        def _get_routes():
+            routes = []
+            for r in app.routes:
+                if hasattr(r, "path"):
+                    routes.append(r)
+                elif hasattr(r, "original_router") and hasattr(r.original_router, "routes"):
+                    routes.extend(r.original_router.routes)
+            return routes
+
         @app.get("/{full_path:path}")
-        async def serve_spa(full_path: str):
+        async def serve_spa(request: Request, full_path: str):
             if full_path.startswith("api/") or full_path == "api":
-                raise HTTPException(status_code=404, detail="API route not found")
+                normalized = f"/{full_path}"
+                for route in _get_routes():
+                    path = getattr(route, "path", None)
+                    if path == normalized:
+                        methods = getattr(route, "methods", set())
+                        if "GET" in methods and getattr(route, "endpoint", None) != serve_spa:
+                            import inspect
+                            if inspect.iscoroutinefunction(route.endpoint):
+                                return await route.endpoint()
+                            return route.endpoint()
+                        elif "GET" not in methods:
+                            raise HTTPException(status_code=405, detail="Method Not Allowed")
+                raise HTTPException(status_code=404, detail="Not Found")
             target_file = frontend_dist / full_path
             if target_file.is_file():
                 return FileResponse(target_file)

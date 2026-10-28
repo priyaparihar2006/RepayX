@@ -5,7 +5,10 @@
 *.log
 backend/.venv
 .venv
-frontend
+frontend/node_modules
+frontend/src
+frontend/public
+frontend/*.log
 node_modules
 */node_modules
 */*/node_modules
