@@ -3,6 +3,7 @@ services:
     name: repayx-backend
     runtime: docker
     dockerfilePath: ./Dockerfile
+    dockerContext: .
     plan: free
     region: oregon
     healthCheckPath: /api/health
