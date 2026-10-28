@@ -21,11 +21,11 @@ const RANK: Record<Role, number> = { viewer: 0, operator: 1, admin: 2 };
 const CHANNELS: Channel[] = ['whatsapp', 'sms', 'email'];
 const providerLabel = (name: string) => name === 'google_apps_script' ? 'Google Apps Script' : name;
 const CHANNEL_LABEL: Record<Channel, string> = { whatsapp: 'WhatsApp', sms: 'SMS', email: 'Email' };
-const card = 'bg-white rounded-2xl border border-slate-200/80 shadow-xs';
-const btn = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
-const btnPrimary = `${btn} bg-slate-900 text-white hover:bg-slate-700`;
-const btnGhost = `${btn} bg-slate-100 text-slate-700 hover:bg-slate-200`;
-const input = 'border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
+const card = 'bg-white rounded-[20px] border border-[#E7EBE3] shadow-fintech-card transition-all duration-200';
+const btn = 'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all';
+const btnPrimary = `${btn} bg-[#245C35] hover:bg-[#1B4728] active:bg-[#14351E] text-white shadow-xs`;
+const btnGhost = `${btn} bg-[#EDF5E5] text-[#245C35] hover:bg-[#D1E8BC]`;
+const input = 'border border-[#E7EBE3] rounded-full px-3.5 py-1.5 text-xs bg-[#F5F7F3] text-[#171A17] placeholder-[#777E77] focus:outline-none focus:ring-2 focus:ring-[#245C35]/20 focus:border-[#245C35] transition-all';
 
 const STATUS_STYLE: Record<string, string> = {
   simulated: 'bg-violet-50 text-violet-700 border-violet-200', scheduled: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -33,7 +33,7 @@ const STATUS_STYLE: Record<string, string> = {
   pending: 'bg-blue-50 text-blue-700 border-blue-200', processing: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   retry: 'bg-amber-50 text-amber-800 border-amber-200', retry_scheduled: 'bg-amber-50 text-amber-800 border-amber-200',
   completed: 'bg-emerald-50 text-emerald-700 border-emerald-200', accepted: 'bg-sky-50 text-sky-700 border-sky-200',
-  delivered: 'bg-emerald-50 text-emerald-700 border-emerald-200', read: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  delivered: 'bg-emerald-50 text-emerald-700 border-emerald-200', read: 'bg-[#EDF5E5] text-[#245C35] border border-[#D1E8BC] border-emerald-300',
   partially_completed: 'bg-lime-50 text-lime-800 border-lime-200', failed: 'bg-rose-50 text-rose-700 border-rose-200',
   dead_letter: 'bg-rose-100 text-rose-800 border-rose-300', unknown: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
   cancelled: 'bg-slate-100 text-slate-600 border-slate-200', skipped: 'bg-slate-100 text-slate-600 border-slate-200',
@@ -44,7 +44,7 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 const Badge: React.FC<{ value: string; title?: string }> = ({ value, title }) => (
-  <span title={title} className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-semibold whitespace-nowrap ${STATUS_STYLE[value] ?? 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+  <span title={title} className={`inline-block px-2.5 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap ${STATUS_STYLE[value] ?? 'bg-slate-50 text-slate-600 border-slate-200'}`}>
     {value.replace(/_/g, ' ')}
   </span>
 );
@@ -1766,10 +1766,10 @@ export const AutomationPage: React.FC = () => {
           Signed in as <span className="font-semibold text-slate-700">{user.name}</span> ({user.role})
         </div>
       </div>
-      <nav className="flex flex-wrap gap-1 border-b border-slate-200" aria-label="Automation sections">
+      <nav className="flex flex-wrap gap-1.5 p-1 bg-[#F5F7F3] rounded-full border border-[#E7EBE3] w-fit" aria-label="Automation sections">
         {visible.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)} aria-current={tab === t.id ? 'page' : undefined}
-            className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 -mb-px cursor-pointer ${tab === t.id ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+            className={`inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold cursor-pointer transition-all ${tab === t.id ? 'bg-[#245C35] text-white shadow-2xs rounded-full' : 'text-[#777E77] hover:text-[#171A17] rounded-full'}`}>
             <t.icon className="w-4 h-4" />{t.label}
           </button>
         ))}

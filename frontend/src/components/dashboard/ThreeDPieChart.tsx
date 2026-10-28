@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Rotate3d, Sparkles, TrendingUp, ChevronRight } from 'lucide-react';
+import { Rotate3d, Sparkles } from 'lucide-react';
 
 export interface PieSliceData {
   id: string;
@@ -26,9 +26,9 @@ const DEFAULT_SLICES: PieSliceData[] = [
     count: 724,
     value: 58,
     amount: '₹48.2L',
-    color: '#10B981',       // emerald-500
-    depthColor: '#047857',  // emerald-700
-    lightColor: '#6EE7B7',  // emerald-300
+    color: '#245C35',
+    depthColor: '#14351E',
+    lightColor: '#B5F078',
   },
   {
     id: 'due_today',
@@ -36,9 +36,9 @@ const DEFAULT_SLICES: PieSliceData[] = [
     count: 225,
     value: 18,
     amount: '₹15.0L',
-    color: '#F59E0B',       // amber-500
-    depthColor: '#B45309',  // amber-700
-    lightColor: '#FDE68A',  // amber-200
+    color: '#D97706',
+    depthColor: '#B45309',
+    lightColor: '#FDE68A',
   },
   {
     id: 'overdue',
@@ -46,9 +46,9 @@ const DEFAULT_SLICES: PieSliceData[] = [
     count: 150,
     value: 12,
     amount: '₹10.2L',
-    color: '#EF4444',       // rose-500
-    depthColor: '#B91C1C',  // rose-700
-    lightColor: '#FCA5A5',  // rose-300
+    color: '#DC2626',
+    depthColor: '#991B1B',
+    lightColor: '#FCA5A5',
   },
   {
     id: 'ptp',
@@ -56,9 +56,9 @@ const DEFAULT_SLICES: PieSliceData[] = [
     count: 100,
     value: 8,
     amount: '₹6.8L',
-    color: '#516072',       // signature slate steel
-    depthColor: '#354352',  // slate steel dark
-    lightColor: '#8899AC',  // slate steel light
+    color: '#16A34A',
+    depthColor: '#15803D',
+    lightColor: '#86EFAC',
   },
   {
     id: 'disputed',
@@ -66,9 +66,9 @@ const DEFAULT_SLICES: PieSliceData[] = [
     count: 49,
     value: 4,
     amount: '₹3.4L',
-    color: '#8B5CF6',       // violet-500
-    depthColor: '#6D28D9',  // violet-700
-    lightColor: '#C4B5FD',  // violet-300
+    color: '#7C3AED',
+    depthColor: '#5B21B6',
+    lightColor: '#DDD6FE',
   },
 ];
 
@@ -99,21 +99,21 @@ export const ThreeDPieChart: React.FC<ThreeDPieChartProps> = ({
       // easeOutCubic
       const eased = 1 - Math.pow(1 - progress, 3);
       setAnimationProgress(eased);
+
       if (progress < 1) {
         requestAnimationFrame(animate);
       }
     };
 
-    const animId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animId);
+    requestAnimationFrame(animate);
   }, []);
 
-  // Optional auto-rotation animation loop
+  // Optional auto-rotation loop
   useEffect(() => {
     if (!isAutoRotating) return;
     const interval = setInterval(() => {
-      setRotationAngle((prev) => (prev + 0.8) % 360);
-    }, 30);
+      setRotationAngle((prev) => (prev + 1) % 360);
+    }, 40);
     return () => clearInterval(interval);
   }, [isAutoRotating]);
 
@@ -121,7 +121,7 @@ export const ThreeDPieChart: React.FC<ThreeDPieChartProps> = ({
   const centerX = 160;
   const centerY = 115;
   const radiusX = 110;
-  const radiusY = radiusX * tiltFactor; // e.g. 110 * 0.55 = 60.5
+  const radiusY = radiusX * tiltFactor;
   const thickness = depthHeight;
 
   // Convert slices into start and end angles (degrees)
@@ -188,32 +188,45 @@ export const ThreeDPieChart: React.FC<ThreeDPieChartProps> = ({
     popout = 0
   ) => {
     // Slices that cross the front hemisphere (0 to 180 degrees in display coordinates)
-    // Angles relative to screen: 0 is 3 o'clock (90 deg polar), 180 is 9 o'clock (270 deg polar).
-    // Front half where y is lower (visual bottom) is from 0 to 180 deg in standard polar where sin(rad) > 0.
-    // In our coordinate system: rad = (angle - 90)*PI/180.
-    // Front arc is between angle = 90 and angle = 270 (normalized).
-    
-    // Subdivide arc into steps to create clean 3D curtain geometry
-    const steps = 16;
-    const stepAngle = (endAngle - startAngle) / steps;
-    const topPoints = [];
-    const bottomPoints = [];
+    const normStart = ((startAngle % 360) + 360) % 360;
+    const normEnd = ((endAngle % 360) + 360) % 360;
 
-    for (let i = 0; i <= steps; i++) {
-      const a = startAngle + i * stepAngle;
-      topPoints.push(getPoint(a, rX, rY, 0, popout));
-      bottomPoints.push(getPoint(a, rX, rY, thickness, popout));
+    const p1 = getPoint(startAngle, rX, rY, 0, popout);
+    const p2 = getPoint(endAngle, rX, rY, 0, popout);
+    const p3 = getPoint(endAngle, rX, rY, thickness, popout);
+    const p4 = getPoint(startAngle, rX, rY, thickness, popout);
+
+    const span = endAngle - startAngle;
+    const largeArcFlag = span > 180 ? 1 : 0;
+
+    let path = `M ${p1.x} ${p1.y} A ${rX} ${rY} 0 ${largeArcFlag} 1 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${rX} ${rY} 0 ${largeArcFlag} 0 ${p4.x} ${p4.y} Z`;
+
+    const isStartVisible = normStart >= 0 && normStart <= 180;
+    const isEndVisible = normEnd >= 0 && normEnd <= 180;
+
+    if (isStartVisible) {
+      const pCenterTop = {
+        x: centerX + Math.cos(((startAngle + endAngle) / 2 - 90) * (Math.PI / 180)) * popout,
+        y: centerY + Math.sin(((startAngle + endAngle) / 2 - 90) * (Math.PI / 180)) * (popout * tiltFactor),
+      };
+      const pCenterBottom = {
+        x: pCenterTop.x,
+        y: pCenterTop.y + thickness,
+      };
+      path += ` M ${pCenterTop.x} ${pCenterTop.y} L ${p1.x} ${p1.y} L ${p4.x} ${p4.y} L ${pCenterBottom.x} ${pCenterBottom.y} Z`;
     }
 
-    let path = `M ${topPoints[0].x} ${topPoints[0].y}`;
-    for (let i = 1; i <= steps; i++) {
-      path += ` L ${topPoints[i].x} ${topPoints[i].y}`;
+    if (isEndVisible) {
+      const pCenterTop = {
+        x: centerX + Math.cos(((startAngle + endAngle) / 2 - 90) * (Math.PI / 180)) * popout,
+        y: centerY + Math.sin(((startAngle + endAngle) / 2 - 90) * (Math.PI / 180)) * (popout * tiltFactor),
+      };
+      const pCenterBottom = {
+        x: pCenterTop.x,
+        y: pCenterTop.y + thickness,
+      };
+      path += ` M ${pCenterTop.x} ${pCenterTop.y} L ${p2.x} ${p2.y} L ${p3.x} ${p3.y} L ${pCenterBottom.x} ${pCenterBottom.y} Z`;
     }
-    path += ` L ${bottomPoints[steps].x} ${bottomPoints[steps].y}`;
-    for (let i = steps - 1; i >= 0; i--) {
-      path += ` L ${bottomPoints[i].x} ${bottomPoints[i].y}`;
-    }
-    path += ' Z';
 
     return path;
   };
@@ -223,36 +236,36 @@ export const ThreeDPieChart: React.FC<ThreeDPieChartProps> = ({
     data.find((s) => s.id === (hoveredSlice || selectedSlice)) || data[0];
 
   return (
-    <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-sm flex flex-col justify-between relative overflow-hidden group/card">
+    <div className="bg-white rounded-[20px] p-5 sm:p-6 border border-[#E7EBE3] shadow-fintech-card flex flex-col justify-between relative overflow-hidden group/card transition-all duration-200">
       {/* Background ambient lighting */}
-      <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#516072]/5 rounded-full blur-2xl pointer-events-none" />
+      <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#B5F078]/15 rounded-full blur-2xl pointer-events-none" />
 
       {/* Header with Title and 3D Controls */}
       <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
-        <h3 className="text-sm font-bold text-slate-900 font-heading truncate">
+        <h3 className="text-sm font-bold text-[#171A17] font-heading truncate">
           {title}
         </h3>
 
         {/* 3D View Controls */}
-        <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-xs font-medium shrink-0">
+        <div className="flex items-center gap-1 bg-[#F5F7F3] p-1 rounded-full border border-[#E7EBE3] text-xs font-medium shrink-0">
           <button
             onClick={() => setRotationAngle((prev) => (prev + 30) % 360)}
-            className="p-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-white transition-all cursor-pointer"
+            className="p-1 rounded-full text-[#777E77] hover:text-[#171A17] hover:bg-white transition-all cursor-pointer"
             title="Rotate 3D angle"
           >
-            <Rotate3d className="w-3.5 h-3.5 text-[#516072]" />
+            <Rotate3d className="w-3.5 h-3.5 text-[#245C35]" />
           </button>
 
           <button
             onClick={() => setIsAutoRotating(!isAutoRotating)}
-            className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
               isAutoRotating
-                ? 'bg-[#516072] text-white shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+                ? 'bg-[#245C35] text-white shadow-2xs'
+                : 'text-[#777E77] hover:text-[#171A17] hover:bg-white'
             }`}
             title="Auto 3D rotation"
           >
-            <Sparkles className="w-3 h-3" />
+            <Sparkles className="w-3 h-3 text-[#B5F078]" />
             <span>Spin</span>
           </button>
 
@@ -260,7 +273,7 @@ export const ThreeDPieChart: React.FC<ThreeDPieChartProps> = ({
             onClick={() => {
               setTiltFactor((prev) => (prev === 0.55 ? 0.7 : prev === 0.7 ? 0.45 : 0.55));
             }}
-            className="px-2 py-0.5 rounded-md text-[11px] font-semibold text-slate-600 hover:text-slate-900 hover:bg-white transition-all cursor-pointer"
+            className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-[#777E77] hover:text-[#171A17] hover:bg-white transition-all cursor-pointer"
             title="Toggle tilt"
           >
             Tilt
@@ -284,8 +297,8 @@ export const ThreeDPieChart: React.FC<ThreeDPieChartProps> = ({
                 dx="0"
                 dy="14"
                 stdDeviation="12"
-                floodColor="#1e293b"
-                floodOpacity="0.22"
+                floodColor="#171A17"
+                floodOpacity="0.18"
               />
             </filter>
 
@@ -302,7 +315,7 @@ export const ThreeDPieChart: React.FC<ThreeDPieChartProps> = ({
                 <linearGradient id={`grad-side-${slice.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
                   <stop offset="0%" stopColor={slice.color} />
                   <stop offset="50%" stopColor={slice.depthColor} />
-                  <stop offset="100%" stopColor="#1E252D" stopOpacity="0.85" />
+                  <stop offset="100%" stopColor="#171A17" stopOpacity="0.85" />
                 </linearGradient>
               </React.Fragment>
             ))}
@@ -314,8 +327,8 @@ export const ThreeDPieChart: React.FC<ThreeDPieChartProps> = ({
             cy={centerY + thickness + 12}
             rx={radiusX * 1.02}
             ry={radiusY * 1.02}
-            fill="#0F172A"
-            opacity="0.12"
+            fill="#171A17"
+            opacity="0.10"
             filter="blur(8px)"
           />
 
@@ -339,14 +352,8 @@ export const ThreeDPieChart: React.FC<ThreeDPieChartProps> = ({
                   key={`side-${slice.id}`}
                   d={sidePath}
                   fill={`url(#grad-side-${slice.id})`}
-                  opacity={hoveredSlice && !isHovered ? 0.65 : 1}
-                  className="transition-all duration-300 cursor-pointer"
-                  onMouseEnter={() => setHoveredSlice(slice.id)}
-                  onMouseLeave={() => setHoveredSlice(null)}
-                  onClick={() => {
-                    setSelectedSlice(slice.id);
-                    if (onSliceClick) onSliceClick(slice);
-                  }}
+                  opacity={hoveredSlice && !isHovered ? 0.6 : 1}
+                  className="transition-all duration-300"
                 />
               );
             })}
@@ -397,7 +404,7 @@ export const ThreeDPieChart: React.FC<ThreeDPieChartProps> = ({
               rx={32}
               ry={32 * tiltFactor}
               fill="#FFFFFF"
-              stroke="#E2E8F0"
+              stroke="#E7EBE3"
               strokeWidth="1.5"
               className="drop-shadow-sm"
             />
@@ -405,7 +412,7 @@ export const ThreeDPieChart: React.FC<ThreeDPieChartProps> = ({
               x={centerX}
               y={centerY - 2}
               textAnchor="middle"
-              className="text-[12px] font-extrabold fill-slate-900 font-heading"
+              className="text-[12px] font-extrabold fill-[#171A17] font-heading"
             >
               {activeSliceData.value}%
             </text>
@@ -413,7 +420,7 @@ export const ThreeDPieChart: React.FC<ThreeDPieChartProps> = ({
               x={centerX}
               y={centerY + 8}
               textAnchor="middle"
-              className="text-[8px] font-semibold fill-slate-500 uppercase tracking-wider"
+              className="text-[8px] font-semibold fill-[#777E77] uppercase tracking-wider"
             >
               {activeSliceData.id === 'paid' ? 'Collected' : 'Portion'}
             </text>
@@ -421,18 +428,18 @@ export const ThreeDPieChart: React.FC<ThreeDPieChartProps> = ({
         </svg>
 
         {/* Minimal Hover / Active Badge */}
-        <div className="absolute top-2 right-2 bg-slate-900/85 backdrop-blur-xs text-white px-2.5 py-1 rounded-lg text-xs font-medium pointer-events-none flex items-center gap-1.5 shadow-sm max-w-[180px] z-10">
+        <div className="absolute top-2 right-2 bg-[#171A17]/90 backdrop-blur-xs text-white px-3 py-1 rounded-full text-xs font-medium pointer-events-none flex items-center gap-1.5 shadow-sm max-w-[180px] z-10 border border-white/10">
           <span
             className="w-2 h-2 rounded-full inline-block shrink-0"
             style={{ backgroundColor: activeSliceData.color }}
           />
           <span className="truncate">{activeSliceData.label}</span>
-          <span className="font-bold text-emerald-400 ml-0.5 shrink-0">{activeSliceData.value}%</span>
+          <span className="font-bold text-[#B5F078] ml-0.5 shrink-0">{activeSliceData.value}%</span>
         </div>
       </div>
 
       {/* Clean, Non-overflowing Legend */}
-      <div className="pt-2.5 border-t border-slate-100 space-y-1">
+      <div className="pt-2.5 border-t border-[#E7EBE3] space-y-1">
         {data.map((item) => {
           const isHovered = hoveredSlice === item.id;
           const isSelected = selectedSlice === item.id;
@@ -446,25 +453,25 @@ export const ThreeDPieChart: React.FC<ThreeDPieChartProps> = ({
                 setSelectedSlice(item.id);
                 if (onSliceClick) onSliceClick(item);
               }}
-              className={`py-1.5 px-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-between text-xs ${
+              className={`py-1.5 px-3 rounded-full transition-all cursor-pointer flex items-center justify-between text-xs ${
                 isSelected || isHovered
-                  ? 'bg-slate-100 text-slate-900 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-50'
+                  ? 'bg-[#EDF5E5] text-[#245C35] font-semibold'
+                  : 'text-[#777E77] hover:bg-[#F5F7F3] hover:text-[#171A17]'
               }`}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span
-                  className="w-2.5 h-2.5 rounded-sm shrink-0"
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
                   style={{ backgroundColor: item.color }}
                 />
                 <span className="truncate">{item.label}</span>
               </div>
 
               <div className="flex items-center gap-2.5 shrink-0 ml-2">
-                <span className="text-[11px] text-slate-400 font-medium">
+                <span className="text-[11px] text-[#777E77] font-medium">
                   {item.amount}
                 </span>
-                <span className="text-xs font-bold text-slate-900 font-heading w-8 text-right">
+                <span className="text-xs font-bold text-[#171A17] font-heading w-8 text-right">
                   {item.value}%
                 </span>
               </div>

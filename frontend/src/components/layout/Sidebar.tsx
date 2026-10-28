@@ -163,14 +163,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: 'EMI Reminder Automation',
           sublabel: 'Imports, Schedules & Delivery',
           icon: BellRing,
-          badgeColor: 'bg-emerald-600',
+          badgeColor: 'bg-[#245C35]',
         },
         {
           id: 'whatsapp',
           label: 'WhatsApp Outreach',
           sublabel: 'NLP, CSV & Schedules',
           icon: MessageSquare,
-          badgeColor: 'bg-emerald-600',
+          badgeColor: 'bg-[#245C35]',
         },
         {
           id: 'conversations',
@@ -178,7 +178,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           sublabel: 'WA, SMS & Email',
           icon: MessageSquare,
           badge: unreadCount > 0 ? unreadCount : undefined,
-          badgeColor: 'bg-[#516072]',
+          badgeColor: 'bg-[#245C35]',
         },
         {
           id: 'follow-ups',
@@ -209,7 +209,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           sublabel: 'Supervisor Reviews',
           icon: ShieldAlert,
           badge: pendingEscalationsCount > 0 ? pendingEscalationsCount : undefined,
-          badgeColor: 'bg-amber-600',
+          badgeColor: 'bg-[#D97706]',
         },
         {
           id: 'rag-knowledge',
@@ -238,25 +238,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const collapsed = inMobile ? false : isCollapsed;
 
     return (
-      <div className="flex flex-col h-full bg-[#242C36] text-slate-200 select-none border-r border-[#34404E]">
+      <div className="flex flex-col h-full bg-white text-[#171A17] select-none border-r border-[#E7EBE3]">
         {/* Brand Header */}
-        <div className="h-16 px-4 flex items-center justify-between border-b border-[#34404E] shrink-0">
+        <div className="h-16 px-4 flex items-center justify-between border-b border-[#E7EBE3] shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-[#516072] text-white flex items-center justify-center font-bold font-heading shadow-md shadow-[#516072]/30 shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-[#245C35] text-[#B5F078] flex items-center justify-center font-bold font-heading shadow-sm shrink-0">
               RX
             </div>
             {!collapsed && (
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-white text-base tracking-tight font-heading">
+                  <span className="font-bold text-[#171A17] text-base tracking-tight font-heading">
                     RepayX
                   </span>
-                  <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-[#516072]/40 text-[#D8E1EC] border border-[#516072]/50">
-                    AI
+                  <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-[#EDF5E5] text-[#245C35] border border-[#D1E8BC]">
+                    FINTECH
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-400 truncate leading-none mt-0.5 font-medium">
-                  Recovery Engine
+                <p className="text-[10px] text-[#777E77] truncate leading-none mt-0.5 font-medium">
+                  Loan Recovery Intelligence
                 </p>
               </div>
             )}
@@ -266,7 +266,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {inMobile && onCloseMobile && (
             <button
               onClick={onCloseMobile}
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-[#34404E] cursor-pointer transition-colors"
+              className="p-1.5 text-[#777E77] hover:text-[#171A17] rounded-lg hover:bg-[#F5F7F3] cursor-pointer transition-colors"
               title="Close drawer"
               aria-label="Close drawer"
             >
@@ -278,7 +278,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {!inMobile && (
             <button
               onClick={onToggleCollapse}
-              className="hidden md:flex p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-[#34404E] cursor-pointer transition-colors"
+              className="hidden md:flex p-1.5 text-[#777E77] hover:text-[#171A17] rounded-lg hover:bg-[#F5F7F3] cursor-pointer transition-colors"
               title={collapsed ? 'Expand sidebar (Ctrl+B)' : 'Close sidebar (Ctrl+B)'}
               aria-label={collapsed ? 'Expand sidebar' : 'Close sidebar'}
             >
@@ -293,17 +293,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Quick Outbound Message Action Button in Sidebar */}
         {!collapsed && (
-          <div className="p-3 border-b border-[#34404E] shrink-0">
+          <div className="p-3 border-b border-[#E7EBE3] shrink-0">
             <button
               onClick={() => {
                 if (onOpenSendMessage) onOpenSendMessage();
                 else onSelectTab('whatsapp');
                 if (inMobile && onCloseMobile) onCloseMobile();
               }}
-              className="w-full py-2.5 px-3 bg-[#516072] hover:bg-[#414D5C] active:scale-[0.98] text-white rounded-xl text-xs font-bold font-heading shadow-md shadow-[#516072]/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="w-full py-2.5 px-3 bg-[#245C35] hover:bg-[#1B4728] active:bg-[#14351E] text-white rounded-xl text-xs font-bold font-heading shadow-md shadow-[#245C35]/15 flex items-center justify-center gap-2 transition-all cursor-pointer group"
             >
-              <Send className="w-3.5 h-3.5" />
-              <span>Send New Message</span>
+              <Send className="w-3.5 h-3.5 text-[#B5F078] group-hover:scale-110 transition-transform" />
+              <span>Send New Reminder</span>
             </button>
           </div>
         )}
@@ -313,7 +313,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {navSections.map((section) => (
             <div key={section.group} className="space-y-1">
               {!collapsed && (
-                <div className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                <div className="px-3 text-[10px] font-bold text-[#777E77] uppercase tracking-wider mb-1">
                   {section.group}
                 </div>
               )}
@@ -331,23 +331,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                         isActive
-                          ? 'bg-[#516072] text-white shadow-sm shadow-[#516072]/30'
-                          : 'text-slate-300 hover:bg-[#34404E] hover:text-white'
+                          ? 'bg-[#EDF5E5] text-[#245C35] font-bold shadow-2xs'
+                          : 'text-[#777E77] hover:bg-[#F5F7F3] hover:text-[#171A17]'
                       } ${collapsed ? 'justify-center px-2' : ''}`}
                     >
                       <div className="relative shrink-0">
                         <Icon
                           className={`w-4 h-4 ${
                             isActive
-                              ? 'text-white'
+                              ? 'text-[#245C35]'
                               : item.isAi
-                              ? 'text-purple-300 group-hover:text-purple-200'
-                              : 'text-slate-400 group-hover:text-white'
+                              ? 'text-[#245C35]'
+                              : 'text-[#777E77] group-hover:text-[#171A17]'
                           }`}
                         />
                         {/* Dot indicator if collapsed has badge */}
                         {collapsed && item.badge !== undefined && (
-                          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-[#242C36]" />
+                          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#E11D48] ring-2 ring-white" />
                         )}
                       </div>
 
@@ -356,8 +356,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <span className="truncate">{item.label}</span>
                           {item.badge !== undefined && (
                             <span
-                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white ${
-                                item.badgeColor || 'bg-[#516072]'
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white shadow-2xs ${
+                                item.badgeColor || 'bg-[#245C35]'
                               }`}
                             >
                               {item.badge}
@@ -369,10 +369,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                     {/* Floating Tooltip for Collapsed Desktop Mode */}
                     {collapsed && (
-                      <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2.5 py-1 bg-slate-900 text-white text-xs font-bold rounded-lg shadow-xl whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 flex items-center gap-2">
+                      <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2.5 py-1 bg-[#171A17] text-white text-xs font-bold rounded-lg shadow-xl whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 flex items-center gap-2">
                         <span>{item.label}</span>
                         {item.badge !== undefined && (
-                          <span className="text-[10px] bg-[#516072] px-1.5 py-0.2 rounded-full">
+                          <span className="text-[10px] bg-[#245C35] px-1.5 py-0.2 rounded-full">
                             {item.badge}
                           </span>
                         )}
@@ -386,30 +386,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Manager Profile & Collapse Footer */}
-        <div className="p-3 border-t border-[#34404E] bg-[#1C232B] flex items-center justify-between shrink-0">
+        <div className="p-3 border-t border-[#E7EBE3] bg-[#F5F7F3]/70 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="relative shrink-0">
               <img
                 src={MANAGER_PROFILE.avatar}
                 alt={MANAGER_PROFILE.name}
                 referrerPolicy="no-referrer"
-                className="w-9 h-9 rounded-full object-cover ring-2 ring-[#516072]/50"
+                className="w-9 h-9 rounded-full object-cover ring-2 ring-[#245C35]/30"
                 onError={(e) => {
                   (e.currentTarget as HTMLElement).style.display = 'none';
                 }}
               />
-              <div className="w-9 h-9 rounded-full bg-[#516072] text-white font-bold flex items-center justify-center text-xs -z-10 absolute inset-0">
-                PP
+              <div className="w-9 h-9 rounded-full bg-[#245C35] text-[#B5F078] font-bold flex items-center justify-center text-xs -z-10 absolute inset-0">
+                PS
               </div>
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-[#1C232B]" />
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#16A34A] rounded-full ring-2 ring-white" />
             </div>
 
             {!collapsed && (
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-bold text-white font-heading truncate">
+                <div className="text-xs font-bold text-[#171A17] font-heading truncate">
                   {MANAGER_PROFILE.name}
                 </div>
-                <div className="text-[10px] text-slate-400 truncate leading-none mt-0.5">
+                <div className="text-[10px] text-[#777E77] truncate leading-none mt-0.5">
                   {MANAGER_PROFILE.role}
                 </div>
               </div>
@@ -419,7 +419,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {!inMobile && !collapsed && (
             <button
               onClick={onToggleCollapse}
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-[#34404E] cursor-pointer transition-colors"
+              className="p-1.5 text-[#777E77] hover:text-[#171A17] rounded-lg hover:bg-white cursor-pointer transition-colors shadow-2xs"
               title="Collapse sidebar (Ctrl+B)"
               aria-label="Collapse sidebar"
             >
@@ -447,7 +447,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="md:hidden fixed inset-0 z-50 flex">
           {/* Backdrop overlay */}
           <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-in fade-in"
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity animate-in fade-in"
             onClick={onCloseMobile}
           />
           {/* Drawer content */}

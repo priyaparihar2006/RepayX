@@ -1,18 +1,34 @@
 @import "tailwindcss";
 
 :root {
-  --color-slate-steel: #516072;
-  --color-slate-steel-hover: #414D5C;
-  --color-slate-steel-dark: #252E38;
-  --color-slate-steel-light: #F0F4F8;
-  --color-slate-steel-border: #D7DEE7;
+  /* Financial-Dashboard Green Theme Design Tokens */
+  --bg-main: #F5F7F3;
+  --bg-sidebar: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --surface-secondary: #EDF5E5;
+  --accent-lime: #B5F078;
+  --accent-lime-hover: #A2E85F;
+  --action-forest: #245C35;
+  --action-forest-hover: #1B4728;
+  --action-forest-active: #14351E;
+  --text-primary: #171A17;
+  --text-muted: #777E77;
+  --border-soft: #E7EBE3;
+  --border-hover: #D5DCD0;
+
+  /* Legacy aliases mapped to refined green palette */
+  --color-slate-steel: #245C35;
+  --color-slate-steel-hover: #1B4728;
+  --color-slate-steel-dark: #171A17;
+  --color-slate-steel-light: #EDF5E5;
+  --color-slate-steel-border: #E7EBE3;
 }
 
 @layer base {
   html, body {
     font-family: 'DM Sans', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #F4F6F9;
-    color: #1E252D;
+    background-color: #F5F7F3;
+    color: #171A17;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -28,6 +44,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Modern fintech soft shadow utilities */
+.shadow-fintech {
+  box-shadow: 0 1px 3px 0 rgba(23, 26, 23, 0.03), 0 1px 2px -1px rgba(23, 26, 23, 0.02);
+}
+
+.shadow-fintech-card {
+  box-shadow: 0 4px 20px -2px rgba(23, 26, 23, 0.04), 0 2px 6px -1px rgba(23, 26, 23, 0.02);
+}
+
+.shadow-fintech-hover {
+  box-shadow: 0 10px 25px -4px rgba(23, 26, 23, 0.07), 0 4px 10px -2px rgba(23, 26, 23, 0.03);
+}
+
 /* Custom smooth scrollbar for dashboard panels */
 ::-webkit-scrollbar {
   width: 6px;
@@ -39,10 +68,10 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #D5DCD0;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #B3BCAD;
 }

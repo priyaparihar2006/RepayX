@@ -27,20 +27,20 @@ export const CustomerDetailsPage: React.FC = () => {
     <div className="space-y-6 max-w-7xl mx-auto">
       <Link
         to="/customers"
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50"
+        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-[#E7EBE3] bg-white text-xs font-semibold text-[#171A17] hover:bg-[#F5F7F3] transition-colors shadow-2xs"
       >
-        <ArrowLeft className="w-3.5 h-3.5" /> Back to Customers
+        <ArrowLeft className="w-3.5 h-3.5 text-[#245C35]" /> Back to Customers
       </Link>
 
       {customerId === null ? (
-        <Card>
+        <Card className="p-6">
           <ErrorState
             error={new ApiError('validation', `"${raw ?? ''}" is not a valid customer ID. Customer IDs are positive numbers.`)}
             title="Invalid customer ID"
           />
         </Card>
       ) : result.status === 'error' ? (
-        <Card>
+        <Card className="p-6">
           <ErrorState
             error={result.error}
             onRetry={result.reload}
@@ -48,7 +48,7 @@ export const CustomerDetailsPage: React.FC = () => {
           />
         </Card>
       ) : result.status === 'loading' || !result.data ? (
-        <Card><LoadingState label={`Loading customer ${customerId}…`} /></Card>
+        <Card className="p-6"><LoadingState label={`Loading customer ${customerId}…`} /></Card>
       ) : (
         <CustomerProfile data={result.data} />
       )}
@@ -62,12 +62,12 @@ const CustomerProfile: React.FC<{ data: CustomerResponse }> = ({ data }) => {
   const c = data.customer;
   return (
   <>
-    <Card className="p-5 sm:p-6">
+    <Card className="p-6 sm:p-7">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">Customer ID</p>
-          <div className="flex items-center gap-2 mt-1">
-            <h1 className="text-2xl font-bold text-slate-900 font-mono tracking-tight">{c.customer_id}</h1>
+          <p className="text-[10px] uppercase tracking-wider font-semibold text-[#777E77]">Customer ID</p>
+          <div className="flex items-center gap-2.5 mt-1">
+            <h1 className="text-2xl font-bold text-[#171A17] font-mono tracking-tight">{c.customer_id}</h1>
             <RiskBadge category={c.risk_category} />
           </div>
         </div>
@@ -77,8 +77,8 @@ const CustomerProfile: React.FC<{ data: CustomerResponse }> = ({ data }) => {
           <Stat label="Predicted Default" value={c.predicted_default ? 'Yes' : 'No'} tone={c.predicted_default ? 'bad' : 'good'} />
         </div>
       </div>
-      <div className="mt-5 pt-4 border-t border-slate-100">
-        <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mb-1">Risk position</p>
+      <div className="mt-6 pt-5 border-t border-[#E7EBE3]">
+        <p className="text-[10px] uppercase tracking-wider font-semibold text-[#777E77] mb-2">Risk position</p>
         <RiskPositionMeter score={c.risk_score} category={c.risk_category} threshold={data.classification_threshold} />
       </div>
     </Card>
@@ -108,7 +108,7 @@ const CustomerProfile: React.FC<{ data: CustomerResponse }> = ({ data }) => {
 
       <Section title="Repayment History">
         {!c.has_installment_history && (
-          <p className="text-xs text-slate-500 pb-2">No installment history is available for this customer.</p>
+          <p className="text-xs text-[#777E77] pb-2">No installment history is available for this customer.</p>
         )}
         <Row label="Installments" value={formatNumber(c.installment_count)} />
         <Row label="Late Payments" value={formatNumber(c.late_payment_count)} />
@@ -126,20 +126,20 @@ const CustomerProfile: React.FC<{ data: CustomerResponse }> = ({ data }) => {
 };
 
 const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`bg-white rounded-2xl border border-slate-200/80 shadow-xs ${className}`}>{children}</div>
+  <div className={`bg-white rounded-[20px] border border-[#E7EBE3] shadow-fintech-card transition-all duration-200 ${className}`}>{children}</div>
 );
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <Card className="p-5">
-    <h2 className="text-sm font-bold text-slate-900 mb-3">{title}</h2>
-    <dl className="divide-y divide-slate-100">{children}</dl>
+  <Card className="p-6">
+    <h2 className="text-sm font-bold text-[#171A17] mb-3">{title}</h2>
+    <dl className="divide-y divide-[#E7EBE3]">{children}</dl>
   </Card>
 );
 
 const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="flex items-center justify-between gap-4 py-2 text-xs">
-    <dt className="text-slate-500">{label}</dt>
-    <dd className="font-mono tabular-nums font-semibold text-slate-800 text-right">{value}</dd>
+  <div className="flex items-center justify-between gap-4 py-2.5 text-xs">
+    <dt className="text-[#777E77]">{label}</dt>
+    <dd className="font-mono tabular-nums font-semibold text-[#171A17] text-right">{value}</dd>
   </div>
 );
 
@@ -147,10 +147,10 @@ const Stat: React.FC<{ label: string; value: string; strong?: boolean; tone?: 'g
   label, value, strong, tone,
 }) => (
   <div>
-    <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">{label}</p>
+    <p className="text-[10px] uppercase tracking-wider font-semibold text-[#777E77]">{label}</p>
     <p
-      className={`mt-1 font-mono tabular-nums ${strong ? 'text-xl font-bold text-slate-900' : 'text-base font-semibold'} ${
-        tone === 'bad' ? 'text-rose-600' : tone === 'good' ? 'text-emerald-600' : 'text-slate-800'
+      className={`mt-1 font-mono tabular-nums ${strong ? 'text-xl font-bold text-[#171A17]' : 'text-base font-semibold'} ${
+        tone === 'bad' ? 'text-rose-600' : tone === 'good' ? 'text-[#245C35]' : 'text-[#171A17]'
       }`}
     >
       {value}

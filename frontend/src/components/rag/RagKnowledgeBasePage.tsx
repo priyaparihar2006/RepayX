@@ -200,7 +200,7 @@ export const RagKnowledgeBasePage: React.FC = () => {
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight font-heading">
               AI Knowledge Base
             </h1>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#516072]/15 text-[#516072]">
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#245C35]/15 text-[#245C35]">
               RAG Grounding
             </span>
           </div>
@@ -211,7 +211,7 @@ export const RagKnowledgeBasePage: React.FC = () => {
 
         <button
           onClick={() => setIsUploadModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#516072] hover:bg-[#43505F] text-white text-xs font-semibold shadow-xs cursor-pointer transition-all self-start sm:self-auto"
+          className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#245C35] hover:bg-[#1B4728] text-white text-xs font-semibold shadow-xs cursor-pointer transition-all self-start sm:self-auto"
         >
           <Upload className="w-3.5 h-3.5" />
           <span>Upload Document</span>
@@ -223,11 +223,11 @@ export const RagKnowledgeBasePage: React.FC = () => {
         {documents.map((doc) => (
           <div
             key={doc.id}
-            className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:border-[#516072]/50 transition-all flex flex-col justify-between group"
+            className="bg-white rounded-[20px] p-5 border border-[#E7EBE3] shadow-fintech-card hover:border-[#245C35]/50 transition-all flex flex-col justify-between group"
           >
             <div>
               <div className="flex items-start justify-between gap-2 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-[#516072]/15 text-[#516072] flex items-center justify-center font-bold text-sm shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-[#245C35]/15 text-[#245C35] flex items-center justify-center font-bold text-sm shrink-0">
                   <FileText className="w-5 h-5" />
                 </div>
 
@@ -280,7 +280,7 @@ export const RagKnowledgeBasePage: React.FC = () => {
       </div>
 
       {/* Interactive "Test AI Retrieval" Playground (Section 20) */}
-      <div className="bg-white rounded-2xl p-6 border border-purple-200/80 shadow-xs bg-gradient-to-b from-purple-50/20 via-white to-white">
+      <div className="bg-white rounded-[20px] p-6 border border-[#E7EBE3] shadow-fintech-card">
         <div className="flex items-center gap-2 mb-2">
           <div className="w-7 h-7 rounded-lg bg-purple-600 text-white flex items-center justify-center">
             <Sparkles className="w-4 h-4" />
@@ -302,14 +302,14 @@ export const RagKnowledgeBasePage: React.FC = () => {
               value={testQuery}
               onChange={(e) => setTestQuery(e.target.value)}
               placeholder="Ask a loan recovery policy question..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#516072]"
+              className="w-full bg-[#F5F7F3] border border-[#E7EBE3] rounded-full pl-10 pr-4 py-2.5 text-xs text-[#171A17] placeholder-[#777E77] focus:outline-none focus:ring-2 focus:ring-[#245C35]/20 focus:border-[#245C35] transition-all"
             />
           </div>
 
           <button
             onClick={handleTestSearch}
             disabled={isSearching}
-            className="px-5 py-2.5 rounded-xl bg-[#516072] hover:bg-[#43505F] disabled:opacity-50 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all shrink-0"
+            className="px-5 py-2.5 rounded-full bg-[#245C35] hover:bg-[#1B4728] disabled:opacity-50 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all shrink-0"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>{isSearching ? 'Embedding & Searching...' : 'Search Knowledge Base'}</span>
@@ -341,9 +341,9 @@ export const RagKnowledgeBasePage: React.FC = () => {
         {retrievalResults && (
           <div className="mt-5 space-y-4 pt-5 border-t border-slate-100">
             {/* AI Synthesized Answer */}
-            <div className="p-4 rounded-xl bg-[#516072]/10 border border-[#516072]/20">
+            <div className="p-4 rounded-2xl bg-[#EDF5E5] border border-[#D1E8BC]">
               <div className="flex items-center gap-1.5 text-xs font-bold text-[#252E38] mb-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#516072]" />
+                <Sparkles className="w-3.5 h-3.5 text-[#245C35]" />
                 <span>RAG Grounded Response Synthesis</span>
               </div>
               <p className="text-xs text-slate-800 leading-relaxed font-normal">
@@ -361,7 +361,7 @@ export const RagKnowledgeBasePage: React.FC = () => {
                   <div key={i} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="font-bold text-slate-900">{src.title}</span>
-                      <span className="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                      <span className="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#EDF5E5] text-[#245C35] border border-[#D1E8BC]">
                         {src.score}% Match
                       </span>
                     </div>
@@ -443,7 +443,7 @@ export const RagKnowledgeBasePage: React.FC = () => {
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         title="Upload & Index Recovery Document"
-        subtitle="Extract, chunk, and embed policy documents into LoanFlow RAG vector database."
+        subtitle="Extract, chunk, and embed policy documents into RepayX RAG vector database."
       >
         <div className="space-y-4 text-xs">
           <div>

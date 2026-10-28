@@ -41,22 +41,22 @@ export const RepaymentComparison: React.FC<{ customer: CustomerDetail; benchmark
         {rows.map((r) => (
           <li key={r.label}>
             <div className="flex items-baseline justify-between gap-3 text-xs">
-              <span className="text-slate-600">
+              <span className="text-[#171A17] font-medium">
                 {r.label}
-                {r.note && <span className="text-slate-400"> · {r.note}</span>}
+                {r.note && <span className="text-[#777E77]"> · {r.note}</span>}
               </span>
               <span>
-                <span className="font-semibold text-slate-900">{r.format(r.value)}</span>
-                <span className="text-slate-500"> vs avg {r.format(r.average)}</span>
+                <span className="font-semibold text-[#171A17]">{r.format(r.value)}</span>
+                <span className="text-[#777E77]"> vs avg {r.format(r.average)}</span>
               </span>
             </div>
-            <div className="relative mt-1.5 h-3 rounded" style={{ backgroundColor: CHART.track }}>
+            <div className="relative mt-2 h-3 rounded-full" style={{ backgroundColor: CHART.track }}>
               {r.value !== null && (
-                <div className="absolute inset-y-0 left-0 rounded" style={{ width: pct(r.value, r.max), backgroundColor: SERIES_COLOR }} />
+                <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: pct(r.value, r.max), backgroundColor: SERIES_COLOR }} />
               )}
               {r.average !== null && (
                 <div
-                  className="absolute -top-1 -bottom-1 w-[3px] -translate-x-1/2 rounded bg-slate-900 ring-2 ring-white"
+                  className="absolute -top-1 -bottom-1 w-[3px] -translate-x-1/2 rounded bg-[#171A17] ring-2 ring-white"
                   style={{ left: pct(r.average, r.max) }}
                   title={`Portfolio average ${r.format(r.average)}`}
                 />
@@ -65,12 +65,12 @@ export const RepaymentComparison: React.FC<{ customer: CustomerDetail; benchmark
           </li>
         ))}
       </ul>
-      <ul className="mt-4 flex flex-wrap gap-4 text-[11px] text-slate-600" aria-label="Legend">
+      <ul className="mt-5 flex flex-wrap gap-4 text-[11px] text-[#777E77]" aria-label="Legend">
         <li className="flex items-center gap-1.5">
-          <span aria-hidden className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: SERIES_COLOR }} /> This customer
+          <span aria-hidden className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SERIES_COLOR }} /> This customer
         </li>
         <li className="flex items-center gap-1.5">
-          <span aria-hidden className="w-[3px] h-3 rounded bg-slate-900" /> Portfolio average
+          <span aria-hidden className="w-[3px] h-3 rounded bg-[#171A17]" /> Portfolio average
         </li>
       </ul>
     </ChartCard>

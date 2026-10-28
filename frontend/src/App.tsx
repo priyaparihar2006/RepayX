@@ -201,7 +201,7 @@ function AppContent() {
   const { title, breadcrumb } = pageMeta(pathname);
 
   return (
-    <div className="min-h-screen bg-[#F4F6F9] text-[#1E252D] flex">
+    <div className="min-h-screen bg-[#F5F7F3] text-[#171A17] flex">
       <Sidebar
         currentTab={currentTab}
         onSelectTab={(tab) => {

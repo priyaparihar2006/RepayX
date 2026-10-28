@@ -3,9 +3,9 @@ import { AlertTriangle, Inbox, Loader2, RefreshCw, ServerOff, SearchX } from 'lu
 import type { ApiError } from '../../services/api';
 
 export const LoadingState: React.FC<{ label?: string }> = ({ label = 'Loading…' }) => (
-  <div role="status" aria-live="polite" className="flex items-center justify-center gap-2 py-16 text-xs text-slate-500">
-    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-    <span>{label}</span>
+  <div role="status" aria-live="polite" className="flex items-center justify-center gap-2.5 py-16 text-xs text-[#777E77]">
+    <Loader2 className="w-5 h-5 animate-spin text-[#245C35]" />
+    <span className="font-medium">{label}</span>
   </div>
 );
 
@@ -30,18 +30,18 @@ export const ErrorState: React.FC<{ error: ApiError; onRetry?: () => void; title
   const retryable = onRetry && !['not_found', 'validation', 'config'].includes(error.kind);
   return (
     <div role="alert" className="flex flex-col items-center justify-center text-center gap-3 py-14 px-6">
-      <div className="w-10 h-10 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center">
+      <div className="w-11 h-11 rounded-full bg-[#FDF2F4] border border-rose-200 flex items-center justify-center">
         <Icon className="w-5 h-5 text-rose-600" />
       </div>
       <div>
-        <p className="text-sm font-bold text-slate-900">{title ?? ERROR_TITLES[error.kind]}</p>
-        <p className="text-xs text-slate-500 mt-1 max-w-md">{error.message}</p>
+        <p className="text-sm font-bold text-[#171A17]">{title ?? ERROR_TITLES[error.kind]}</p>
+        <p className="text-xs text-[#777E77] mt-1 max-w-md">{error.message}</p>
       </div>
       {retryable && (
         <button
           type="button"
           onClick={onRetry}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#EDF5E5] hover:bg-[#D1E8BC] text-[#245C35] text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           Try again
@@ -53,8 +53,8 @@ export const ErrorState: React.FC<{ error: ApiError; onRetry?: () => void; title
 
 export const EmptyState: React.FC<{ title: string; message?: string }> = ({ title, message }) => (
   <div className="flex flex-col items-center justify-center text-center gap-2 py-14 px-6">
-    <Inbox className="w-6 h-6 text-slate-300" />
-    <p className="text-sm font-semibold text-slate-700">{title}</p>
-    {message && <p className="text-xs text-slate-500 max-w-md">{message}</p>}
+    <Inbox className="w-7 h-7 text-[#777E77]/50" />
+    <p className="text-sm font-bold text-[#171A17]">{title}</p>
+    {message && <p className="text-xs text-[#777E77] max-w-md">{message}</p>}
   </div>
 );

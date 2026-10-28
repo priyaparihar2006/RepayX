@@ -67,35 +67,35 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-[#171A17]/40 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       />
 
       {/* Slide-over panel */}
-      <div className="relative w-full max-w-md bg-white h-full shadow-2xl z-10 flex flex-col border-l border-slate-200">
+      <div className="relative w-full max-w-md bg-white h-full shadow-2xl z-10 flex flex-col border-l border-[#E7EBE3]">
         {/* Header */}
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white">
+        <div className="p-4 border-b border-[#E7EBE3] flex items-center justify-between bg-[#245C35] text-white">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-purple-500/30 border border-purple-400/40 flex items-center justify-center text-purple-200">
+            <div className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-[#B5F078]">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold tracking-tight">RepayX Copilot</h3>
-              <p className="text-[11px] text-purple-200">Portfolio queries - powered by the RepayX API</p>
+              <h3 className="text-sm font-bold tracking-tight font-heading">RepayX Copilot</h3>
+              <p className="text-[11px] text-white/80">Portfolio queries · powered by the RepayX API</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
             aria-label="Close Copilot"
-            className="p-1 rounded-lg text-purple-200 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Message Thread */}
-        <div ref={thread} role="log" aria-label="Copilot conversation" aria-live="polite" className="flex-1 p-4 overflow-y-auto space-y-3.5 bg-slate-50/50">
+        <div ref={thread} role="log" aria-label="Copilot conversation" aria-live="polite" className="flex-1 p-4 overflow-y-auto space-y-3.5 bg-[#F5F7F3]">
           {messages.map((m, idx) => (
             <div
               key={idx}
@@ -103,27 +103,27 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
                 m.sender === 'user' ? 'items-end' : 'items-start'
               } max-w-[90%] ${m.sender === 'user' ? 'ml-auto' : 'mr-auto'}`}
             >
-              <div className="flex items-center gap-1 text-[10px] text-slate-400 mb-1 px-1">
+              <div className="flex items-center gap-1 text-[10px] text-[#777E77] mb-1 px-1">
                 {m.sender === 'ai' ? (
-                  <span className="font-semibold text-purple-700 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" /> AI Copilot
+                  <span className="font-semibold text-[#245C35] flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-[#245C35]" /> AI Copilot
                   </span>
                 ) : (
-                  <span className="font-semibold text-slate-700">Priya Parihar</span>
+                  <span className="font-semibold text-[#171A17]">Priya Parihar</span>
                 )}
               </div>
 
               <div
-                className={`p-3 rounded-2xl text-xs leading-relaxed shadow-2xs ${
+                className={`p-3.5 rounded-[18px] text-xs leading-relaxed shadow-2xs ${
                   m.sender === 'user'
-                    ? 'bg-blue-600 text-white rounded-tr-xs'
-                    : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs'
+                    ? 'bg-[#245C35] text-white rounded-tr-xs'
+                    : 'bg-white border border-[#E7EBE3] text-[#171A17] rounded-tl-xs'
                 }`}
               >
                 <p role={m.error ? 'alert' : undefined}>{m.text}</p>
 
                 {m.response && (m.response.customer || m.response.customers?.length) ? (
-                  <div className="mt-2 pt-2 border-t border-slate-100 space-y-2">
+                  <div className="mt-2.5 pt-2.5 border-t border-[#E7EBE3] space-y-2">
                     {(m.response.customers ?? (m.response.customer ? [m.response.customer] : [])).map((customer) => (
                       <button
                         key={customer.customer_id}
@@ -131,7 +131,7 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
                           onNavigateToTab('risk-customer', String(customer.customer_id));
                           onClose();
                         }}
-                        className="flex items-center gap-1 text-left font-semibold text-[11px] text-blue-600 hover:text-blue-800"
+                        className="flex items-center gap-1 text-left font-semibold text-[11px] text-[#245C35] hover:underline"
                       >
                         Customer {customer.customer_id} - {customer.risk_category} - {customer.risk_score.toFixed(2)}/100
                         <ArrowRight className="w-3 h-3 shrink-0" />
@@ -144,15 +144,15 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
           ))}
 
           {isTyping && (
-            <div className="flex items-center gap-1.5 text-xs text-purple-600 bg-purple-50 p-2.5 rounded-xl border border-purple-100 w-fit">
-              <Sparkles className="w-3.5 h-3.5 animate-spin" />
-              <span>Querying portfolio data...</span>
+            <div className="flex items-center gap-2 text-xs text-[#245C35] bg-[#EDF5E5] p-3 rounded-full border border-[#D1E8BC] w-fit">
+              <Sparkles className="w-3.5 h-3.5 animate-spin text-[#245C35]" />
+              <span className="font-medium">Querying portfolio data...</span>
             </div>
           )}
         </div>
 
         {/* Quick prompt buttons */}
-        <div className="p-2 border-t border-slate-100 bg-white flex flex-wrap gap-1.5 text-[11px]">
+        <div className="p-3 border-t border-[#E7EBE3] bg-white flex flex-wrap gap-1.5 text-[11px]">
           {[
             'How many high-risk customers are there?',
             'What is the average late payment rate?',
@@ -163,7 +163,7 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
               key={prompt}
               onClick={() => void handleSend(prompt)}
               disabled={isTyping}
-              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition-colors text-left"
+              className="px-3 py-1 rounded-full bg-[#F5F7F3] hover:bg-[#EDF5E5] text-[#171A17] border border-[#E7EBE3] font-medium transition-colors text-left cursor-pointer"
             >
               {prompt}
             </button>
@@ -171,7 +171,7 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
         </div>
 
         {/* Input */}
-        <div className="p-3 border-t border-slate-200 bg-white flex items-center gap-2">
+        <div className="p-3.5 border-t border-[#E7EBE3] bg-white flex items-center gap-2">
           <input
             type="text"
             aria-label="Ask RepayX Copilot"
@@ -182,15 +182,15 @@ export const AiAssistantDrawer: React.FC<AiAssistantDrawerProps> = ({
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleSend();
             }}
-            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
+            className="flex-1 bg-[#F5F7F3] border border-[#E7EBE3] rounded-full px-4 py-2 text-xs text-[#171A17] placeholder-[#777E77] focus:outline-none focus:ring-2 focus:ring-[#245C35]/20 focus:border-[#245C35] transition-all"
           />
           <button
             onClick={() => handleSend()}
             aria-label="Send question"
             disabled={!input.trim() || isTyping}
-            className="p-2 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white transition-colors"
+            className="p-2.5 rounded-full bg-[#245C35] hover:bg-[#1B4728] disabled:opacity-40 text-white transition-colors cursor-pointer shadow-xs"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-4 h-4 text-[#B5F078]" />
           </button>
         </div>
       </div>

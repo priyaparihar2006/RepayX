@@ -47,10 +47,10 @@ export const ReportsPage: React.FC = () => {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight font-heading">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#171A17] tracking-tight font-heading">
           Recovery Reports & Ledgers
         </h1>
-        <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+        <p className="text-xs sm:text-sm text-[#777E77] mt-0.5">
           Audited reporting on delinquency migrations, settlement fulfillment, and collection executive performance.
         </p>
       </div>
@@ -59,28 +59,28 @@ export const ReportsPage: React.FC = () => {
         {reports.map((rep) => (
           <div
             key={rep.title}
-            className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between"
+            className="bg-white rounded-[20px] p-5 border border-[#E7EBE3] shadow-fintech-card flex flex-col justify-between transition-all duration-200"
           >
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#516072]/15 text-[#516072]">
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-[#EDF5E5] text-[#245C35] border border-[#D1E8BC]">
                   {rep.type}
                 </span>
-                <span className="text-xs font-mono text-slate-400">{rep.period}</span>
+                <span className="text-xs font-mono text-[#777E77]">{rep.period}</span>
               </div>
-              <h3 className="font-bold text-slate-900 text-sm">{rep.title}</h3>
-              <p className="text-xs text-slate-500 mt-1">
+              <h3 className="font-bold text-[#171A17] text-sm font-heading">{rep.title}</h3>
+              <p className="text-xs text-[#777E77] mt-1">
                 {rep.records} · File size: {rep.size}
               </p>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400 font-mono">Format: .xlsx / .csv</span>
+            <div className="mt-5 pt-3.5 border-t border-[#E7EBE3] flex items-center justify-between">
+              <span className="text-[11px] text-[#777E77] font-mono">Format: .xlsx / .csv</span>
               <button
                 onClick={() => handleExport(rep.title)}
-                className="px-3 py-1.5 rounded-xl bg-[#516072] hover:bg-[#43505F] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                className="px-4 py-2 rounded-full bg-[#245C35] hover:bg-[#1B4728] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
               >
-                <Download className="w-3.5 h-3.5" />
+                <Download className="w-3.5 h-3.5 text-[#B5F078]" />
                 <span>Download Report</span>
               </button>
             </div>

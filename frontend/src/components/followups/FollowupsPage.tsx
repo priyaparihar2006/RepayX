@@ -68,71 +68,71 @@ export const FollowupsPage: React.FC<FollowupsPageProps> = ({
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Follow-ups</h1>
-        <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#171A17] tracking-tight font-heading">Follow-ups</h1>
+        <p className="text-xs sm:text-sm text-[#777E77] mt-0.5">
           Schedule, track, and execute AI omnichannel customer outreach.
         </p>
       </div>
 
       {/* Summary Stat Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+        <div className="bg-white rounded-[20px] p-5 border border-[#E7EBE3] shadow-fintech-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Today's Follow-ups</span>
-            <div className="w-7 h-7 rounded-lg bg-[#516072]/15 text-[#516072] flex items-center justify-center">
-              <CalendarClock className="w-3.5 h-3.5" />
+            <span className="text-xs font-medium text-[#777E77]">Today's Follow-ups</span>
+            <div className="w-8 h-8 rounded-full bg-[#EDF5E5] text-[#245C35] flex items-center justify-center">
+              <CalendarClock className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-bold font-mono text-slate-900 mt-2 tabular-nums">64</p>
-          <span className="text-[10px] text-slate-400 mt-0.5 block">Omnichannel queue</span>
+          <p className="text-2xl font-bold font-heading text-[#171A17] mt-2 tabular-nums">64</p>
+          <span className="text-[11px] text-[#245C35] font-semibold mt-1 block">Omnichannel queue</span>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 border border-amber-200/80 shadow-xs bg-amber-50/20">
+        <div className="bg-white rounded-[20px] p-5 border border-[#E7EBE3] shadow-fintech-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-amber-800 font-semibold">Pending Action</span>
-            <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
-              <Clock className="w-3.5 h-3.5" />
+            <span className="text-xs font-semibold text-[#B45309]">Pending Action</span>
+            <div className="w-8 h-8 rounded-full bg-[#FEF7EA] text-[#D97706] flex items-center justify-center">
+              <Clock className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-bold font-mono text-amber-700 mt-2 tabular-nums">18</p>
-          <span className="text-[10px] text-amber-600 mt-0.5 block">Requires outreach</span>
+          <p className="text-2xl font-bold font-heading text-[#D97706] mt-2 tabular-nums">18</p>
+          <span className="text-[11px] text-[#B45309] font-medium mt-1 block">Requires outreach</span>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs bg-emerald-50/20">
+        <div className="bg-white rounded-[20px] p-5 border border-[#E7EBE3] shadow-fintech-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-emerald-800 font-semibold">Completed</span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
-              <CheckCircle2 className="w-3.5 h-3.5" />
+            <span className="text-xs font-semibold text-[#245C35]">Completed</span>
+            <div className="w-8 h-8 rounded-full bg-[#EDF5E5] text-[#16A34A] flex items-center justify-center">
+              <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-bold font-mono text-emerald-700 mt-2 tabular-nums">42</p>
-          <span className="text-[10px] text-emerald-600 mt-0.5 block">Response received</span>
+          <p className="text-2xl font-bold font-heading text-[#16A34A] mt-2 tabular-nums">42</p>
+          <span className="text-[11px] text-[#16A34A] font-medium mt-1 block">Response received</span>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 border border-rose-200/80 shadow-xs bg-rose-50/20">
+        <div className="bg-white rounded-[20px] p-5 border border-[#E7EBE3] shadow-fintech-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-rose-800 font-semibold">Escalated</span>
-            <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
-              <AlertTriangle className="w-3.5 h-3.5" />
+            <span className="text-xs font-semibold text-rose-700">Escalated</span>
+            <div className="w-8 h-8 rounded-full bg-[#FDF2F4] text-rose-600 flex items-center justify-center">
+              <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-bold font-mono text-rose-700 mt-2 tabular-nums">4</p>
-          <span className="text-[10px] text-rose-600 mt-0.5 block">Disputes / Hardship</span>
+          <p className="text-2xl font-bold font-heading text-rose-600 mt-2 tabular-nums">4</p>
+          <span className="text-[11px] text-rose-600 font-medium mt-1 block">Disputes / Hardship</span>
         </div>
       </div>
 
       {/* Filter Tabs & Search */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white rounded-[20px] p-4 border border-[#E7EBE3] shadow-fintech-card flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         {/* Tabs */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto text-xs font-semibold">
+        <div className="flex items-center gap-1 bg-[#F5F7F3] p-1 rounded-full border border-[#E7EBE3] overflow-x-auto text-xs font-semibold">
           {(['all', 'pending', 'completed', 'escalated', 'failed'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1.5 rounded-lg capitalize transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-3.5 py-1.5 rounded-full capitalize transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === tab
-                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-[#245C35] text-white shadow-2xs font-bold'
+                  : 'text-[#777E77] hover:text-[#171A17]'
               }`}
             >
               {tab}
@@ -142,72 +142,72 @@ export const FollowupsPage: React.FC<FollowupsPageProps> = ({
 
         {/* Search Input */}
         <div className="relative min-w-[240px]">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3.5 top-2.5 text-[#777E77]" />
           <input
             type="text"
             placeholder="Search follow-ups..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#516072]"
+            className="w-full bg-[#F5F7F3] border border-[#E7EBE3] rounded-full pl-10 pr-4 py-2 text-xs text-[#171A17] placeholder-[#777E77] focus:outline-none focus:ring-2 focus:ring-[#245C35]/20 focus:border-[#245C35] transition-all"
           />
         </div>
       </div>
 
       {/* Follow-ups Table */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-[20px] border border-[#E7EBE3] shadow-fintech-card overflow-hidden transition-all duration-200">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/80 text-slate-500 uppercase tracking-wider text-[10px] font-semibold border-b border-slate-100">
+            <thead className="bg-[#F5F7F3] text-[#777E77] uppercase tracking-wider text-[10px] font-semibold border-b border-[#E7EBE3]">
               <tr>
-                <th className="py-3.5 px-4">Customer</th>
-                <th className="py-3.5 px-4">Loan ID</th>
-                <th className="py-3.5 px-4">Type</th>
-                <th className="py-3.5 px-4">Scheduled At</th>
-                <th className="py-3.5 px-4">AI Reason / Context</th>
-                <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
+                <th className="py-3.5 px-4 font-semibold">Customer</th>
+                <th className="py-3.5 px-4 font-semibold">Loan ID</th>
+                <th className="py-3.5 px-4 font-semibold">Type</th>
+                <th className="py-3.5 px-4 font-semibold">Scheduled At</th>
+                <th className="py-3.5 px-4 font-semibold">AI Reason / Context</th>
+                <th className="py-3.5 px-4 font-semibold">Status</th>
+                <th className="py-3.5 px-4 text-right font-semibold">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody className="divide-y divide-[#E7EBE3] text-[#171A17]">
               {filtered.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                <tr key={item.id} className="hover:bg-[#EDF5E5]/40 transition-colors">
                   <td className="py-3.5 px-4">
-                    <p className="font-bold text-slate-900">{item.customerName}</p>
-                    <span className="text-[10px] text-slate-400 font-mono">{item.customerId}</span>
+                    <p className="font-bold text-[#171A17]">{item.customerName}</p>
+                    <span className="text-[10px] text-[#777E77] font-mono">{item.customerId}</span>
                   </td>
 
-                  <td className="py-3.5 px-4 font-mono font-semibold text-slate-800">
+                  <td className="py-3.5 px-4 font-mono font-semibold text-[#171A17]">
                     {item.loanId}
                   </td>
 
                   <td className="py-3.5 px-4">
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#F5F7F3] text-[#777E77] border border-[#E7EBE3]">
                       {item.followupType}
                     </span>
                   </td>
 
-                  <td className="py-3.5 px-4 font-mono text-[11px] text-slate-700">
+                  <td className="py-3.5 px-4 font-mono text-[11px] text-[#171A17]">
                     <div>{item.scheduledAt}</div>
-                    <span className="text-[10px] text-slate-400">{item.scheduledTime}</span>
+                    <span className="text-[10px] text-[#777E77]">{item.scheduledTime}</span>
                   </td>
 
                   <td className="py-3.5 px-4 max-w-xs">
-                    <p className="text-slate-700 truncate" title={item.aiReason}>
+                    <p className="text-[#171A17] truncate" title={item.aiReason}>
                       {item.aiReason}
                     </p>
-                    <span className="text-[10px] text-slate-400">Attempt #{item.attemptNumber}</span>
+                    <span className="text-[10px] text-[#777E77]">Attempt #{item.attemptNumber}</span>
                   </td>
 
                   <td className="py-3.5 px-4">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                         item.status === 'completed'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          ? 'bg-[#EDF5E5] text-[#245C35] border-[#D1E8BC]'
                           : item.status === 'pending'
-                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          ? 'bg-[#FEF7EA] text-[#B45309] border-amber-200'
                           : item.status === 'escalated'
                           ? 'bg-purple-50 text-purple-700 border-purple-200'
-                          : 'bg-rose-50 text-rose-700 border-rose-200'
+                          : 'bg-[#FDF2F4] text-rose-700 border-rose-200'
                       }`}
                     >
                       {item.status.toUpperCase()}
@@ -218,7 +218,7 @@ export const FollowupsPage: React.FC<FollowupsPageProps> = ({
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => onOpenConversation()}
-                        className="p-1.5 text-slate-400 hover:text-[#516072] hover:bg-[#516072]/10 rounded-lg transition-colors cursor-pointer"
+                        className="p-1.5 text-[#777E77] hover:text-[#245C35] hover:bg-[#EDF5E5] rounded-full transition-colors cursor-pointer"
                         title="Open Conversation"
                       >
                         <MessageSquare className="w-3.5 h-3.5" />
@@ -226,7 +226,7 @@ export const FollowupsPage: React.FC<FollowupsPageProps> = ({
 
                       <button
                         onClick={() => setSelectedFollowup(item)}
-                        className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] cursor-pointer"
+                        className="px-3 py-1 rounded-full bg-[#EDF5E5] hover:bg-[#D1E8BC] text-[#245C35] font-semibold text-[11px] cursor-pointer transition-colors"
                       >
                         Reschedule
                       </button>
@@ -234,7 +234,7 @@ export const FollowupsPage: React.FC<FollowupsPageProps> = ({
                       {item.status === 'pending' && (
                         <button
                           onClick={() => handleCancelFollowup(item.id, item.customerName)}
-                          className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-slate-500 font-medium text-[11px] cursor-pointer transition-colors"
+                          className="px-2.5 py-1 rounded-full border border-[#E7EBE3] hover:bg-[#FDF2F4] hover:text-rose-700 hover:border-rose-200 text-[#777E77] font-medium text-[11px] cursor-pointer transition-colors"
                         >
                           Cancel
                         </button>
@@ -257,21 +257,21 @@ export const FollowupsPage: React.FC<FollowupsPageProps> = ({
       >
         <div className="space-y-4 text-xs">
           <div>
-            <label className="font-semibold text-slate-700 block mb-1">New Date</label>
+            <label className="font-semibold text-[#171A17] block mb-1.5">New Date</label>
             <input
               type="date"
               value={rescheduleDate}
               onChange={(e) => setRescheduleDate(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-mono"
+              className="w-full bg-[#F5F7F3] border border-[#E7EBE3] rounded-full px-4 py-2 text-xs text-[#171A17] font-mono focus:outline-none focus:border-[#245C35]"
             />
           </div>
 
           <div>
-            <label className="font-semibold text-slate-700 block mb-1">Time Slot</label>
+            <label className="font-semibold text-[#171A17] block mb-1.5">Time Slot</label>
             <select
               value={rescheduleTime}
               onChange={(e) => setRescheduleTime(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800"
+              className="w-full bg-[#F5F7F3] border border-[#E7EBE3] rounded-full px-4 py-2 text-xs text-[#171A17] focus:outline-none focus:border-[#245C35]"
             >
               <option value="10:00 AM">10:00 AM</option>
               <option value="11:30 AM">11:30 AM</option>
@@ -281,25 +281,25 @@ export const FollowupsPage: React.FC<FollowupsPageProps> = ({
           </div>
 
           <div>
-            <label className="font-semibold text-slate-700 block mb-1">Reason for Rescheduling</label>
+            <label className="font-semibold text-[#171A17] block mb-1.5">Reason for Rescheduling</label>
             <input
               type="text"
               value={rescheduleReason}
               onChange={(e) => setRescheduleReason(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800"
+              className="w-full bg-[#F5F7F3] border border-[#E7EBE3] rounded-full px-4 py-2 text-xs text-[#171A17] focus:outline-none focus:border-[#245C35]"
             />
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-2">
             <button
               onClick={() => setSelectedFollowup(null)}
-              className="px-3.5 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold"
+              className="px-4 py-2 rounded-full text-[#777E77] hover:bg-[#F5F7F3] font-semibold transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleRescheduleSubmit}
-              className="px-4 py-2 rounded-xl bg-[#516072] hover:bg-[#43505F] text-white font-semibold cursor-pointer shadow-xs transition-colors"
+              className="px-4 py-2 rounded-full bg-[#245C35] hover:bg-[#1B4728] text-white font-semibold cursor-pointer shadow-xs transition-colors"
             >
               Confirm Reschedule
             </button>

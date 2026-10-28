@@ -33,51 +33,51 @@ export const WorkflowBanner: React.FC = () => {
   ];
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs mb-6 overflow-hidden">
-      <div className="px-5 py-3.5 flex items-center justify-between bg-gradient-to-r from-[#242C36] via-[#354352] to-[#516072] text-white">
+    <div className="bg-white rounded-[20px] border border-[#E7EBE3] shadow-fintech-card mb-6 overflow-hidden transition-all duration-200">
+      <div className="px-5 py-3.5 flex items-center justify-between bg-[#245C35] text-white">
         <div className="flex items-center gap-2.5">
-          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-300 font-heading">
+          <div className="w-2 h-2 rounded-full bg-[#B5F078] animate-pulse" />
+          <span className="text-xs font-bold uppercase tracking-wider text-[#B5F078] font-heading">
             Intelligent Recovery Architecture
           </span>
-          <span className="text-slate-400 text-xs hidden sm:inline">·</span>
-          <span className="text-xs text-slate-200 hidden sm:inline">
+          <span className="text-white/40 text-xs hidden sm:inline">·</span>
+          <span className="text-xs text-white/90 hidden sm:inline">
             End-to-End Autonomous & Manager-in-the-Loop Recovery Pipeline
           </span>
         </div>
 
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer py-1 px-2.5 rounded-md hover:bg-white/10"
+          className="flex items-center gap-1.5 text-xs text-white/90 hover:text-white transition-colors cursor-pointer py-1 px-3 rounded-full hover:bg-white/10"
         >
           <span>{isExpanded ? 'Hide Pipeline Architecture' : 'View Pipeline Architecture'}</span>
-          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-[#B5F078]" /> : <ChevronDown className="w-3.5 h-3.5 text-[#B5F078]" />}
         </button>
       </div>
 
       {/* Quick compact stepper */}
       <div className="p-4 overflow-x-auto">
-        <div className="flex items-center min-w-[920px] justify-between gap-1 text-slate-700">
+        <div className="flex items-center min-w-[920px] justify-between gap-1 text-[#171A17]">
           {steps.map((step, idx) => {
             const Icon = step.icon;
             return (
               <React.Fragment key={step.label}>
                 <div className="flex flex-col items-center text-center group cursor-pointer">
                   <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
                       step.highlight
-                        ? 'bg-[#516072]/15 text-[#516072] ring-2 ring-[#516072]/40 shadow-xs'
-                        : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
+                        ? 'bg-[#EDF5E5] text-[#245C35] ring-2 ring-[#B5F078] shadow-xs'
+                        : 'bg-[#F5F7F3] text-[#777E77] group-hover:bg-[#EDF5E5] group-hover:text-[#245C35]'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
                   </div>
-                  <span className="text-[11px] font-medium text-slate-700 mt-1.5 whitespace-nowrap">
+                  <span className="text-[11px] font-medium text-[#171A17] mt-1.5 whitespace-nowrap">
                     {step.label}
                   </span>
                 </div>
                 {idx < steps.length - 1 && (
-                  <div className="flex-1 h-0.5 bg-slate-200 mx-1 mb-4 shrink-0" />
+                  <div className="flex-1 h-0.5 bg-[#E7EBE3] mx-1 mb-4 shrink-0" />
                 )}
               </React.Fragment>
             );
@@ -87,22 +87,22 @@ export const WorkflowBanner: React.FC = () => {
 
       {/* Expanded Details */}
       {isExpanded && (
-        <div className="px-5 pb-5 pt-2 border-t border-slate-100 bg-slate-50/60">
+        <div className="px-5 pb-5 pt-3 border-t border-[#E7EBE3] bg-[#F5F7F3]/60">
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 text-xs">
             {steps.map((step, idx) => (
               <div
                 key={step.label}
-                className={`p-3 rounded-xl border bg-white ${
-                  step.highlight ? 'border-purple-200 ring-1 ring-purple-100' : 'border-slate-200/80'
+                className={`p-3.5 rounded-2xl border bg-white shadow-2xs ${
+                  step.highlight ? 'border-[#D1E8BC] ring-1 ring-[#B5F078]' : 'border-[#E7EBE3]'
                 }`}
               >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-4 h-4 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold flex items-center justify-center">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="w-5 h-5 rounded-full bg-[#EDF5E5] text-[#245C35] text-[10px] font-bold flex items-center justify-center">
                     {idx + 1}
                   </span>
-                  <span className="font-semibold text-slate-900">{step.label}</span>
+                  <span className="font-bold text-[#171A17]">{step.label}</span>
                 </div>
-                <p className="text-slate-500 leading-relaxed">{step.desc}</p>
+                <p className="text-[#777E77] leading-relaxed">{step.desc}</p>
               </div>
             ))}
           </div>

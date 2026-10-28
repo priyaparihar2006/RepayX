@@ -695,7 +695,7 @@ export function WhatsAppPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4 sm:pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#E7EBE3] pb-4 sm:pb-5">
         <div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">WhatsApp Messages & AI Auto-Pilot</h1>
@@ -758,7 +758,7 @@ export function WhatsAppPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
         {/* Left Column: Link WhatsApp Web */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-6 shadow-sm space-y-5">
+          <div className="bg-white border border-[#E7EBE3] rounded-[20px] p-4 sm:p-6 shadow-sm space-y-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <QrCode className="w-5 h-5 text-emerald-600" />
@@ -774,7 +774,7 @@ export function WhatsAppPage() {
               )}
             </div>
 
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
+            <div className="p-4 bg-slate-50 border border-[#E7EBE3] rounded-2xl space-y-1">
               <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Sending From Account</div>
               <div className="text-sm font-black text-slate-900 font-mono">
                 {status?.session_info?.phone_number || '+91 9105830551'}
@@ -793,7 +793,7 @@ export function WhatsAppPage() {
               </div>
             ) : qrVisible ? (
               <div className="text-center space-y-3">
-                <div className="p-3 bg-white border border-slate-200 rounded-2xl inline-block shadow-sm max-w-full">
+                <div className="p-3 bg-white border border-[#E7EBE3] rounded-2xl inline-block shadow-sm max-w-full">
                   <img src={status?.qr_code || ''} alt="WhatsApp QR" className="w-44 sm:w-48 h-44 sm:h-48 mx-auto object-contain" />
                 </div>
                 <div className="text-xs font-bold text-slate-600 flex items-center justify-center gap-1.5">
@@ -819,7 +819,7 @@ export function WhatsAppPage() {
                 <button
                   onClick={requestPairCode}
                   disabled={pairing}
-                  className={`w-full bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 ${button}`}
+                  className={`w-full bg-slate-100 hover:bg-slate-200 text-slate-800 border border-[#E7EBE3] ${button}`}
                 >
                   <Smartphone className="w-4 h-4" /> {pairing ? 'Requesting Code...' : 'Pair via 8-Digit Code'}
                 </button>
@@ -834,7 +834,7 @@ export function WhatsAppPage() {
           </div>
 
           {/* AI Auto-Pilot Engine Status Card */}
-          <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-3xl p-4 sm:p-6 shadow-xl border border-indigo-900/50 space-y-4">
+          <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-[20px] p-4 sm:p-6 shadow-xl border border-indigo-900/50 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bot className="w-5 h-5 text-emerald-400" />
@@ -856,7 +856,7 @@ export function WhatsAppPage() {
 
         {/* Right Column: Demo Contacts & EMI Message Editor */}
         <div className="lg:col-span-8 space-y-6">
-          <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-6 shadow-sm space-y-5">
+          <div className="bg-white border border-[#E7EBE3] rounded-[20px] p-4 sm:p-6 shadow-sm space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-slate-900">EMI message editor</h2>
@@ -880,7 +880,7 @@ export function WhatsAppPage() {
 
             <div className="space-y-4">
               {drafts.map((draft) => (
-                <div key={draft.requestId || `${draft.customer_id}-${draft.phone}`} className="p-3.5 sm:p-5 bg-slate-50/80 border border-slate-200 rounded-2xl space-y-3">
+                <div key={draft.requestId || `${draft.customer_id}-${draft.phone}`} className="p-3.5 sm:p-5 bg-slate-50/80 border border-[#E7EBE3] rounded-2xl space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -911,7 +911,7 @@ export function WhatsAppPage() {
                     aria-label={`Message for ${draft.name}`}
                     value={draft.message || ''}
                     onChange={(e) => edit(draft.requestId || draft.customer_id, e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-sans text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full bg-white border border-[#E7EBE3] rounded-xl p-3 text-xs font-sans text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   {draft.error && (
                     <div className="space-y-1">
@@ -925,7 +925,7 @@ export function WhatsAppPage() {
           </div>
 
           {/* AI Two-Way WhatsApp Conversational Bot Simulator */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-6 shadow-sm space-y-4">
+          <div className="bg-white border border-[#E7EBE3] rounded-[20px] p-4 sm:p-6 shadow-sm space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-indigo-600" />
@@ -946,7 +946,7 @@ export function WhatsAppPage() {
                 <select
                   value={chatPhone}
                   onChange={(e) => setChatPhone(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-800 mt-1"
+                  className="w-full bg-slate-50 border border-[#E7EBE3] rounded-xl p-2.5 text-xs font-bold text-slate-800 mt-1"
                 >
                   <option value="+917060200849">Nancy (+917060200849)</option>
                   <option value="+919105830551">Sid (+919105830551)</option>
@@ -963,7 +963,7 @@ export function WhatsAppPage() {
                     value={chatUserQuery}
                     onChange={(e) => setChatUserQuery(e.target.value)}
                     placeholder="e.g. How much EMI is left to repay?"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900"
+                    className="w-full bg-slate-50 border border-[#E7EBE3] rounded-xl px-3 py-2 text-xs font-semibold text-slate-900"
                   />
                   <button
                     onClick={handleTestAiChat}
@@ -991,7 +991,7 @@ export function WhatsAppPage() {
       {/* ========================================================================= */}
       {/* 📄 NLP DOCUMENT DEFAULTER PROCESSOR (PDF, DOCX, CSV, JSON) & DUE DATE DISPATCH */}
       {/* ========================================================================= */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-6 lg:p-8 shadow-sm space-y-6">
+      <div className="bg-white border border-[#E7EBE3] rounded-[20px] p-4 sm:p-6 lg:p-8 shadow-sm space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
           <div>
             <div className="flex items-start sm:items-center gap-2.5">
@@ -1049,16 +1049,16 @@ export function WhatsAppPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-              <span className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-emerald-700">
+              <span className="px-3 py-1 bg-white border border-[#E7EBE3] rounded-lg text-[11px] font-bold text-emerald-700">
                 .CSV (Per-Customer Scheduled Messages)
               </span>
-              <span className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-rose-700">
+              <span className="px-3 py-1 bg-white border border-[#E7EBE3] rounded-lg text-[11px] font-bold text-rose-700">
                 .PDF (Statements)
               </span>
-              <span className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-blue-700">
+              <span className="px-3 py-1 bg-white border border-[#E7EBE3] rounded-lg text-[11px] font-bold text-blue-700">
                 .DOCX (Word Lists)
               </span>
-              <span className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-amber-700">
+              <span className="px-3 py-1 bg-white border border-[#E7EBE3] rounded-lg text-[11px] font-bold text-amber-700">
                 .JSON (API Objects)
               </span>
             </div>
@@ -1087,7 +1087,7 @@ export function WhatsAppPage() {
           <div className="space-y-6">
             {/* Scheduling Summary Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3">
-              <div className="p-3 sm:p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+              <div className="p-3 sm:p-3.5 bg-slate-50 border border-[#E7EBE3] rounded-2xl">
                 <div className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase truncate">Total Imported</div>
                 <div className="text-lg sm:text-xl font-black text-slate-900 mt-1">{schedulingSummary?.total_imported ?? scheduledRecords.length}</div>
               </div>
@@ -1138,7 +1138,7 @@ export function WhatsAppPage() {
 
               {/* Action Buttons: Responsive Layout */}
               <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
-                <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-sm w-full sm:w-auto">
+                <div className="flex items-center gap-1.5 bg-white border border-[#E7EBE3] rounded-xl px-2.5 py-1.5 shadow-sm w-full sm:w-auto">
                   <span className="text-[11px] font-bold text-slate-500 uppercase shrink-0">Filter:</span>
                   <select
                     value={scheduleFilter}
@@ -1165,7 +1165,7 @@ export function WhatsAppPage() {
 
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition flex items-center justify-center min-h-[38px]"
+                    className="px-3 py-2 bg-white border border-[#E7EBE3] hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition flex items-center justify-center min-h-[38px]"
                   >
                     Replace CSV
                   </button>
@@ -1173,7 +1173,7 @@ export function WhatsAppPage() {
                   <a
                     href="/api/whatsapp/scheduled/download-validation-report?format=csv"
                     download="repayx_validation_report.csv"
-                    className="px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm min-h-[38px]"
+                    className="px-3 py-2 bg-white border border-[#E7EBE3] hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm min-h-[38px]"
                   >
                     <Download className="w-3.5 h-3.5 text-slate-500" />
                     <span>CSV Report</span>
@@ -1182,7 +1182,7 @@ export function WhatsAppPage() {
                   <a
                     href="/api/whatsapp/scheduled/download-validation-report?format=json"
                     download="repayx_validation_report.json"
-                    className="px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm min-h-[38px]"
+                    className="px-3 py-2 bg-white border border-[#E7EBE3] hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm min-h-[38px]"
                   >
                     <Download className="w-3.5 h-3.5 text-slate-500" />
                     <span>JSON Report</span>
@@ -1228,7 +1228,7 @@ export function WhatsAppPage() {
             </div>
 
             {/* Mobile Scroll Indicator */}
-            <div className="md:hidden flex items-center justify-between text-[11px] text-slate-500 px-3 py-1.5 font-medium bg-slate-50 rounded-xl border border-slate-200">
+            <div className="md:hidden flex items-center justify-between text-[11px] text-slate-500 px-3 py-1.5 font-medium bg-slate-50 rounded-xl border border-[#E7EBE3]">
               <span className="flex items-center gap-1">👉 Swipe horizontally to view all fields & actions</span>
               <span className="font-mono text-slate-400 font-bold">{scheduledRecords.length} rows</span>
             </div>
@@ -1273,10 +1273,10 @@ export function WhatsAppPage() {
             )}
 
             {/* Scheduled Records Table */}
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-[500px] overscroll-x-contain">
+            <div className="overflow-x-auto rounded-2xl border border-[#E7EBE3] max-h-[500px] overscroll-x-contain">
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="sticky top-0 bg-slate-100 z-10">
-                  <tr className="border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
+                  <tr className="border-b border-[#E7EBE3] text-slate-700 font-bold uppercase tracking-wider text-[11px]">
                     <th className="p-3">Customer Name</th>
                     <th className="p-3">Phone Number</th>
                     <th className="p-3">Unpaid Amount</th>
@@ -1316,7 +1316,7 @@ export function WhatsAppPage() {
                         ? 'bg-purple-100 text-purple-800 border-purple-200'
                         : r.schedule_status === 'INVALID_TIME' || r.schedule_status === 'FAILED'
                         ? 'bg-rose-100 text-rose-800 border-rose-200'
-                        : 'bg-slate-100 text-slate-700 border-slate-200';
+                        : 'bg-slate-100 text-slate-700 border-[#E7EBE3]';
 
                     const statusLabel =
                       isDelivered
@@ -1459,7 +1459,7 @@ export function WhatsAppPage() {
         {/* ========================================================================= */}
         {extractedDefaulters.length > 0 && scheduledRecords.length === 0 && (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-[#E7EBE3]">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <span className="text-xs font-black text-slate-900">
                   {extractedDefaulters.length} Defaulters Extracted
@@ -1478,7 +1478,7 @@ export function WhatsAppPage() {
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex-1 sm:flex-initial justify-center px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition min-h-[38px]"
+                  className="flex-1 sm:flex-initial justify-center px-3 py-2 bg-white border border-[#E7EBE3] hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition min-h-[38px]"
                 >
                   Upload Another File
                 </button>
@@ -1494,15 +1494,15 @@ export function WhatsAppPage() {
             </div>
 
             {/* Mobile Scroll Indicator for Defaulters Table */}
-            <div className="md:hidden flex items-center justify-between text-[11px] text-slate-500 px-3 py-1.5 font-medium bg-slate-50 rounded-xl border border-slate-200">
+            <div className="md:hidden flex items-center justify-between text-[11px] text-slate-500 px-3 py-1.5 font-medium bg-slate-50 rounded-xl border border-[#E7EBE3]">
               <span className="flex items-center gap-1">👉 Swipe horizontally to view all details</span>
               <span className="font-mono text-slate-400 font-bold">{extractedDefaulters.length} rows</span>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-96 overscroll-x-contain">
+            <div className="overflow-x-auto rounded-2xl border border-[#E7EBE3] max-h-96 overscroll-x-contain">
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="sticky top-0 bg-slate-100 z-10">
-                  <tr className="border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
+                  <tr className="border-b border-[#E7EBE3] text-slate-700 font-bold uppercase tracking-wider text-[11px]">
                     <th className="p-3">Borrower</th>
                     <th className="p-3">Loan Taken / Paid</th>
                     <th className="p-3">EMI Left to Repay</th>
@@ -1551,7 +1551,7 @@ export function WhatsAppPage() {
                         </span>
                       </td>
                       <td className="p-3 max-w-xs">
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-2 text-[11px] text-slate-700 line-clamp-2 font-mono">
+                        <div className="bg-slate-50 border border-[#E7EBE3] rounded-xl p-2 text-[11px] text-slate-700 line-clamp-2 font-mono">
                           {item.generated_message}
                         </div>
                       </td>
@@ -1576,7 +1576,7 @@ export function WhatsAppPage() {
       {/* ========================================================================= */}
       {/* 📁 BOTTOM SECTION: 2 USER LOAN & EMI FILES (JSON, CSV) & DATA VIEWER */}
       {/* ========================================================================= */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-6 lg:p-8 shadow-sm space-y-6">
+      <div className="bg-white border border-[#E7EBE3] rounded-[20px] p-4 sm:p-6 lg:p-8 shadow-sm space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
           <div>
             <div className="flex items-center gap-2.5">
@@ -1657,7 +1657,7 @@ export function WhatsAppPage() {
                 setLoanSearch(e.target.value);
                 void loadLoanEmiRecords(1, e.target.value);
               }}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-medium text-slate-900 w-full sm:w-80 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="bg-slate-50 border border-[#E7EBE3] rounded-xl px-4 py-2 text-xs font-medium text-slate-900 w-full sm:w-80 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
             <span className="text-xs text-slate-500 font-mono">
               Showing {loanEmiData?.users?.length || 0} of {loanEmiData?.total || 0} borrowers
@@ -1665,15 +1665,15 @@ export function WhatsAppPage() {
           </div>
 
           {/* Mobile Scroll Indicator for Loan Dataset Table */}
-          <div className="md:hidden flex items-center justify-between text-[11px] text-slate-500 px-3 py-1.5 font-medium bg-slate-50 rounded-xl border border-slate-200">
+          <div className="md:hidden flex items-center justify-between text-[11px] text-slate-500 px-3 py-1.5 font-medium bg-slate-50 rounded-xl border border-[#E7EBE3]">
             <span className="flex items-center gap-1">👉 Swipe horizontally to view all columns</span>
             <span className="font-mono text-slate-400 font-bold">{loanEmiData?.users?.length || 0} rows</span>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-200 overscroll-x-contain">
+          <div className="overflow-x-auto rounded-2xl border border-[#E7EBE3] overscroll-x-contain">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
+                <tr className="bg-slate-50 border-b border-[#E7EBE3] text-slate-600 font-bold uppercase tracking-wider text-[11px]">
                   <th className="p-3.5">Borrower</th>
                   <th className="p-3.5">Loan Taken</th>
                   <th className="p-3.5">EMI Paid</th>
