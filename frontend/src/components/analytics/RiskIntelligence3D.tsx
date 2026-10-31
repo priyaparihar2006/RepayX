@@ -29,7 +29,6 @@ interface HoveredNodeInfo {
 export const RiskIntelligence3D: React.FC<RiskIntelligence3DProps> = ({ data, className = '' }) => {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const [viewMode, setViewMode] = useState<ViewMode>('sphere');
   const [selectedCategory, setSelectedCategory] = useState<RiskCategory | 'ALL'>('ALL');
@@ -65,7 +64,7 @@ export const RiskIntelligence3D: React.FC<RiskIntelligence3DProps> = ({ data, cl
     currentZoom: number;
     isDragging: boolean;
     prevMousePos: { x: number; y: number };
-    clock: THREE.Clock;
+    startTime: number;
     raycaster: THREE.Raycaster;
     mouse: THREE.Vector2;
     cleanupListeners: () => void;
@@ -74,41 +73,39 @@ export const RiskIntelligence3D: React.FC<RiskIntelligence3DProps> = ({ data, cl
   // Initialize Three.js scene
   useEffect(() => {
     const container = containerRef.current;
-    const canvas = canvasRef.current;
-    if (!container || !canvas) return;
-
-    // Check WebGL availability
-    try {
-      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-      if (!gl) {
-        setHasWebGL(false);
-        return;
-      }
-    } catch {
-      setHasWebGL(false);
-      return;
-    }
+    if (!container) return;
 
     const width = container.clientWidth || 800;
     const height = 480;
 
-    // 1. Scene, Camera, Renderer
+    // 1. Initialize WebGLRenderer safely
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: 'high-performance',
+      });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    } catch (err) {
+      console.warn('[RepayX 3D] WebGL context initialization error:', err);
+      setHasWebGL(false);
+      return;
+    }
+
+    const canvas = renderer.domElement;
+    canvas.className = 'w-full h-full block outline-none';
+    container.appendChild(canvas);
+
+    // 2. Scene, Camera
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0xf5f7f3, 0.02);
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
     camera.position.set(0, 0, 4.4);
 
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true,
-      alpha: true,
-      powerPreference: 'high-performance',
-    });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-
-    // 2. Lights
+    // 3. Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambientLight);
 
@@ -428,7 +425,7 @@ export const RiskIntelligence3D: React.FC<RiskIntelligence3DProps> = ({ data, cl
       currentZoom: 4.4,
       isDragging: false,
       prevMousePos: { x: 0, y: 0 },
-      clock: new THREE.Clock(),
+      startTime: performance.now(),
       raycaster,
       mouse,
       cleanupListeners: () => {},
@@ -562,7 +559,7 @@ export const RiskIntelligence3D: React.FC<RiskIntelligence3DProps> = ({ data, cl
 
     const animate = () => {
       state.animFrameId = requestAnimationFrame(animate);
-      const elapsedTime = state.clock.getElapsedTime();
+      const elapsedTime = (performance.now() - state.startTime) / 1000;
 
       // Smooth inertia & damping for rotation
       if (!state.isDragging && !prefersReducedMotion) {
@@ -605,6 +602,9 @@ export const RiskIntelligence3D: React.FC<RiskIntelligence3DProps> = ({ data, cl
       state.cleanupListeners();
       renderer.dispose();
       scene.clear();
+      if (container && container.contains(canvas)) {
+        container.removeChild(canvas);
+      }
     };
   }, [byCategory, viewMode, navigate]);
 
@@ -789,9 +789,7 @@ export const RiskIntelligence3D: React.FC<RiskIntelligence3DProps> = ({ data, cl
 
       {/* Main 3D Canvas Container */}
       <div ref={containerRef} className="relative w-full h-[440px] sm:h-[480px] cursor-grab active:cursor-grabbing select-none">
-        {hasWebGL ? (
-          <canvas ref={canvasRef} className="w-full h-full block outline-none" />
-        ) : (
+        {!hasWebGL && (
           /* Graceful WebGL Fallback */
           <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 bg-[#F5F7F3]">
             <Globe className="w-12 h-12 text-[#245C35] mb-2 animate-spin" style={{ animationDuration: '10s' }} />

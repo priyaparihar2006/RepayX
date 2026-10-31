@@ -12,6 +12,7 @@ import { RiskScoreHistogram } from '../components/analytics/RiskScoreHistogram';
 import { LateRateChart } from '../components/analytics/LateRateChart';
 import { TopCustomersTable } from '../components/analytics/TopCustomersTable';
 import { AiEngineStatusIndicator } from '../components/analytics/AiEngineStatusIndicator';
+import { ErrorBoundary } from '../components/common/ErrorBoundary';
 
 // Code-split and lazy-load 3D Three.js visualization for optimal initial dashboard load speed
 const RiskIntelligence3D = React.lazy(() =>
@@ -73,17 +74,19 @@ export const DashboardPage: React.FC = () => (
           </div>
 
           {/* Premium Interactive 3D AI Risk Intelligence Globe & Network Experience */}
-          <React.Suspense
-            fallback={
-              <div className="w-full h-[520px] rounded-[24px] bg-white border border-[#E7EBE3] shadow-fintech flex flex-col items-center justify-center p-8 text-center animate-pulse">
-                <div className="w-16 h-16 rounded-full border-2 border-[#10B981]/40 border-t-[#245C35] animate-spin mb-4" />
-                <h3 className="text-sm font-bold text-[#171A17]">Initializing AI 3D Engine...</h3>
-                <p className="text-xs text-[#777E77] mt-1">Streaming dynamic customer risk vectors</p>
-              </div>
-            }
-          >
-            <RiskIntelligence3D data={data} />
-          </React.Suspense>
+          <ErrorBoundary>
+            <React.Suspense
+              fallback={
+                <div className="w-full h-[520px] rounded-[24px] bg-white border border-[#E7EBE3] shadow-fintech flex flex-col items-center justify-center p-8 text-center animate-pulse">
+                  <div className="w-16 h-16 rounded-full border-2 border-[#10B981]/40 border-t-[#245C35] animate-spin mb-4" />
+                  <h3 className="text-sm font-bold text-[#171A17]">Initializing AI 3D Engine...</h3>
+                  <p className="text-xs text-[#777E77] mt-1">Streaming dynamic customer risk vectors</p>
+                </div>
+              }
+            >
+              <RiskIntelligence3D data={data} />
+            </React.Suspense>
+          </ErrorBoundary>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2 flex flex-col">
