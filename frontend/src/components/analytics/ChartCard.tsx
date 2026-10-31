@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
-/** Card for a chart with a built-in table view, so values never depend on hover or color alone. */
+/** Card for a chart with a built-in table view, subtle interactive 3D depth, and full accessible fallback. */
 export const ChartCard: React.FC<{
   title: string;
   subtitle?: string;
@@ -9,10 +9,51 @@ export const ChartCard: React.FC<{
   children: React.ReactNode;
   footer?: React.ReactNode;
   className?: string;
-}> = ({ title, subtitle, table, children, footer, className = '' }) => {
+  enable3DTilt?: boolean;
+}> = ({ title, subtitle, table, children, footer, className = '', enable3DTilt = true }) => {
   const [showTable, setShowTable] = useState(false);
+  const cardRef = useRef<HTMLElement>(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    if (!enable3DTilt || !cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    // Micro 3D tilt: max 2.5 degrees for subtle, non-distracting depth
+    const rotateY = ((x - centerX) / centerX) * 2.5;
+    const rotateX = -((y - centerY) / centerY) * 2.5;
+    setTilt({ x: rotateX, y: rotateY });
+  }, [enable3DTilt]);
+
+  const handleMouseEnter = useCallback(() => {
+    if (enable3DTilt) setIsHovered(true);
+  }, [enable3DTilt]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (enable3DTilt) {
+      setIsHovered(false);
+      setTilt({ x: 0, y: 0 });
+    }
+  }, [enable3DTilt]);
+
   return (
-    <section className={`bg-white rounded-[20px] border border-[#E7EBE3] shadow-fintech p-5 sm:p-6 flex flex-col ${className}`}>
+    <section
+      ref={cardRef}
+      onMouseMove={handleMouseMove}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        transform: isHovered
+          ? `perspective(1000px) rotateX(${tilt.x.toFixed(2)}deg) rotateY(${tilt.y.toFixed(2)}deg) translateZ(3px)`
+          : 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateZ(0px)',
+        transition: isHovered ? 'transform 0.08s ease-out' : 'transform 0.4s ease-out, box-shadow 0.3s ease',
+      }}
+      className={`bg-white rounded-[20px] border border-[#E7EBE3] shadow-fintech p-5 sm:p-6 flex flex-col hover:shadow-fintech-card transition-shadow ${className}`}
+    >
       <header className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h2 className="text-sm sm:text-base font-bold text-[#171A17] font-heading">{title}</h2>
