@@ -99,7 +99,7 @@ class AutomationConfig:
     poll_seconds: int = field(default_factory=lambda: _env_int("SCHEDULER_POLL_SECONDS", 15))
     batch_size: int = field(default_factory=lambda: _env_int("SCHEDULER_BATCH_SIZE", 25))
     lease_seconds: int = field(default_factory=lambda: _env_int("SCHEDULER_LEASE_SECONDS", 300))
-    embedded_worker: bool = field(default_factory=lambda: _env_bool("SCHEDULER_EMBEDDED", False))
+    embedded_worker: bool = field(default_factory=lambda: _env_bool("SCHEDULER_EMBEDDED", True))
     retry_max_attempts: int = field(default_factory=lambda: _env_int("RETRY_MAX_ATTEMPTS", 5))
     retry_base_seconds: int = field(default_factory=lambda: _env_int("RETRY_BASE_SECONDS", 60))
     retry_max_seconds: int = field(default_factory=lambda: _env_int("RETRY_MAX_SECONDS", 3600))

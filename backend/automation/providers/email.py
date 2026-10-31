@@ -101,14 +101,20 @@ class SmtpEmailProvider(Provider):
             if relay_res.accepted:
                 return relay_res
 
-        # 2. Direct SMTP connection
+        # 2. Direct SMTP connection (port 465 SSL or port 587 TLS)
         msg = self.build(message)
+        server = None
+        # Try port 465 direct SSL first for high reliability across cloud hosts
         try:
-            server = smtplib.SMTP(c.smtp_host, c.smtp_port, timeout=self.timeout)
-        except (OSError, smtplib.SMTPException):
-            return self._send_via_https_relay(message)
-        try:
+            server = smtplib.SMTP_SSL(c.smtp_host, 465, context=ssl.create_default_context(), timeout=self.timeout)
+            if c.smtp_username:
+                server.login(c.smtp_username, c.smtp_password)
+        except Exception:
+            server = None
+
+        if server is None:
             try:
+                server = smtplib.SMTP(c.smtp_host, c.smtp_port or 587, timeout=self.timeout)
                 server.ehlo()
                 if c.smtp_use_tls:
                     server.starttls(context=ssl.create_default_context())
@@ -119,6 +125,8 @@ class SmtpEmailProvider(Provider):
                 return SendResult.fail("smtp_auth", "SMTP authentication failed.", transient=False)
             except (OSError, smtplib.SMTPException):
                 return self._send_via_https_relay(message)
+
+        try:
             try:
                 refused = server.send_message(msg)
             except smtplib.SMTPRecipientsRefused as exc:

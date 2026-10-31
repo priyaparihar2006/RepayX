@@ -344,6 +344,41 @@ function parseCsv(text: string): { headers: string[]; rows: Record<string, strin
   return { headers, rows };
 }
 
+
+function getRelativeReminderInfo(dtStr: string): string {
+  if (!dtStr || !dtStr.trim()) return '';
+  try {
+    // Parse format YYYY-MM-DD HH:MM:SS
+    const parts = dtStr.trim().split(/[\sT]+/);
+    if (parts.length < 2) return '';
+    const [d, t] = parts;
+    const [yyyy, mm, dd] = d.split('-').map(Number);
+    const [hh, min, ss = 0] = t.split(':').map(Number);
+    // Construct in IST (UTC+5:30)
+    const targetUtcMs = Date.UTC(yyyy, mm - 1, dd, hh - 5, min - 30, ss);
+    const nowUtcMs = Date.now();
+    const diffSec = Math.round((targetUtcMs - nowUtcMs) / 1000);
+    if (diffSec <= 0) {
+      return '⚡ Due / Dispatches immediately';
+    }
+    if (diffSec < 60) {
+      return `⏳ Sends in ${diffSec}s`;
+    }
+    const diffMin = Math.round(diffSec / 60);
+    if (diffMin < 60) {
+      return `⏳ Sends in ${diffMin} min`;
+    }
+    const diffHours = (diffSec / 3600).toFixed(1);
+    if (diffSec < 86400) {
+      return `⏳ Sends in ${diffHours} hrs`;
+    }
+    const diffDays = Math.round(diffSec / 86400);
+    return `📆 Sends in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+  } catch {
+    return '';
+  }
+}
+
 function serializeCsv(headers: string[], rows: Record<string, string>[]): string {
   const escapeCell = (val: string | null | undefined) => {
     if (val === null || val === undefined) return '';
@@ -649,16 +684,24 @@ const ImportTab: React.FC = () => {
     setHasEdits(true);
   };
 
-  const applyPresetTime = (offsetDays: number, timeStr?: string, isInstant = false) => {
-    const targetDate = new Date(Date.now() + offsetDays * 86_400_000);
+  const applyPresetTime = (offsetDays: number, timeStr?: string, isInstant = false, offsetMinutes?: number) => {
+    const now = Date.now();
+    let targetMs = now + offsetDays * 86_400_000;
+    if (offsetMinutes) {
+      targetMs = now + offsetMinutes * 60_000;
+    }
+    const targetDate = new Date(targetMs);
     const datePart = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(targetDate);
     let finalTime = timeStr;
     if (isInstant) {
-      const rightNow = new Date(Date.now() + 2_000);
+      const rightNow = new Date(now + 15_000);
       const timeFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
       finalTime = timeFormatter.format(rightNow);
+    } else if (offsetMinutes) {
+      const timeFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      finalTime = timeFormatter.format(targetDate);
     } else if (!finalTime) {
-      const in2Min = new Date(Date.now() + 2 * 60_000);
+      const in2Min = new Date(now + 2 * 60_000);
       const timeFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
       finalTime = timeFormatter.format(in2Min);
     }
@@ -961,30 +1004,35 @@ const ImportTab: React.FC = () => {
                   {/* 1-Click Quick Time Presets */}
                   <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200">
                     <span className="text-[11px] font-semibold text-slate-600">Quick Time Presets:</span>
+                    {currentIST && (
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-mono text-[11px] font-bold border border-emerald-200" title="Current Indian Standard Time (IST)">
+                        🕒 IST: {currentIST}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => applyPresetTime(0, undefined, true)}
                       className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-100 text-amber-900 hover:bg-amber-200 border border-amber-300 cursor-pointer transition shadow-xs flex items-center gap-1"
-                      title="Set reminder_datetime on all rows to right now for instant dispatch"
+                      title="Set reminder_datetime on all rows to right now (+15s) for immediate dispatch"
                     >
                       <Zap className="w-3 h-3 fill-current" />
                       <span>⚡ Send Instantly Now</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => applyPresetTime(0)}
+                      onClick={() => applyPresetTime(0, undefined, false, 2)}
                       className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 cursor-pointer transition"
-                      title="Set reminder_datetime on all rows to 2 minutes from right now"
+                      title="Set reminder_datetime on all rows to exactly 2 minutes from now"
                     >
-                      ⚡ Send in 2 Minutes (Test Now)
+                      ⏳ In 2 Minutes (Test Now)
                     </button>
                     <button
                       type="button"
-                      onClick={() => applyPresetTime(0, '13:00:00')}
-                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 cursor-pointer transition"
-                      title="Set reminder_datetime on all rows to today at 1:00 PM"
+                      onClick={() => applyPresetTime(0, undefined, false, 5)}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 cursor-pointer transition"
+                      title="Set reminder_datetime on all rows to exactly 5 minutes from now"
                     >
-                      📅 Today at 1:00 PM
+                      ⏳ In 5 Minutes
                     </button>
                     <button
                       type="button"
@@ -992,7 +1040,7 @@ const ImportTab: React.FC = () => {
                       className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 cursor-pointer transition"
                       title="Set reminder_datetime on all rows to 2 days from now at 11:10 AM"
                     >
-                      📆 In 2 Days at 11:10 AM (Sends Even When PC Is Off)
+                      📆 In 2 Days at 11:10 AM
                     </button>
                   </div>
                 </div>
@@ -1019,17 +1067,31 @@ const ImportTab: React.FC = () => {
                           {displayHeaders.map((col) => (
                             <td key={col} className="p-1.5">
                               {isEditMode ? (
-                                <input
-                                  type="text"
-                                  value={r[col] ?? ''}
-                                  onChange={(e) => handleCellChange(i, col, e.target.value)}
-                                  className={`w-full ${getColMinWidth(col)} px-2.5 py-1 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 font-medium`}
-                                  placeholder={`Enter ${col}...`}
-                                />
+                                <div className="space-y-0.5">
+                                  <input
+                                    type="text"
+                                    value={r[col] ?? ''}
+                                    onChange={(e) => handleCellChange(i, col, e.target.value)}
+                                    className={`w-full ${getColMinWidth(col)} px-2.5 py-1 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 font-medium`}
+                                    placeholder={`Enter ${col}...`}
+                                  />
+                                  {col === 'reminder_datetime' && r[col] && (
+                                    <div className="text-[10px] font-bold tracking-tight text-indigo-700 bg-indigo-50/80 px-1.5 py-0.5 rounded border border-indigo-100/60 inline-block">
+                                      {getRelativeReminderInfo(r[col])}
+                                    </div>
+                                  )}
+                                </div>
                               ) : (
-                                <span className="text-xs text-slate-800 whitespace-nowrap px-1">
-                                  {r[col] !== undefined && r[col] !== '' ? r[col] : '—'}
-                                </span>
+                                <div className="space-y-0.5">
+                                  <span className="text-xs text-slate-800 whitespace-nowrap px-1">
+                                    {r[col] !== undefined && r[col] !== '' ? r[col] : '—'}
+                                  </span>
+                                  {col === 'reminder_datetime' && r[col] && (
+                                    <div className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded inline-block">
+                                      {getRelativeReminderInfo(r[col])}
+                                    </div>
+                                  )}
+                                </div>
                               )}
                             </td>
                           ))}
