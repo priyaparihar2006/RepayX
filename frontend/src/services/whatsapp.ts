@@ -236,6 +236,13 @@ export const whatsapp = {
     return request<LoanEmiDataResponse>(`/api/whatsapp/loan-emi-data?${q.toString()}`);
   },
 
+  updateLoanEmiRecord: (record: Partial<UserLoanEmiRecord> & { customer_id: number | string }) =>
+    request<{ success: boolean; record: UserLoanEmiRecord }>('/api/whatsapp/loan-emi-data/update', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record),
+    }),
+
   getDefaulters: (params?: { search?: string; risk_tier?: string; page?: number; page_size?: number }) => {
     const q = new URLSearchParams();
     if (params?.search) q.set('search', params.search);
@@ -340,6 +347,13 @@ export const whatsapp = {
         body: JSON.stringify(payload),
       }
     ),
+
+  updateScheduledRecord: (record: Partial<ScheduledRecord> & { schedule_id: string }) =>
+    request<{ success: boolean; record: ScheduledRecord }>('/api/whatsapp/scheduled/update-record', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record),
+    }),
 
   processDueScheduledJobs: () =>
     request<{ processed_count: number; dispatched: any[]; skipped_count: number; wa_connected: boolean }>(

@@ -526,6 +526,70 @@ class CSVSchedulerService:
             "status": new_status,
         }
 
+    def update_schedule_record(
+        self,
+        schedule_id: str,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM scheduled_messages WHERE schedule_id = ?", (schedule_id,))
+            row = cursor.fetchone()
+            if not row:
+                raise ValueError(f"Schedule '{schedule_id}' not found.")
+
+            allowed = {
+                "customer_name", "phone_number", "email", "loan_id", "unpaid_amount",
+                "due_date", "days_past_due", "payment_status", "risk_category",
+                "probability_of_default", "payment_link", "scheduled_message_time",
+                "timezone", "message_text", "status"
+            }
+            fields_to_update = {k: v for k, v in updates.items() if k in allowed and v is not None}
+
+            if "phone_number" in fields_to_update and fields_to_update["phone_number"]:
+                cleaned_ph = clean_phone_number(fields_to_update["phone_number"])
+                if cleaned_ph:
+                    fields_to_update["phone_number"] = cleaned_ph
+
+            if "unpaid_amount" in fields_to_update:
+                fields_to_update["unpaid_amount"] = clean_float(fields_to_update["unpaid_amount"])
+
+            if "scheduled_message_time" in fields_to_update:
+                sched_time = normalize_nullable_field(fields_to_update["scheduled_message_time"])
+                tz_str = fields_to_update.get("timezone", row["timezone"]) or self.default_timezone
+                try:
+                    zone_info = ZoneInfo(tz_str)
+                except Exception:
+                    zone_info = ZoneInfo(self.default_timezone)
+                now_in_tz = datetime.now(zone_info)
+
+                if sched_time is None:
+                    fields_to_update["scheduled_message_time"] = None
+                    fields_to_update["scheduled_message_at"] = None
+                    fields_to_update["status"] = "UNSCHEDULED"
+                elif TIME_FORMAT_REGEX.match(sched_time):
+                    fields_to_update["scheduled_message_time"] = sched_time
+                    hour, minute = map(int, sched_time.split(":"))
+                    target_dt = datetime.combine(now_in_tz.date(), time(hour, minute), tzinfo=zone_info)
+                    fields_to_update["scheduled_message_at"] = target_dt.isoformat()
+                    if target_dt < now_in_tz:
+                        fields_to_update["status"] = "MISSED_SCHEDULE"
+                    else:
+                        fields_to_update["status"] = "SCHEDULED"
+
+            fields_to_update["updated_at"] = datetime.now(ZoneInfo("UTC")).isoformat()
+
+            if fields_to_update:
+                set_clause = ", ".join(f"{k} = ?" for k in fields_to_update.keys())
+                values = list(fields_to_update.values()) + [schedule_id]
+                cursor.execute(f"UPDATE scheduled_messages SET {set_clause} WHERE schedule_id = ?", values)
+                conn.commit()
+
+            cursor.execute("SELECT * FROM scheduled_messages WHERE schedule_id = ?", (schedule_id,))
+            updated_row = dict(cursor.fetchone())
+            return {"success": True, "record": updated_row}
+
     def get_schedules(
         self,
         campaign_id: str | None = None,

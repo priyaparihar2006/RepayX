@@ -629,6 +629,31 @@ class WhatsAppService:
             },
         }
 
+    def update_loan_emi_record(
+        self,
+        customer_id: int | str,
+        updates: dict,
+    ) -> dict:
+        records: list[dict] = []
+        if self.settings.loan_emi_json.exists():
+            try:
+                records = json.loads(self.settings.loan_emi_json.read_text(encoding="utf-8"))
+            except Exception:
+                records = []
+        target = None
+        cid_str = str(customer_id)
+        for r in records:
+            if str(r.get("customer_id")) == cid_str:
+                for k, v in updates.items():
+                    if k != "customer_id" and v is not None:
+                        r[k] = v
+                target = r
+                break
+        if not target:
+            raise ValueError(f"Customer #{customer_id} not found in loan EMI dataset.")
+        self.settings.loan_emi_json.write_text(json.dumps(records, indent=2), encoding="utf-8")
+        return {"success": True, "record": target}
+
     def get_defaulters(
         self,
         customer_service: CustomerService | None = None,

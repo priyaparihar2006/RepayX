@@ -10,6 +10,9 @@ import {
   CheckCircle2,
   Clock,
   Download,
+  Edit,
+  Edit2,
+  Edit3,
   FileCode,
   FileSpreadsheet,
   FileText,
@@ -17,17 +20,21 @@ import {
   Layers,
   LogOut,
   MessageSquare,
+  Plus,
   QrCode,
   RefreshCw,
+  Save,
   Send,
   ShieldAlert,
   Smartphone,
   Sparkles,
+  Trash2,
   TrendingDown,
   TrendingUp,
   Upload,
   UploadCloud,
   UserCheck,
+  X,
   Zap,
 } from 'lucide-react';
 import {
@@ -98,6 +105,14 @@ export function WhatsAppPage() {
   const [checkingDelivery, setCheckingDelivery] = useState<boolean>(false);
   const [dispatchingId, setDispatchingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Edit states for all sections
+  const [isScheduleEditMode, setIsScheduleEditMode] = useState<boolean>(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [savingScheduleId, setSavingScheduleId] = useState<string | null>(null);
+  const [editingDefaulterIdx, setEditingDefaulterIdx] = useState<number | null>(null);
+  const [editingLoanCustomerId, setEditingLoanCustomerId] = useState<number | string | null>(null);
+  const [savingLoanId, setSavingLoanId] = useState<number | string | null>(null);
 
   const recomputeSummary = (records: ScheduledRecord[]) => {
     const total_imported = records.length;
@@ -233,6 +248,108 @@ export function WhatsAppPage() {
     });
     setScheduledRecords(updated);
     recomputeSummary(updated);
+  };
+
+  const handleSaveScheduleRecord = async (r: ScheduledRecord) => {
+    setSavingScheduleId(r.schedule_id || r.customer_id);
+    try {
+      if (r.schedule_id) {
+        await whatsapp.updateScheduledRecord({
+          schedule_id: r.schedule_id,
+          customer_name: r.customer_name,
+          phone_number: r.phone_number,
+          loan_id: r.loan_id,
+          unpaid_amount: r.unpaid_amount,
+          days_past_due: r.days_past_due,
+          payment_status: r.payment_status,
+          risk_category: r.risk_category,
+          scheduled_message_time: r.scheduled_message_time,
+          timezone: r.timezone,
+        });
+      }
+      setUploadNotice(`✅ Saved changes for ${r.customer_name || 'customer'}!`);
+      setEditingScheduleId(null);
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setSavingScheduleId(null);
+    }
+  };
+
+  const handleAddScheduleRow = () => {
+    const newId = `CUST-${Date.now().toString().slice(-4)}`;
+    const newRecord: ScheduledRecord = {
+      schedule_id: `sched_${Date.now()}`,
+      row_number: scheduledRecords.length + 1,
+      customer_id: newId,
+      customer_name: 'New Borrower',
+      phone_number: '+919876543210',
+      loan_id: `LN-${Date.now().toString().slice(-4)}`,
+      unpaid_amount: 5000,
+      days_past_due: 0,
+      payment_status: 'overdue',
+      risk_category: 'MEDIUM',
+      scheduled_message_time: '12:00',
+      timezone: 'Asia/Kolkata',
+      scheduled_message_at: null,
+      schedule_status: 'SCHEDULED',
+      is_valid: true,
+      validation_errors: [],
+    };
+    const updated = [newRecord, ...scheduledRecords];
+    setScheduledRecords(updated);
+    recomputeSummary(updated);
+    setEditingScheduleId(newRecord.schedule_id);
+    setUploadNotice(`➕ Added new customer row. Edit the fields and click Save!`);
+  };
+
+  const handleDeleteScheduleRow = (scheduleId: string) => {
+    const updated = scheduledRecords.filter((r) => r.schedule_id !== scheduleId);
+    setScheduledRecords(updated);
+    recomputeSummary(updated);
+    setUploadNotice('🗑️ Removed customer row.');
+  };
+
+  const handleUpdateDefaulterField = (idx: number, field: keyof ExtractedDefaulter, val: any) => {
+    setExtractedDefaulters((prev) => {
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], [field]: val };
+      return copy;
+    });
+  };
+
+  const handleUpdateLoanUserField = (customerId: number, field: keyof UserLoanEmiRecord, val: any) => {
+    setLoanEmiData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        users: prev.users.map((u) => (u.customer_id === customerId ? { ...u, [field]: val } : u)),
+      };
+    });
+  };
+
+  const handleSaveLoanRecord = async (user: UserLoanEmiRecord) => {
+    setSavingLoanId(user.customer_id);
+    try {
+      await whatsapp.updateLoanEmiRecord({
+        customer_id: user.customer_id,
+        customer_name: user.customer_name,
+        phone: user.phone,
+        total_loan_amount: user.total_loan_amount,
+        emi_paid_amount: user.emi_paid_amount,
+        emi_left_to_repay: user.emi_left_to_repay,
+        monthly_emi: user.monthly_emi,
+        days_past_due: user.days_past_due,
+        risk_tier: user.risk_tier,
+        payment_link: user.payment_link,
+      });
+      setNotice(`✅ Updated borrower ${user.customer_name} (#${user.customer_id}) in loan dataset.`);
+      setEditingLoanCustomerId(null);
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setSavingLoanId(null);
+    }
   };
 
   const [dispatchingAll, setDispatchingAll] = useState(false);
@@ -1164,6 +1281,28 @@ export function WhatsAppPage() {
                   </button>
 
                   <button
+                    onClick={() => setIsScheduleEditMode((prev) => !prev)}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-1.5 shadow-sm min-h-[38px] ${
+                      isScheduleEditMode
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-300'
+                        : 'bg-white hover:bg-slate-50 text-blue-700 border-blue-200'
+                    }`}
+                    title="Toggle inline edit mode for all fields"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>{isScheduleEditMode ? 'Edit Mode: ON' : '✏️ Edit Mode'}</span>
+                  </button>
+
+                  <button
+                    onClick={handleAddScheduleRow}
+                    className="px-3 py-2 bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm min-h-[38px]"
+                    title="Add a new customer row"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Add Row</span>
+                  </button>
+
+                  <button
                     onClick={() => fileInputRef.current?.click()}
                     className="px-3 py-2 bg-white border border-[#E7EBE3] hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition flex items-center justify-center min-h-[38px]"
                   >
@@ -1333,39 +1472,127 @@ export function WhatsAppPage() {
                         ? '⏸️ Paused (WA Offline)'
                         : '⚪ Unscheduled';
 
+                    const isRowEditing = isScheduleEditMode || editingScheduleId === (r.schedule_id || r.customer_id);
+
                     return (
-                      <tr key={`${r.schedule_id || 'preview'}:${r.row_number ?? index}`} className={`transition ${isDelivered ? 'bg-emerald-50/30 hover:bg-emerald-50/60' : 'hover:bg-slate-50/70'}`}>
+                      <tr key={`${r.schedule_id || 'preview'}:${r.row_number ?? index}`} className={`transition ${isRowEditing ? 'bg-blue-50/40 ring-1 ring-blue-300' : isDelivered ? 'bg-emerald-50/30 hover:bg-emerald-50/60' : 'hover:bg-slate-50/70'}`}>
                         <td className="p-3">
-                          <span className="font-bold text-slate-900">{r.customer_name || 'Customer'}</span>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <span className="text-[10px] text-slate-400 font-mono">#{r.customer_id || 'N/A'}</span>
-                            {r.loan_id && <span className="text-[10px] text-slate-500 font-mono">· {r.loan_id}</span>}
-                          </div>
+                          {isRowEditing ? (
+                            <div className="space-y-1 min-w-[130px]">
+                              <input
+                                type="text"
+                                value={r.customer_name || ''}
+                                onChange={(e) => handleUpdateField(r, 'customer_name', e.target.value)}
+                                className="w-full px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-blue-500 shadow-xs"
+                                placeholder="Customer Name"
+                              />
+                              <div className="flex gap-1">
+                                <input
+                                  type="text"
+                                  value={r.customer_id || ''}
+                                  onChange={(e) => handleUpdateField(r, 'customer_id', e.target.value)}
+                                  className="w-16 px-1.5 py-0.5 text-[10px] bg-white border border-slate-300 rounded font-mono"
+                                  placeholder="#ID"
+                                />
+                                <input
+                                  type="text"
+                                  value={r.loan_id || ''}
+                                  onChange={(e) => handleUpdateField(r, 'loan_id', e.target.value)}
+                                  className="w-20 px-1.5 py-0.5 text-[10px] bg-white border border-slate-300 rounded font-mono"
+                                  placeholder="Loan ID"
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <span className="font-bold text-slate-900">{r.customer_name || 'Customer'}</span>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <span className="text-[10px] text-slate-400 font-mono">#{r.customer_id || 'N/A'}</span>
+                                {r.loan_id && <span className="text-[10px] text-slate-500 font-mono">· {r.loan_id}</span>}
+                              </div>
+                            </>
+                          )}
                         </td>
                         <td className="p-3 font-mono font-semibold text-slate-700">
-                          {r.phone_number || r.raw_phone || '-'}
+                          {isRowEditing ? (
+                            <input
+                              type="text"
+                              value={r.phone_number || r.raw_phone || ''}
+                              onChange={(e) => handleUpdateField(r, 'phone_number', e.target.value)}
+                              className="w-32 px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg text-slate-900 font-mono font-semibold focus:ring-2 focus:ring-blue-500 shadow-xs"
+                              placeholder="+91..."
+                            />
+                          ) : (
+                            r.phone_number || r.raw_phone || '-'
+                          )}
                         </td>
                         <td className="p-3 font-bold text-rose-700 font-mono">
-                          {formatCurrency(r.unpaid_amount)}
+                          {isRowEditing ? (
+                            <input
+                              type="number"
+                              value={r.unpaid_amount ?? ''}
+                              onChange={(e) => handleUpdateField(r, 'unpaid_amount', parseFloat(e.target.value) || 0)}
+                              className="w-24 px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg text-rose-700 font-mono font-bold focus:ring-2 focus:ring-blue-500 shadow-xs"
+                              placeholder="₹"
+                            />
+                          ) : (
+                            formatCurrency(r.unpaid_amount)
+                          )}
                         </td>
                         <td className="p-3">
-                          <span
-                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
-                              r.risk_category === 'HIGH'
-                                ? 'bg-rose-50 text-rose-800 border-rose-300'
-                                : r.risk_category === 'LOW'
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                : 'bg-amber-50 text-amber-800 border-amber-300'
-                            }`}
-                          >
-                            {r.risk_category || 'MEDIUM'}
-                          </span>
+                          {isRowEditing ? (
+                            <select
+                              value={r.risk_category || 'MEDIUM'}
+                              onChange={(e) => handleUpdateField(r, 'risk_category', e.target.value)}
+                              className="px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg font-bold text-slate-800 shadow-xs"
+                            >
+                              <option value="HIGH">HIGH</option>
+                              <option value="MEDIUM">MEDIUM</option>
+                              <option value="LOW">LOW</option>
+                            </select>
+                          ) : (
+                            <span
+                              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
+                                r.risk_category === 'HIGH'
+                                  ? 'bg-rose-50 text-rose-800 border-rose-300'
+                                  : r.risk_category === 'LOW'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                  : 'bg-amber-50 text-amber-800 border-amber-300'
+                              }`}
+                            >
+                              {r.risk_category || 'MEDIUM'}
+                            </span>
+                          )}
                         </td>
                         <td className="p-3">
-                          <span className="font-mono font-semibold text-slate-800">{r.payment_status || 'UNPAID'}</span>
-                          {r.days_past_due ? (
-                            <div className="text-[10px] text-slate-400 mt-0.5">{r.days_past_due}d late</div>
-                          ) : null}
+                          {isRowEditing ? (
+                            <div className="space-y-1">
+                              <select
+                                value={r.payment_status || 'overdue'}
+                                onChange={(e) => handleUpdateField(r, 'payment_status', e.target.value)}
+                                className="px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg font-bold text-slate-800 shadow-xs"
+                              >
+                                <option value="overdue">overdue</option>
+                                <option value="unpaid">unpaid</option>
+                                <option value="pending">pending</option>
+                                <option value="paid">paid</option>
+                              </select>
+                              <input
+                                type="number"
+                                value={r.days_past_due ?? 0}
+                                onChange={(e) => handleUpdateField(r, 'days_past_due', parseInt(e.target.value) || 0)}
+                                placeholder="Days late"
+                                className="w-20 px-1.5 py-0.5 text-[10px] bg-white border border-slate-300 rounded font-mono block"
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <span className="font-mono font-semibold text-slate-800">{r.payment_status || 'UNPAID'}</span>
+                              {r.days_past_due ? (
+                                <div className="text-[10px] text-slate-400 mt-0.5">{r.days_past_due}d late</div>
+                              ) : null}
+                            </>
+                          )}
                         </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
@@ -1383,7 +1610,16 @@ export function WhatsAppPage() {
                           </div>
                         </td>
                         <td className="p-3 font-mono text-[11px] text-slate-600">
-                          {r.timezone || 'Asia/Kolkata'}
+                          {isRowEditing ? (
+                            <input
+                              type="text"
+                              value={r.timezone || 'Asia/Kolkata'}
+                              onChange={(e) => handleUpdateField(r, 'timezone', e.target.value)}
+                              className="w-28 px-2 py-1 text-[11px] bg-white border border-blue-400 rounded-lg font-mono text-slate-700 shadow-xs"
+                            />
+                          ) : (
+                            r.timezone || 'Asia/Kolkata'
+                          )}
                         </td>
                         <td className="p-3">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusBadge}`}>
@@ -1396,11 +1632,49 @@ export function WhatsAppPage() {
                           )}
                         </td>
                         <td className="p-3 text-right">
-                          {r.validation_errors && r.validation_errors.length > 0 && !isDelivered ? (
-                            <div className="flex flex-col items-end gap-1">
-                              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-right max-w-[200px] truncate" title={r.validation_errors.join(', ')}>
-                                ⚠️ {r.validation_errors.join(', ')}
-                              </span>
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            {isRowEditing ? (
+                              <>
+                                <button
+                                  onClick={() => handleSaveScheduleRecord(r)}
+                                  disabled={savingScheduleId === (r.schedule_id || r.customer_id)}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg shadow-sm transition flex items-center gap-1 cursor-pointer"
+                                  title="Save edited row"
+                                >
+                                  {savingScheduleId === (r.schedule_id || r.customer_id) ? (
+                                    <RefreshCw className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <Save className="w-3 h-3" />
+                                  )}
+                                  <span>Save</span>
+                                </button>
+                                <button
+                                  onClick={() => setEditingScheduleId(null)}
+                                  className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] rounded-lg transition"
+                                  title="Close row edit"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteScheduleRow(r.schedule_id)}
+                                  className="px-1.5 py-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded transition"
+                                  title="Delete customer row"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => setEditingScheduleId(r.schedule_id || r.customer_id)}
+                                className="px-2 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-bold text-[11px] rounded-lg transition flex items-center gap-1 cursor-pointer"
+                                title="Edit this customer record"
+                              >
+                                <Edit2 className="w-3 h-3 text-blue-600" />
+                                <span>Edit</span>
+                              </button>
+                            )}
+
+                            {r.validation_errors && r.validation_errors.length > 0 && !isDelivered ? (
                               <button
                                 onClick={() => handleDispatchSingle(r)}
                                 disabled={dispatchingId === r.schedule_id}
@@ -1414,36 +1688,36 @@ export function WhatsAppPage() {
                                 )}
                                 <span>{dispatchingId === r.schedule_id ? 'Retrying...' : '🎙️ Retry (Text + Voice)'}</span>
                               </button>
-                            </div>
-                          ) : isDelivered ? (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 border border-emerald-300 rounded-xl text-emerald-800 text-[11px] font-bold shadow-sm">
-                              <CheckCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span>Delivered {r.sent_at ? `(${r.sent_at.substring(11, 16)})` : ''}</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                onClick={() => handleDispatchSingle(r)}
-                                disabled={dispatchingId === r.schedule_id}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg shadow-sm transition disabled:opacity-50 flex items-center gap-1"
-                                title="Send reminder now and confirm delivery"
-                              >
-                                {dispatchingId === r.schedule_id ? (
-                                  <RefreshCw className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <Send className="w-3 h-3" />
-                                )}
-                                <span>{dispatchingId === r.schedule_id ? 'Sending Text + Voice...' : '🎙️ Send Text + Voice Note'}</span>
-                              </button>
-                              <button
-                                onClick={() => handleMarkDelivered(r)}
-                                className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-semibold text-[11px] rounded-lg transition"
-                                title="Mark as delivered manually"
-                              >
-                                Mark Delivered
-                              </button>
-                            </div>
-                          )}
+                            ) : isDelivered ? (
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 border border-emerald-300 rounded-xl text-emerald-800 text-[11px] font-bold shadow-sm">
+                                <CheckCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span>Delivered {r.sent_at ? `(${r.sent_at.substring(11, 16)})` : ''}</span>
+                              </div>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleDispatchSingle(r)}
+                                  disabled={dispatchingId === r.schedule_id}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg shadow-sm transition disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                                  title="Send reminder now and confirm delivery"
+                                >
+                                  {dispatchingId === r.schedule_id ? (
+                                    <RefreshCw className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <Send className="w-3 h-3" />
+                                  )}
+                                  <span>{dispatchingId === r.schedule_id ? 'Sending...' : '🎙️ Send Text + Voice Note'}</span>
+                                </button>
+                                <button
+                                  onClick={() => handleMarkDelivered(r)}
+                                  className="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-semibold text-[11px] rounded-lg transition cursor-pointer"
+                                  title="Mark as delivered manually"
+                                >
+                                  Mark Delivered
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1513,59 +1787,169 @@ export function WhatsAppPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {extractedDefaulters.map((item, index) => (
-                    <tr key={index} className="hover:bg-slate-50/70 transition">
-                      <td className="p-3">
-                        <div className="font-bold text-slate-900">{item.customer_name}</div>
-                        <div className="text-[11px] text-slate-400 font-mono">
-                          #{item.customer_id} · {item.phone}
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="font-bold text-indigo-950">{formatCurrency(item.total_loan_amount)}</div>
-                        <div className="text-[10px] text-emerald-700 font-medium">
-                          Paid: {formatCurrency(item.emi_paid_amount)}
-                        </div>
-                      </td>
-                      <td className="p-3 font-bold text-rose-700 text-sm">
-                        {formatCurrency(item.emi_left_to_repay)}
-                      </td>
-                      <td className="p-3 font-mono text-slate-800 font-semibold">
-                        {item.last_date_to_pay || 'N/A'}
-                      </td>
-                      <td className="p-3">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                            item.urgency_status === 'OVERDUE'
-                              ? 'bg-rose-100 text-rose-800'
-                              : item.urgency_status === 'DUE_TODAY'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}
-                        >
-                          {item.urgency_status === 'OVERDUE'
-                            ? `🚨 ${Math.abs(item.days_diff)}d Overdue`
-                            : item.urgency_status === 'DUE_TODAY'
-                            ? '⏳ Due Today'
-                            : `📅 In ${item.days_diff}d`}
-                        </span>
-                      </td>
-                      <td className="p-3 max-w-xs">
-                        <div className="bg-slate-50 border border-[#E7EBE3] rounded-xl p-2 text-[11px] text-slate-700 line-clamp-2 font-mono">
-                          {item.generated_message}
-                        </div>
-                      </td>
-                      <td className="p-3 text-right">
-                        {item.status === 'delivered' ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                            <Check className="w-3 h-3 text-emerald-600" /> Sent
-                          </span>
-                        ) : (
-                          <span className="text-[11px] font-bold text-slate-400">Ready</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {extractedDefaulters.map((item, index) => {
+                    const isEditing = editingDefaulterIdx === index;
+                    return (
+                      <tr key={index} className={`transition ${isEditing ? 'bg-blue-50/40 ring-1 ring-blue-300' : 'hover:bg-slate-50/70'}`}>
+                        <td className="p-3">
+                          {isEditing ? (
+                            <div className="space-y-1 min-w-[130px]">
+                              <input
+                                type="text"
+                                value={item.customer_name || ''}
+                                onChange={(e) => handleUpdateDefaulterField(index, 'customer_name', e.target.value)}
+                                className="w-full px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg text-slate-900 font-bold"
+                                placeholder="Customer Name"
+                              />
+                              <input
+                                type="text"
+                                value={item.phone || ''}
+                                onChange={(e) => handleUpdateDefaulterField(index, 'phone', e.target.value)}
+                                className="w-full px-2 py-1 text-[11px] bg-white border border-slate-300 rounded font-mono"
+                                placeholder="+91..."
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <div className="font-bold text-slate-900">{item.customer_name}</div>
+                              <div className="text-[11px] text-slate-400 font-mono">
+                                #{item.customer_id} · {item.phone}
+                              </div>
+                            </>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {isEditing ? (
+                            <div className="space-y-1">
+                              <input
+                                type="number"
+                                value={item.total_loan_amount ?? ''}
+                                onChange={(e) => handleUpdateDefaulterField(index, 'total_loan_amount', parseFloat(e.target.value) || 0)}
+                                className="w-24 px-1.5 py-1 text-xs bg-white border border-blue-400 rounded-lg font-bold"
+                                placeholder="Total Loan"
+                              />
+                              <input
+                                type="number"
+                                value={item.emi_paid_amount ?? ''}
+                                onChange={(e) => handleUpdateDefaulterField(index, 'emi_paid_amount', parseFloat(e.target.value) || 0)}
+                                className="w-24 px-1.5 py-1 text-[11px] bg-white border border-slate-300 rounded"
+                                placeholder="Paid"
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <div className="font-bold text-indigo-950">{formatCurrency(item.total_loan_amount)}</div>
+                              <div className="text-[10px] text-emerald-700 font-medium">
+                                Paid: {formatCurrency(item.emi_paid_amount)}
+                              </div>
+                            </>
+                          )}
+                        </td>
+                        <td className="p-3 font-bold text-rose-700 text-sm">
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              value={item.emi_left_to_repay ?? ''}
+                              onChange={(e) => handleUpdateDefaulterField(index, 'emi_left_to_repay', parseFloat(e.target.value) || 0)}
+                              className="w-24 px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg font-bold text-rose-700"
+                            />
+                          ) : (
+                            formatCurrency(item.emi_left_to_repay)
+                          )}
+                        </td>
+                        <td className="p-3 font-mono text-slate-800 font-semibold">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={item.last_date_to_pay || ''}
+                              onChange={(e) => handleUpdateDefaulterField(index, 'last_date_to_pay', e.target.value)}
+                              className="w-28 px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg font-mono"
+                              placeholder="YYYY-MM-DD"
+                            />
+                          ) : (
+                            item.last_date_to_pay || 'N/A'
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {isEditing ? (
+                            <select
+                              value={item.urgency_status}
+                              onChange={(e) => handleUpdateDefaulterField(index, 'urgency_status', e.target.value)}
+                              className="px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg font-bold"
+                            >
+                              <option value="OVERDUE">OVERDUE</option>
+                              <option value="DUE_TODAY">DUE_TODAY</option>
+                              <option value="UPCOMING">UPCOMING</option>
+                            </select>
+                          ) : (
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                item.urgency_status === 'OVERDUE'
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : item.urgency_status === 'DUE_TODAY'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-blue-100 text-blue-800'
+                              }`}
+                            >
+                              {item.urgency_status === 'OVERDUE'
+                                ? `🚨 ${Math.abs(item.days_diff)}d Overdue`
+                                : item.urgency_status === 'DUE_TODAY'
+                                ? '⏳ Due Today'
+                                : `📅 In ${item.days_diff}d`}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 max-w-xs">
+                          {isEditing ? (
+                            <textarea
+                              rows={2}
+                              value={item.generated_message || ''}
+                              onChange={(e) => handleUpdateDefaulterField(index, 'generated_message', e.target.value)}
+                              className="w-full p-1.5 text-[11px] bg-white border border-blue-400 rounded-lg font-mono"
+                            />
+                          ) : (
+                            <div className="bg-slate-50 border border-[#E7EBE3] rounded-xl p-2 text-[11px] text-slate-700 line-clamp-2 font-mono">
+                              {item.generated_message}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {isEditing ? (
+                              <>
+                                <button
+                                  onClick={() => setEditingDefaulterIdx(null)}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg shadow-sm transition flex items-center gap-1"
+                                >
+                                  <Save className="w-3 h-3" />
+                                  <span>Save</span>
+                                </button>
+                                <button
+                                  onClick={() => setEditingDefaulterIdx(null)}
+                                  className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] rounded-lg transition"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => setEditingDefaulterIdx(index)}
+                                className="px-2 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-bold text-[11px] rounded-lg transition flex items-center gap-1"
+                              >
+                                <Edit2 className="w-3 h-3 text-blue-600" />
+                                <span>Edit</span>
+                              </button>
+                            )}
+                            {item.status === 'delivered' ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                <Check className="w-3 h-3 text-emerald-600" /> Sent
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1681,64 +2065,201 @@ export function WhatsAppPage() {
                   <th className="p-3.5">Monthly EMI</th>
                   <th className="p-3.5">Late Days</th>
                   <th className="p-3.5">Risk Tier</th>
-                  <th className="p-3.5 text-right">Payment Link</th>
+                  <th className="p-3.5">Payment Link</th>
+                  <th className="p-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {loanEmiData?.users?.map((user) => (
-                  <tr key={user.customer_id} className="hover:bg-slate-50/70 transition">
-                    <td className="p-3.5">
-                      <div className="font-bold text-slate-900">{user.customer_name}</div>
-                      <div className="text-[11px] text-slate-400 font-mono">
-                        #{user.customer_id} · {user.phone}
-                      </div>
-                    </td>
-                    <td className="p-3.5 font-bold text-indigo-950">{formatCurrency(user.total_loan_amount)}</td>
-                    <td className="p-3.5 font-bold text-emerald-700">
-                      {formatCurrency(user.emi_paid_amount)}
-                      <span className="text-[10px] text-slate-400 font-normal block">({user.emis_paid_count} paid)</span>
-                    </td>
-                    <td className="p-3.5 font-bold text-rose-700">
-                      {formatCurrency(user.emi_left_to_repay)}
-                      <span className="text-[10px] text-slate-400 font-normal block">({user.emis_remaining_count} left)</span>
-                    </td>
-                    <td className="p-3.5 text-slate-700 font-medium">{formatCurrency(user.monthly_emi)}/mo</td>
-                    <td className="p-3.5">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                          user.days_past_due > 30
-                            ? 'bg-rose-100 text-rose-800'
-                            : user.days_past_due > 15
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        {user.days_past_due} days
-                      </span>
-                    </td>
-                    <td className="p-3.5">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                          user.risk_tier === 'High Risk'
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}
-                      >
-                        {user.risk_tier} ({user.risk_score}%)
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-right">
-                      <a
-                        href={user.payment_link}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 transition"
-                      >
-                        Open Link
-                      </a>
-                    </td>
-                  </tr>
-                ))}
+                {loanEmiData?.users?.map((user) => {
+                  const isEditing = editingLoanCustomerId === user.customer_id;
+                  return (
+                    <tr key={user.customer_id} className={`transition ${isEditing ? 'bg-blue-50/40 ring-1 ring-blue-300' : 'hover:bg-slate-50/70'}`}>
+                      <td className="p-3.5">
+                        {isEditing ? (
+                          <div className="space-y-1 min-w-[130px]">
+                            <input
+                              type="text"
+                              value={user.customer_name}
+                              onChange={(e) => handleUpdateLoanUserField(user.customer_id, 'customer_name', e.target.value)}
+                              className="w-full px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg text-slate-900 font-bold"
+                              placeholder="Borrower Name"
+                            />
+                            <input
+                              type="text"
+                              value={user.phone}
+                              onChange={(e) => handleUpdateLoanUserField(user.customer_id, 'phone', e.target.value)}
+                              className="w-full px-2 py-1 text-[11px] bg-white border border-slate-300 rounded font-mono"
+                              placeholder="+91..."
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <div className="font-bold text-slate-900">{user.customer_name}</div>
+                            <div className="text-[11px] text-slate-400 font-mono">
+                              #{user.customer_id} · {user.phone}
+                            </div>
+                          </>
+                        )}
+                      </td>
+                      <td className="p-3.5 font-bold text-indigo-950">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={user.total_loan_amount ?? ''}
+                            onChange={(e) => handleUpdateLoanUserField(user.customer_id, 'total_loan_amount', parseFloat(e.target.value) || 0)}
+                            className="w-24 px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg font-bold"
+                          />
+                        ) : (
+                          formatCurrency(user.total_loan_amount)
+                        )}
+                      </td>
+                      <td className="p-3.5 font-bold text-emerald-700">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={user.emi_paid_amount ?? ''}
+                            onChange={(e) => handleUpdateLoanUserField(user.customer_id, 'emi_paid_amount', parseFloat(e.target.value) || 0)}
+                            className="w-24 px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg font-bold"
+                          />
+                        ) : (
+                          <>
+                            {formatCurrency(user.emi_paid_amount)}
+                            <span className="text-[10px] text-slate-400 font-normal block">({user.emis_paid_count} paid)</span>
+                          </>
+                        )}
+                      </td>
+                      <td className="p-3.5 font-bold text-rose-700">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={user.emi_left_to_repay ?? ''}
+                            onChange={(e) => handleUpdateLoanUserField(user.customer_id, 'emi_left_to_repay', parseFloat(e.target.value) || 0)}
+                            className="w-24 px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg font-bold"
+                          />
+                        ) : (
+                          <>
+                            {formatCurrency(user.emi_left_to_repay)}
+                            <span className="text-[10px] text-slate-400 font-normal block">({user.emis_remaining_count} left)</span>
+                          </>
+                        )}
+                      </td>
+                      <td className="p-3.5 text-slate-700 font-medium">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={user.monthly_emi ?? ''}
+                            onChange={(e) => handleUpdateLoanUserField(user.customer_id, 'monthly_emi', parseFloat(e.target.value) || 0)}
+                            className="w-20 px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg"
+                          />
+                        ) : (
+                          `${formatCurrency(user.monthly_emi)}/mo`
+                        )}
+                      </td>
+                      <td className="p-3.5">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={user.days_past_due ?? 0}
+                            onChange={(e) => handleUpdateLoanUserField(user.customer_id, 'days_past_due', parseInt(e.target.value) || 0)}
+                            className="w-16 px-1.5 py-1 text-xs bg-white border border-blue-400 rounded-lg font-mono"
+                          />
+                        ) : (
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                              user.days_past_due > 30
+                                ? 'bg-rose-100 text-rose-800'
+                                : user.days_past_due > 15
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {user.days_past_due} days
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3.5">
+                        {isEditing ? (
+                          <select
+                            value={user.risk_tier}
+                            onChange={(e) => handleUpdateLoanUserField(user.customer_id, 'risk_tier', e.target.value as any)}
+                            className="px-2 py-1 text-xs bg-white border border-blue-400 rounded-lg font-bold"
+                          >
+                            <option value="High Risk">High Risk</option>
+                            <option value="Medium Risk">Medium Risk</option>
+                            <option value="Low Risk">Low Risk</option>
+                          </select>
+                        ) : (
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                              user.risk_tier === 'High Risk'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}
+                          >
+                            {user.risk_tier} ({user.risk_score}%)
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3.5">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={user.payment_link || ''}
+                            onChange={(e) => handleUpdateLoanUserField(user.customer_id, 'payment_link', e.target.value)}
+                            className="w-32 px-2 py-1 text-[11px] bg-white border border-blue-400 rounded-lg font-mono"
+                            placeholder="https://..."
+                          />
+                        ) : (
+                          <a
+                            href={user.payment_link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 transition"
+                          >
+                            Open Link
+                          </a>
+                        )}
+                      </td>
+                      <td className="p-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={() => handleSaveLoanRecord(user)}
+                                disabled={savingLoanId === user.customer_id}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg shadow-sm transition flex items-center gap-1 cursor-pointer"
+                                title="Save changes to dataset"
+                              >
+                                {savingLoanId === user.customer_id ? (
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Save className="w-3 h-3" />
+                                )}
+                                <span>Save</span>
+                              </button>
+                              <button
+                                onClick={() => setEditingLoanCustomerId(null)}
+                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] rounded-lg transition"
+                                title="Cancel"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => setEditingLoanCustomerId(user.customer_id)}
+                              className="px-2 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-bold text-[11px] rounded-lg transition flex items-center gap-1 cursor-pointer"
+                              title="Edit borrower details"
+                            >
+                              <Edit2 className="w-3 h-3 text-blue-600" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

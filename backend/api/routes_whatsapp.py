@@ -432,6 +432,38 @@ class UpdateScheduleTimeRequest(BaseModel):
     timezone: str | None = None
 
 
+class UpdateScheduleRecordRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    schedule_id: str
+    customer_name: str | None = None
+    phone_number: str | None = None
+    email: str | None = None
+    loan_id: str | None = None
+    unpaid_amount: float | None = None
+    due_date: str | None = None
+    days_past_due: int | None = None
+    payment_status: str | None = None
+    risk_category: str | None = None
+    scheduled_message_time: str | None = None
+    timezone: str | None = None
+    payment_link: str | None = None
+
+
+class UpdateLoanEmiRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    customer_id: Any
+    customer_name: str | None = None
+    phone: str | None = None
+    total_loan_amount: float | None = None
+    emi_paid_amount: float | None = None
+    emi_left_to_repay: float | None = None
+    monthly_emi: float | None = None
+    days_past_due: int | None = None
+    risk_tier: str | None = None
+    payment_link: str | None = None
+    payment_status: str | None = None
+
+
 @router.post("/scheduled/preview-csv")
 async def scheduled_preview_csv(
     file: UploadFile = File(...),
@@ -503,6 +535,36 @@ def scheduled_update_time(
             target_date_str=body.target_date,
             timezone_str=body.timezone,
         )
+        return res
+    except ValueError as exc:
+        return Response(status_code=400, content=str(exc))
+
+
+@router.put("/scheduled/update-record")
+def scheduled_update_record(
+    body: UpdateScheduleRecordRequest,
+    messaging: WhatsAppService = Depends(service),
+):
+    """Updates arbitrary fields for a single customer scheduled message."""
+    try:
+        data = body.model_dump(exclude_unset=True)
+        schedule_id = data.pop("schedule_id")
+        res = messaging.scheduler.update_schedule_record(schedule_id, data)
+        return res
+    except ValueError as exc:
+        return Response(status_code=400, content=str(exc))
+
+
+@router.put("/loan-emi-data/update")
+def update_loan_emi_data(
+    body: UpdateLoanEmiRequest,
+    messaging: WhatsAppService = Depends(service),
+):
+    """Updates an individual borrower record in the loan EMI dataset."""
+    try:
+        data = body.model_dump(exclude_unset=True)
+        customer_id = data.pop("customer_id")
+        res = messaging.update_loan_emi_record(customer_id, data)
         return res
     except ValueError as exc:
         return Response(status_code=400, content=str(exc))
