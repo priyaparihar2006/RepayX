@@ -1,5 +1,6 @@
 import React from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { motion } from 'motion/react';
 import type { AnalyticsResponse } from '../../types/api';
 import { CHART, SERIES_COLOR } from '../../lib/chartTheme';
 import { formatNumber } from '../../lib/format';
@@ -14,6 +15,12 @@ export const LateRateChart: React.FC<{ buckets: Bucket[]; className?: string }> 
   const data = buckets
     .filter((b) => b.bucket !== 'Unknown')
     .map((b) => ({ ...b, label: b.bucket.replace(/ \(.*\)/, '') }));
+
+  const [animKey, setAnimKey] = React.useState(0);
+  React.useEffect(() => {
+    setAnimKey((k) => k + 1);
+  }, [buckets]);
+
   return (
     <ChartCard
       className={className}
@@ -26,9 +33,16 @@ export const LateRateChart: React.FC<{ buckets: Bucket[]; className?: string }> 
           : undefined
       }
     >
-      <div className="flex-1 w-full min-h-[220px]" role="img" aria-label="Customers by late payment rate bucket">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
+        className="flex-1 w-full min-h-[220px]"
+        role="img"
+        aria-label="Customers by late payment rate bucket"
+      >
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
+          <BarChart key={animKey} data={data} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={CHART.grid} />
             <XAxis dataKey="label" tick={{ fontSize: 10, fill: CHART.tick }} tickLine={false} axisLine={{ stroke: CHART.axis }} interval={0} />
             <YAxis
@@ -48,10 +62,20 @@ export const LateRateChart: React.FC<{ buckets: Bucket[]; className?: string }> 
                 ) : null;
               }}
             />
-            <Bar dataKey="customers" fill={SERIES_COLOR} radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
+            <Bar
+              dataKey="customers"
+              fill={SERIES_COLOR}
+              radius={[5, 5, 0, 0]}
+              maxBarSize={28}
+              isAnimationActive={true}
+              animationDuration={1500}
+              animationEasing="ease-out"
+              animationBegin={150}
+              className="transition-all duration-300 hover:opacity-85 hover:brightness-110 cursor-pointer"
+            />
           </BarChart>
         </ResponsiveContainer>
-      </div>
+      </motion.div>
     </ChartCard>
   );
 };

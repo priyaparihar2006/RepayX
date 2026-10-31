@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle, CircleDollarSign, Clock, Gauge, Users } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useAnalytics } from '../hooks/useAnalytics';
 import type { AnalyticsResponse } from '../types/api';
 import { RISK_COLORS } from '../lib/chartTheme';
@@ -11,6 +12,8 @@ import { RiskDistributionBar } from '../components/analytics/RiskDistributionBar
 import { RiskScoreHistogram } from '../components/analytics/RiskScoreHistogram';
 import { LateRateChart } from '../components/analytics/LateRateChart';
 import { TopCustomersTable } from '../components/analytics/TopCustomersTable';
+import { DefaultProbabilityGauge } from '../components/analytics/DefaultProbabilityGauge';
+import { AnimatedCounter } from '../components/common/AnimatedCounter';
 
 /** Loads /api/analytics once and renders loading / error states around a page body. */
 export const AnalyticsPage: React.FC<{
@@ -29,17 +32,24 @@ export const AnalyticsPage: React.FC<{
         {result.data?.model_version && (
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold ${
+              className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold ${
                 result.isFallback
                   ? 'bg-[#FEF7EA] text-[#B45309] border border-[#FDE68A]'
                   : 'bg-[#EDF5E5] text-[#245C35] border border-[#D1E8BC]'
               }`}
             >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  result.isFallback ? 'bg-[#D97706] animate-pulse' : 'bg-[#245C35]'
-                }`}
-              />
+              <span className="relative flex h-2 w-2">
+                <span
+                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    result.isFallback ? 'bg-[#F59E0B]' : 'bg-[#10B981]'
+                  }`}
+                />
+                <span
+                  className={`relative inline-flex rounded-full h-2 w-2 ${
+                    result.isFallback ? 'bg-[#D97706]' : 'bg-[#245C35]'
+                  }`}
+                />
+              </span>
               {result.isFallback ? '⚡ Warming Cloud API...' : 'Live Engine Connected'}
             </span>
             <p className="text-[11px] text-[#777E77]">
@@ -70,17 +80,29 @@ export const DashboardPage: React.FC = () => (
       const { portfolio: p, repayment: r } = data;
       const byCategory = Object.fromEntries(p.risk_categories.map((c) => [c.risk_category, c]));
       return (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="space-y-6">
+          {/* Top Metric Cards with Staggered Entrance */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+            className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
+          >
             <MetricCard label="Total Customers" value={formatNumber(p.total_customers)} icon={Users}
               detail={`Average risk score ${formatScore(p.average_risk_score)}`} />
             {(['High Risk', 'Medium Risk', 'Low Risk'] as const).map((c) => (
               <MetricCard key={c} label={c} keyColor={RISK_COLORS[c]} value={formatNumber(byCategory[c]?.customers ?? 0)}
                 detail={`${formatPercent(byCategory[c]?.share ?? 0)} of customers`} />
             ))}
-          </div>
+          </motion.div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Core Analytics Row */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1, ease: 'easeOut' }}
+            className="grid grid-cols-1 xl:grid-cols-3 gap-6"
+          >
             <div className="xl:col-span-2 flex flex-col">
               <RiskScoreHistogram
                 className="h-full"
@@ -91,38 +113,58 @@ export const DashboardPage: React.FC = () => (
             </div>
             <div className="space-y-6 flex flex-col">
               <RiskDistributionBar categories={p.risk_categories} total={p.total_customers} />
+
+              {/* Enhanced Default Probability Overview with Radial Gauge */}
               <section className="bg-white rounded-[20px] border border-[#E7EBE3] shadow-fintech-card p-5 transition-all duration-200 flex-1 flex flex-col justify-between">
                 <div>
-                  <h2 className="text-sm font-bold text-[#171A17]">Default Probability Overview</h2>
-                  <dl className="mt-3.5 grid grid-cols-2 gap-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-sm font-bold text-[#171A17]">Default Probability Overview</h2>
+                      <p className="text-[11px] text-[#777E77] mt-0.5">Model portfolio assessment</p>
+                    </div>
+                    <DefaultProbabilityGauge probability={p.average_default_probability} size={92} />
+                  </div>
+
+                  <dl className="mt-3 grid grid-cols-2 gap-4">
                     <div>
                       <dt className="text-xs text-[#777E77]">Avg est. default probability</dt>
-                      <dd className="mt-1 text-xl font-semibold text-[#171A17]">{formatPercent(p.average_default_probability)}</dd>
+                      <dd className="mt-1 text-xl font-semibold text-[#171A17]">
+                        <AnimatedCounter value={formatPercent(p.average_default_probability)} />
+                      </dd>
                     </div>
                     <div>
                       <dt className="text-xs text-[#777E77]">Median risk score</dt>
-                      <dd className="mt-1 text-xl font-semibold text-[#171A17]">{formatScore(p.median_risk_score)}</dd>
+                      <dd className="mt-1 text-xl font-semibold text-[#171A17]">
+                        <AnimatedCounter value={formatScore(p.median_risk_score)} />
+                      </dd>
                     </div>
                     <div className="col-span-2 pt-2 border-t border-[#E7EBE3]/70">
                       <dt className="text-xs text-[#777E77]">Predicted defaults</dt>
                       <dd className="mt-1 text-xl font-semibold text-[#171A17]">
-                        {formatNumber(p.predicted_defaults)}{' '}
-                        <span className="text-xs font-normal text-[#777E77]">({formatPercent(p.predicted_default_share)} of customers)</span>
+                        <AnimatedCounter value={formatNumber(p.predicted_defaults)} />{' '}
+                        <span className="text-xs font-normal text-[#777E77]">
+                          (<AnimatedCounter value={formatPercent(p.predicted_default_share)} /> of customers)
+                        </span>
                       </dd>
                     </div>
                   </dl>
                 </div>
                 {data.model && (
-                  <p className="mt-2 text-[11px] text-[#777E77] bg-[#F5F7F3] p-2.5 rounded-xl border border-[#E7EBE3] leading-relaxed">
+                  <p className="mt-3 text-[11px] text-[#777E77] bg-[#F5F7F3] p-2.5 rounded-xl border border-[#E7EBE3] leading-relaxed">
                     Estimated probability at or above the {formatPercent(data.model.classification_threshold * 100, 0)} classification
                     threshold. This threshold is separate from the risk categories.
                   </p>
                 )}
               </section>
             </div>
-          </div>
+          </motion.div>
 
-          <div>
+          {/* Repayment Analytics Row */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2, ease: 'easeOut' }}
+          >
             <h2 className="text-sm font-bold text-[#171A17] mb-3">Repayment Analytics</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               <MetricCard label="Average Late Payment Rate" icon={Clock} value={formatPercent(r.average_late_payment_rate)}
@@ -134,17 +176,23 @@ export const DashboardPage: React.FC = () => (
               <MetricCard label="Average Underpaid Rate" icon={Gauge} value={formatPercent(r.average_underpaid_rate)}
                 detail={`Average payment ratio ${formatScore(r.average_payment_ratio)} (1.00 = paid in full)`} />
             </div>
-          </div>
+          </motion.div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Bottom Table and Late Rate Distribution */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3, ease: 'easeOut' }}
+            className="grid grid-cols-1 xl:grid-cols-3 gap-6"
+          >
             <div className="xl:col-span-1 flex flex-col">
               <LateRateChart className="h-full" buckets={data.late_payment_rate_buckets} />
             </div>
             <div className="xl:col-span-2">
               <TopCustomersTable title="Highest-Risk Customers" subtitle="Top 10 by risk score" sortBy="risk_score" />
             </div>
-          </div>
-        </>
+          </motion.div>
+        </div>
       );
     }}
   </AnalyticsPage>
