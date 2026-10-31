@@ -11,13 +11,6 @@ import { RiskDistributionBar } from '../components/analytics/RiskDistributionBar
 import { RiskScoreHistogram } from '../components/analytics/RiskScoreHistogram';
 import { LateRateChart } from '../components/analytics/LateRateChart';
 import { TopCustomersTable } from '../components/analytics/TopCustomersTable';
-import { AiEngineStatusIndicator } from '../components/analytics/AiEngineStatusIndicator';
-import { ErrorBoundary } from '../components/common/ErrorBoundary';
-
-// Code-split and lazy-load 3D Three.js visualization for optimal initial dashboard load speed
-const RiskIntelligence3D = React.lazy(() =>
-  import('../components/analytics/RiskIntelligence3D').then((m) => ({ default: m.RiskIntelligence3D }))
-);
 
 /** Loads /api/analytics once and renders loading / error states around a page body. */
 export const AnalyticsPage: React.FC<{
@@ -34,11 +27,25 @@ export const AnalyticsPage: React.FC<{
           <p className="text-xs sm:text-sm text-[#777E77] mt-0.5">{description}</p>
         </div>
         {result.data?.model_version && (
-          <AiEngineStatusIndicator
-            modelVersion={result.data.model_version}
-            isFallback={result.isFallback}
-            totalScored={result.data.portfolio?.total_customers}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold ${
+                result.isFallback
+                  ? 'bg-[#FEF7EA] text-[#B45309] border border-[#FDE68A]'
+                  : 'bg-[#EDF5E5] text-[#245C35] border border-[#D1E8BC]'
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  result.isFallback ? 'bg-[#D97706] animate-pulse' : 'bg-[#245C35]'
+                }`}
+              />
+              {result.isFallback ? '⚡ Warming Cloud API...' : 'Live Engine Connected'}
+            </span>
+            <p className="text-[11px] text-[#777E77]">
+              Scored by <span className="font-mono text-[#171A17] font-medium">{result.data.model_version}</span>
+            </p>
+          </div>
         )}
       </div>
       {result.status === 'error' && !result.data ? (
@@ -72,21 +79,6 @@ export const DashboardPage: React.FC = () => (
                 detail={`${formatPercent(byCategory[c]?.share ?? 0)} of customers`} />
             ))}
           </div>
-
-          {/* Premium Interactive 3D AI Risk Intelligence Globe & Network Experience */}
-          <ErrorBoundary>
-            <React.Suspense
-              fallback={
-                <div className="w-full h-[520px] rounded-[24px] bg-white border border-[#E7EBE3] shadow-fintech flex flex-col items-center justify-center p-8 text-center animate-pulse">
-                  <div className="w-16 h-16 rounded-full border-2 border-[#10B981]/40 border-t-[#245C35] animate-spin mb-4" />
-                  <h3 className="text-sm font-bold text-[#171A17]">Initializing AI 3D Engine...</h3>
-                  <p className="text-xs text-[#777E77] mt-1">Streaming dynamic customer risk vectors</p>
-                </div>
-              }
-            >
-              <RiskIntelligence3D data={data} />
-            </React.Suspense>
-          </ErrorBoundary>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2 flex flex-col">
