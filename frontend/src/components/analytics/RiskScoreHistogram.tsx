@@ -12,11 +12,13 @@ export const RiskScoreHistogram: React.FC<{
   bins: AnalyticsResponse['risk_score_histogram'];
   mediumFrom?: number;
   highFrom?: number;
-}> = ({ bins, mediumFrom = 30, highFrom = 60 }) => {
+  className?: string;
+}> = ({ bins, mediumFrom = 30, highFrom = 60, className = '' }) => {
   const total = bins.reduce((s, b) => s + b.customers, 0) || 1;
   const data: Bin[] = bins.map((b) => ({ ...b, category: riskCategoryForScore(b.min, mediumFrom, highFrom) }));
   return (
     <ChartCard
+      className={className}
       title="Risk Score Overview"
       subtitle="Customers per 10-point risk score band, coloured by risk category"
       table={
@@ -26,7 +28,7 @@ export const RiskScoreHistogram: React.FC<{
         />
       }
     >
-      <div className="h-56" role="img" aria-label="Histogram of customer risk scores">
+      <div className="flex-1 w-full min-h-[240px] xl:min-h-[300px]" role="img" aria-label="Histogram of customer risk scores">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={CHART.grid} />

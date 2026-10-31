@@ -5,8 +5,13 @@ import { formatNumber, formatPercent } from '../../lib/format';
 import { ChartCard, DataTable } from './ChartCard';
 
 /** Part-to-whole of the three risk tiers as one 100% bar (2px surface gaps between segments) with a legend. */
-export const RiskDistributionBar: React.FC<{ categories: RiskCategoryCount[]; total: number }> = ({ categories, total }) => (
+export const RiskDistributionBar: React.FC<{ categories: RiskCategoryCount[]; total: number; className?: string }> = ({
+  categories,
+  total,
+  className = '',
+}) => (
   <ChartCard
+    className={className}
     title="Risk Distribution"
     subtitle={`${formatNumber(total)} scored customers by risk category`}
     table={

@@ -9,13 +9,14 @@ import { TooltipBox } from './ChartTooltip';
 type Bucket = AnalyticsResponse['late_payment_rate_buckets'][number];
 
 /** Customers by share of installments paid late. Customers with an unknown rate are reported, not plotted. */
-export const LateRateChart: React.FC<{ buckets: Bucket[] }> = ({ buckets }) => {
+export const LateRateChart: React.FC<{ buckets: Bucket[]; className?: string }> = ({ buckets, className = '' }) => {
   const unknown = buckets.find((b) => b.bucket === 'Unknown')?.customers ?? 0;
   const data = buckets
     .filter((b) => b.bucket !== 'Unknown')
     .map((b) => ({ ...b, label: b.bucket.replace(/ \(.*\)/, '') }));
   return (
     <ChartCard
+      className={className}
       title="Late Payment Rate Distribution"
       subtitle="Customers by the share of their installments paid after the due date"
       table={<DataTable headers={['Late payment rate', 'Customers']} rows={buckets.map((b) => [b.bucket, formatNumber(b.customers)])} />}
@@ -25,7 +26,7 @@ export const LateRateChart: React.FC<{ buckets: Bucket[] }> = ({ buckets }) => {
           : undefined
       }
     >
-      <div className="h-56" role="img" aria-label="Customers by late payment rate bucket">
+      <div className="flex-1 w-full min-h-[220px]" role="img" aria-label="Customers by late payment rate bucket">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={CHART.grid} />

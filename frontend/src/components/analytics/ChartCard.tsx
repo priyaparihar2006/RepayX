@@ -28,7 +28,7 @@ export const ChartCard: React.FC<{
           {showTable ? 'Chart' : 'Table'}
         </button>
       </header>
-      <div className="flex-1">{showTable ? table : children}</div>
+      <div className="flex-1 flex flex-col min-h-0">{showTable ? table : children}</div>
       {footer && <div className="mt-3.5 pt-2.5 border-t border-[#F5F7F3] text-[11px] text-[#777E77]">{footer}</div>}
     </section>
   );

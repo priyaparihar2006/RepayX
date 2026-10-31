@@ -156,9 +156,18 @@ class VoiceService:
         """Convert MP3 audio to WhatsApp-compliant OGG Opus format (48kHz, mono, 32kbps)."""
         ogg_path = mp3_path.with_suffix(".ogg")
         try:
-            import imageio_ffmpeg
+            import shutil
             import subprocess
-            ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+            ffmpeg_exe = shutil.which("ffmpeg")
+            if not ffmpeg_exe:
+                try:
+                    import imageio_ffmpeg
+                    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+                except Exception:
+                    ffmpeg_exe = None
+            if not ffmpeg_exe:
+                logger.warning("ffmpeg executable not found in PATH or imageio_ffmpeg")
+                return mp3_path
             cmd = [
                 ffmpeg_exe,
                 "-y",
@@ -170,7 +179,7 @@ class VoiceService:
                 "-ac", "1",
                 str(ogg_path),
             ]
-            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=12)
+            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
             if res.returncode == 0 and ogg_path.is_file() and ogg_path.stat().st_size > 500:
                 logger.info("Converted audio to WhatsApp native OGG Opus voice note: %s (%d bytes)", ogg_path.name, ogg_path.stat().st_size)
                 return ogg_path
@@ -209,15 +218,22 @@ class VoiceService:
                 communicate = edge_tts.Communicate(text, chosen_voice)
                 await communicate.save(str(out_path))
 
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                        pool.submit(lambda: asyncio.run(_synthesize_edge())).result(timeout=12.0)
-                else:
-                    loop.run_until_complete(_synthesize_edge())
-            except RuntimeError:
+            def _run_edge():
                 asyncio.run(_synthesize_edge())
+
+            try:
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+
+                if loop and loop.is_running():
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                        pool.submit(_run_edge).result(timeout=18.0)
+                else:
+                    _run_edge()
+            except Exception as loop_err:
+                logger.warning("Edge-TTS event loop run error: %s", loop_err)
 
             if out_path.is_file() and out_path.stat().st_size > 1000:
                 words = len(text.split())
@@ -262,7 +278,8 @@ class VoiceService:
         try:
             from gtts import gTTS
             lang_code = "hi" if lang in ("hinglish", "hindi", "hi") else "en"
-            tts = gTTS(text=text, lang=lang_code, slow=False)
+            tld = "com" if lang_code == "hi" else "co.in"
+            tts = gTTS(text=text, lang=lang_code, tld=tld, slow=False)
             tts.save(str(out_path))
             if out_path.is_file() and out_path.stat().st_size > 1000:
                 words = len(text.split())

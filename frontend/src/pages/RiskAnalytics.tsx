@@ -23,11 +23,17 @@ export const RiskAnalyticsPage: React.FC = () => (
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="xl:col-span-2">
-              <RiskScoreHistogram bins={data.risk_score_histogram}
-                mediumFrom={data.model?.risk_band_medium_from} highFrom={data.model?.risk_band_high_from} />
+            <div className="xl:col-span-2 flex flex-col">
+              <RiskScoreHistogram
+                className="h-full"
+                bins={data.risk_score_histogram}
+                mediumFrom={data.model?.risk_band_medium_from}
+                highFrom={data.model?.risk_band_high_from}
+              />
             </div>
-            <RiskDistributionBar categories={p.risk_categories} total={p.total_customers} />
+            <div className="flex flex-col">
+              <RiskDistributionBar className="h-full" categories={p.risk_categories} total={p.total_customers} />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

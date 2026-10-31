@@ -81,37 +81,43 @@ export const DashboardPage: React.FC = () => (
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="xl:col-span-2">
-              <RiskScoreHistogram bins={data.risk_score_histogram}
-                mediumFrom={data.model?.risk_band_medium_from} highFrom={data.model?.risk_band_high_from} />
+            <div className="xl:col-span-2 flex flex-col">
+              <RiskScoreHistogram
+                className="h-full"
+                bins={data.risk_score_histogram}
+                mediumFrom={data.model?.risk_band_medium_from}
+                highFrom={data.model?.risk_band_high_from}
+              />
             </div>
-            <div className="space-y-6">
+            <div className="space-y-6 flex flex-col">
               <RiskDistributionBar categories={p.risk_categories} total={p.total_customers} />
-              <section className="bg-white rounded-[20px] border border-[#E7EBE3] shadow-fintech-card p-5 transition-all duration-200">
-                <h2 className="text-sm font-bold text-[#171A17]">Default Probability Overview</h2>
-                <dl className="mt-3.5 grid grid-cols-2 gap-4">
-                  <div>
-                    <dt className="text-xs text-[#777E77]">Avg est. default probability</dt>
-                    <dd className="mt-1 text-xl font-semibold text-[#171A17]">{formatPercent(p.average_default_probability)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-[#777E77]">Median risk score</dt>
-                    <dd className="mt-1 text-xl font-semibold text-[#171A17]">{formatScore(p.median_risk_score)}</dd>
-                  </div>
-                  <div className="col-span-2 pt-2 border-t border-[#E7EBE3]/70">
-                    <dt className="text-xs text-[#777E77]">Predicted defaults</dt>
-                    <dd className="mt-1 text-xl font-semibold text-[#171A17]">
-                      {formatNumber(p.predicted_defaults)}{' '}
-                      <span className="text-xs font-normal text-[#777E77]">({formatPercent(p.predicted_default_share)} of customers)</span>
-                    </dd>
-                    {data.model && (
-                      <p className="mt-2 text-[11px] text-[#777E77] bg-[#F5F7F3] p-2.5 rounded-xl border border-[#E7EBE3] leading-relaxed">
-                        Estimated probability at or above the {formatPercent(data.model.classification_threshold * 100, 0)} classification
-                        threshold. This threshold is separate from the risk categories.
-                      </p>
-                    )}
-                  </div>
-                </dl>
+              <section className="bg-white rounded-[20px] border border-[#E7EBE3] shadow-fintech-card p-5 transition-all duration-200 flex-1 flex flex-col justify-between">
+                <div>
+                  <h2 className="text-sm font-bold text-[#171A17]">Default Probability Overview</h2>
+                  <dl className="mt-3.5 grid grid-cols-2 gap-4">
+                    <div>
+                      <dt className="text-xs text-[#777E77]">Avg est. default probability</dt>
+                      <dd className="mt-1 text-xl font-semibold text-[#171A17]">{formatPercent(p.average_default_probability)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-[#777E77]">Median risk score</dt>
+                      <dd className="mt-1 text-xl font-semibold text-[#171A17]">{formatScore(p.median_risk_score)}</dd>
+                    </div>
+                    <div className="col-span-2 pt-2 border-t border-[#E7EBE3]/70">
+                      <dt className="text-xs text-[#777E77]">Predicted defaults</dt>
+                      <dd className="mt-1 text-xl font-semibold text-[#171A17]">
+                        {formatNumber(p.predicted_defaults)}{' '}
+                        <span className="text-xs font-normal text-[#777E77]">({formatPercent(p.predicted_default_share)} of customers)</span>
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+                {data.model && (
+                  <p className="mt-2 text-[11px] text-[#777E77] bg-[#F5F7F3] p-2.5 rounded-xl border border-[#E7EBE3] leading-relaxed">
+                    Estimated probability at or above the {formatPercent(data.model.classification_threshold * 100, 0)} classification
+                    threshold. This threshold is separate from the risk categories.
+                  </p>
+                )}
               </section>
             </div>
           </div>
@@ -131,8 +137,8 @@ export const DashboardPage: React.FC = () => (
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="xl:col-span-1">
-              <LateRateChart buckets={data.late_payment_rate_buckets} />
+            <div className="xl:col-span-1 flex flex-col">
+              <LateRateChart className="h-full" buckets={data.late_payment_rate_buckets} />
             </div>
             <div className="xl:col-span-2">
               <TopCustomersTable title="Highest-Risk Customers" subtitle="Top 10 by risk score" sortBy="risk_score" />
