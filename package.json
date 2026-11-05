@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "build": "npm --prefix frontend run build",
+    "deploy": "npm --prefix frontend run build && git add frontend/dist frontend/src backend && git commit -m \"deploy: sync production build to Render\" && git push origin main",
     "postinstall": "cd backend/whatsapp-bridge && npm install --production",
     "start": "cd backend/whatsapp-bridge && node server.js"
   }
