@@ -32,16 +32,63 @@ async function createBridge(deps = {}) {
   let initializing = false, reconnectTimer, reconnects = 0, error = null, pairingReady = false, generation = 0;
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-  // In-memory store for sent & received messages to fulfill getMessage retry requests (eliminates "Waiting for this message")
+  // Persistent store for sent & received messages to fulfill getMessage retry requests (eliminates "Waiting for this message")
+  const messageStorePath = path.join(authDir, 'message_store.json');
   const messageStore = new Map();
+  function loadMessageStore() {
+    try {
+      if (fs.existsSync(messageStorePath)) {
+        const raw = fs.readFileSync(messageStorePath, 'utf8');
+        const parsed = JSON.parse(raw);
+        for (const [k, v] of Object.entries(parsed)) {
+          messageStore.set(k, v);
+        }
+      }
+    } catch {}
+  }
+  loadMessageStore();
+
+  let saveStoreTimer = null;
+  function persistMessageStore() {
+    clearTimeout(saveStoreTimer);
+    saveStoreTimer = setTimeout(() => {
+      try {
+        if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
+        const obj = {};
+        for (const [k, v] of messageStore.entries()) {
+          obj[k] = v;
+        }
+        fs.writeFileSync(messageStorePath, JSON.stringify(obj), 'utf8');
+      } catch {}
+    }, 1500);
+  }
+
   function storeMessage(keyId, message) {
     if (!keyId || !message) return;
-    if (messageStore.size > 3000) {
+    if (messageStore.size > 2500) {
       const oldestKey = messageStore.keys().next().value;
       messageStore.delete(oldestKey);
     }
-    messageStore.set(keyId, message);
+    const cleanMsg = typeof message === 'string' ? { conversation: message } : (message.message || message);
+    messageStore.set(keyId, cleanMsg);
+    persistMessageStore();
   }
+
+  // Baileys Signal Protocol retry & device caches
+  const retryMap = new Map();
+  const msgRetryCounterCache = {
+    get: (key) => retryMap.get(key),
+    set: (key, val) => retryMap.set(key, val),
+    del: (key) => retryMap.delete(key),
+    flushAll: () => retryMap.clear(),
+  };
+  const deviceMap = new Map();
+  const userDevicesCache = {
+    get: (key) => deviceMap.get(key),
+    set: (key, val) => deviceMap.set(key, val),
+    del: (key) => deviceMap.delete(key),
+    flushAll: () => deviceMap.clear(),
+  };
 
   function snapshot() {
     const connected = state === 'CONNECTED' && !!socket?.user && !!user;
@@ -75,11 +122,13 @@ async function createBridge(deps = {}) {
         qrTimeout: 60000,
         syncFullHistory: false,
         markOnlineOnConnect: true,
+        msgRetryCounterCache,
+        userDevicesCache,
         getMessage: async (key) => {
           if (key && key.id) {
             const stored = messageStore.get(key.id);
             if (stored) {
-              return stored.message || stored;
+              return typeof stored === 'string' ? { conversation: stored } : (stored.message || stored);
             }
           }
           return undefined;
