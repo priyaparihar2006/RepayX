@@ -14,6 +14,8 @@ import {
 import { FollowUpItem } from '../../types';
 import { Modal } from '../common/Modal';
 import { useToast } from '../common/Toast';
+import { PtpTrackerModal } from '../features/PtpTrackerModal';
+import { DynamicUpiModal } from '../features/DynamicUpiModal';
 
 interface FollowupsPageProps {
   followups: FollowUpItem[];
@@ -35,6 +37,9 @@ export const FollowupsPage: React.FC<FollowupsPageProps> = ({
   const [rescheduleDate, setRescheduleDate] = useState('2026-10-01');
   const [rescheduleTime, setRescheduleTime] = useState('11:00 AM');
   const [rescheduleReason, setRescheduleReason] = useState('Requested by borrower');
+  const [ptpModalOpen, setPtpModalOpen] = useState(false);
+  const [upiModalOpen, setUpiModalOpen] = useState(false);
+  const [activeBorrower, setActiveBorrower] = useState({ borrowerName: 'Rahul Sharma', loanId: 'LN1001', amount: 8500 });
 
   const filtered = followups.filter((f) => {
     const matchesTab = activeTab === 'all' || f.status === activeTab;
@@ -247,6 +252,25 @@ export const FollowupsPage: React.FC<FollowupsPageProps> = ({
           </table>
         </div>
       </div>
+
+      {/* AI PTP Tracker Modal */}
+      <PtpTrackerModal
+        isOpen={ptpModalOpen}
+        onClose={() => setPtpModalOpen(false)}
+        onOpenUpiModal={(b) => {
+          setActiveBorrower(b);
+          setPtpModalOpen(false);
+          setUpiModalOpen(true);
+        }}
+      />
+
+      <DynamicUpiModal
+        isOpen={upiModalOpen}
+        onClose={() => setUpiModalOpen(false)}
+        borrowerName={activeBorrower.borrowerName}
+        loanId={activeBorrower.loanId}
+        amount={activeBorrower.amount}
+      />
 
       {/* Reschedule Modal */}
       <Modal

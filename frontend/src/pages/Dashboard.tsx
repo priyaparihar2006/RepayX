@@ -1,5 +1,26 @@
-import React from 'react';
-import { AlertTriangle, ArrowRight, Bot, CheckCircle2, CircleDollarSign, Clock, Gauge, Mail, MessageSquare, Sparkles, Users, Zap } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Bot,
+  Calendar,
+  CheckCircle2,
+  CircleDollarSign,
+  Clock,
+  Download,
+  FileCheck,
+  FileSpreadsheet,
+  Gauge,
+  Languages,
+  Mail,
+  MessageSquare,
+  Percent,
+  QrCode,
+  ShieldCheck,
+  Sparkles,
+  Users,
+  Zap,
+} from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { useAnalytics } from '../hooks/useAnalytics';
@@ -15,6 +36,11 @@ import { LateRateChart } from '../components/analytics/LateRateChart';
 import { TopCustomersTable } from '../components/analytics/TopCustomersTable';
 import { DefaultProbabilityGauge } from '../components/analytics/DefaultProbabilityGauge';
 import { AnimatedCounter } from '../components/common/AnimatedCounter';
+import { DynamicUpiModal } from '../components/features/DynamicUpiModal';
+import { PtpTrackerModal } from '../components/features/PtpTrackerModal';
+import { MultiLanguageOutreachModal } from '../components/features/MultiLanguageOutreachModal';
+import { OtsGeneratorModal } from '../components/features/OtsGeneratorModal';
+import { ExecutiveReportModal } from '../components/features/ExecutiveReportModal';
 
 /** Loads /api/analytics once and renders loading / error states around a page body. */
 export const AnalyticsPage: React.FC<{
@@ -77,6 +103,18 @@ export const AnalyticsPage: React.FC<{
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const [upiModalOpen, setUpiModalOpen] = useState(false);
+  const [ptpModalOpen, setPtpModalOpen] = useState(false);
+  const [langModalOpen, setLangModalOpen] = useState(false);
+  const [otsModalOpen, setOtsModalOpen] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [activeBorrower, setActiveBorrower] = useState({
+    name: 'Rahul Sharma',
+    loanId: 'LN1001',
+    amount: 8500,
+    phone: '+91 98201 54321',
+  });
+
   return (
     <AnalyticsPage title="Portfolio Risk Overview" description="Model-based default risk and repayment behaviour across the scored portfolio.">
       {(data) => {
@@ -241,6 +279,220 @@ export const DashboardPage: React.FC = () => {
               </div>
             </motion.div>
 
+            {/* Executive Innovation Suite - 5 New High-Impact Features */}
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.05, ease: 'easeOut' }}
+              className="space-y-3"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="p-1 rounded-lg bg-[#EDF5E5] text-[#245C35]">
+                    <Zap className="w-4 h-4 text-[#245C35]" />
+                  </span>
+                  <div>
+                    <h2 className="text-sm font-bold text-[#171A17] font-heading flex items-center gap-2">
+                      Executive Innovation Suite
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#EDF5E5] text-[#245C35] border border-[#D1E8BC]">
+                        5 New High-Impact Features
+                      </span>
+                    </h2>
+                    <p className="text-xs text-[#777E77]">
+                      Advanced recovery tools for executive presentation: Dynamic UPI, AI PTP Engine, Multi-Lingual Outreach, OTS Restructuring & Audit Reporting
+                    </p>
+                  </div>
+                </div>
+
+                {/* Quick Action Pills */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    onClick={() => setReportModalOpen(true)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#245C35] hover:bg-[#1E4D2C] text-white text-xs font-bold shadow-xs transition-colors"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-[#B5F078]" />
+                    Executive Report
+                  </button>
+                  <button
+                    onClick={() => setUpiModalOpen(true)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#EDF5E5] hover:bg-[#D1E8BC] text-[#245C35] text-xs font-bold border border-[#D1E8BC] transition-colors"
+                  >
+                    <QrCode className="w-3.5 h-3.5 text-[#245C35]" />
+                    Dynamic UPI
+                  </button>
+                  <button
+                    onClick={() => setPtpModalOpen(true)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#EDF5E5] hover:bg-[#D1E8BC] text-[#245C35] text-xs font-bold border border-[#D1E8BC] transition-colors"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-[#245C35]" />
+                    PTP Engine
+                  </button>
+                  <button
+                    onClick={() => setLangModalOpen(true)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#EDF5E5] hover:bg-[#D1E8BC] text-[#245C35] text-xs font-bold border border-[#D1E8BC] transition-colors"
+                  >
+                    <Languages className="w-3.5 h-3.5 text-[#245C35]" />
+                    Multi-Lingual
+                  </button>
+                  <button
+                    onClick={() => setOtsModalOpen(true)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#EDF5E5] hover:bg-[#D1E8BC] text-[#245C35] text-xs font-bold border border-[#D1E8BC] transition-colors"
+                  >
+                    <Percent className="w-3.5 h-3.5 text-[#245C35]" />
+                    OTS Offers
+                  </button>
+                </div>
+              </div>
+
+              {/* 5 High-Impact Feature Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* 1. Dynamic UPI QR Code */}
+                <div
+                  onClick={() => setUpiModalOpen(true)}
+                  className="group bg-white hover:bg-[#FBFDF9] rounded-[20px] border border-[#E7EBE3] hover:border-[#245C35]/50 shadow-fintech-card hover:shadow-fintech-hover transition-all duration-200 p-4 cursor-pointer flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#EDF5E5] text-[#245C35] flex items-center justify-center font-bold">
+                        <QrCode className="w-5 h-5 text-[#245C35]" />
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EDF5E5] text-[#245C35] border border-[#D1E8BC]">
+                        NPCI UPI 2.0
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-bold text-[#171A17] font-heading group-hover:text-[#245C35] transition-colors">
+                      1. Dynamic UPI QR & Intent Links
+                    </h3>
+                    <p className="text-xs text-[#777E77] mt-1 line-clamp-2">
+                      Instant 1-tap PhonePe, GPay & Paytm links inside reminders with real-time webhook settlement simulator.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-[#E7EBE3] flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-[#245C35]">Zero payment friction</span>
+                    <span className="text-xs font-bold text-[#245C35] flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                      Launch UPI <ArrowRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. AI PTP Tracker & Auto-Pause Engine */}
+                <div
+                  onClick={() => setPtpModalOpen(true)}
+                  className="group bg-white hover:bg-[#FBFDF9] rounded-[20px] border border-[#E7EBE3] hover:border-[#245C35]/50 shadow-fintech-card hover:shadow-fintech-hover transition-all duration-200 p-4 cursor-pointer flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#EDF5E5] text-[#245C35] flex items-center justify-center font-bold">
+                        <Calendar className="w-5 h-5 text-[#245C35]" />
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-300">
+                        Auto-Pause Active
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-bold text-[#171A17] font-heading group-hover:text-[#245C35] transition-colors">
+                      2. AI Promise-to-Pay (PTP) Engine
+                    </h3>
+                    <p className="text-xs text-[#777E77] mt-1 line-clamp-2">
+                      Auto-detects salary credit promises, silences repetitive calls until promised date, and schedules morning check-ins.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-[#E7EBE3] flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-[#245C35]">78.4% Kept Rate</span>
+                    <span className="text-xs font-bold text-[#245C35] flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                      Open PTP <ArrowRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Vernacular Multi-Language Outreach */}
+                <div
+                  onClick={() => setLangModalOpen(true)}
+                  className="group bg-white hover:bg-[#FBFDF9] rounded-[20px] border border-[#E7EBE3] hover:border-[#245C35]/50 shadow-fintech-card hover:shadow-fintech-hover transition-all duration-200 p-4 cursor-pointer flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#EDF5E5] text-[#245C35] flex items-center justify-center font-bold">
+                        <Languages className="w-5 h-5 text-[#245C35]" />
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
+                        7 Languages
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-bold text-[#171A17] font-heading group-hover:text-[#245C35] transition-colors">
+                      3. Regional & Hinglish Outreach
+                    </h3>
+                    <p className="text-xs text-[#777E77] mt-1 line-clamp-2">
+                      Native outreach in Hindi, Hinglish, Marathi, Tamil, Telugu, Gujarati + interactive AI Voice Note audio synthesis.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-[#E7EBE3] flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-[#245C35]">+42% Response rate</span>
+                    <span className="text-xs font-bold text-[#245C35] flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                      Studio <ArrowRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4. One-Time Settlement & Restructure */}
+                <div
+                  onClick={() => setOtsModalOpen(true)}
+                  className="group bg-white hover:bg-[#FBFDF9] rounded-[20px] border border-[#E7EBE3] hover:border-[#245C35]/50 shadow-fintech-card hover:shadow-fintech-hover transition-all duration-200 p-4 cursor-pointer flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#EDF5E5] text-[#245C35] flex items-center justify-center font-bold">
+                        <Percent className="w-5 h-5 text-[#245C35]" />
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300">
+                        NPA Rescue
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-bold text-[#171A17] font-heading group-hover:text-[#245C35] transition-colors">
+                      4. One-Time Settlement (OTS) & NOC
+                    </h3>
+                    <p className="text-xs text-[#777E77] mt-1 line-clamp-2">
+                      3-tier strategic settlement calculator for delinquent loans: fast discounts, 3-split EMIs & printable formal NOC letters.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-[#E7EBE3] flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-[#245C35]">Print Official NOC</span>
+                    <span className="text-xs font-bold text-[#245C35] flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                      Generate <ArrowRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                </div>
+
+                {/* 5. Executive PDF Recovery Report */}
+                <div
+                  onClick={() => setReportModalOpen(true)}
+                  className="group bg-white hover:bg-[#FBFDF9] rounded-[20px] border border-[#E7EBE3] hover:border-[#245C35]/50 shadow-fintech-card hover:shadow-fintech-hover transition-all duration-200 p-4 cursor-pointer flex flex-col justify-between lg:col-span-2"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#EDF5E5] text-[#245C35] flex items-center justify-center font-bold">
+                        <FileSpreadsheet className="w-5 h-5 text-[#245C35]" />
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EDF5E5] text-[#245C35] border border-[#D1E8BC]">
+                        Audit & C-Suite Ready
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-bold text-[#171A17] font-heading group-hover:text-[#245C35] transition-colors">
+                      5. 1-Click Executive PDF & Excel Audit Report
+                    </h3>
+                    <p className="text-xs text-[#777E77] mt-1">
+                      Generate high-resolution printable management briefing dossiers and export complete audit recovery ledgers with channel attribution.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-[#E7EBE3] flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-[#245C35]">Instant Download PDF / XLSX</span>
+                    <span className="text-xs font-bold text-[#245C35] flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                      Download Dossier <ArrowRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
             {/* Top Metric Cards with Staggered Entrance */}
           <motion.div
             initial={{ opacity: 0, y: 14 }}
@@ -352,6 +604,51 @@ export const DashboardPage: React.FC = () => {
               <TopCustomersTable title="Highest-Risk Customers" subtitle="Top 10 by risk score" sortBy="risk_score" />
             </div>
           </motion.div>
+
+          {/* 5 High-Impact Feature Modals for Executive Demo */}
+          <DynamicUpiModal
+            isOpen={upiModalOpen}
+            onClose={() => setUpiModalOpen(false)}
+            borrowerName={activeBorrower.name}
+            loanId={activeBorrower.loanId}
+            amount={activeBorrower.amount}
+            phone={activeBorrower.phone}
+          />
+
+          <PtpTrackerModal
+            isOpen={ptpModalOpen}
+            onClose={() => setPtpModalOpen(false)}
+            onOpenUpiModal={(item) => {
+              setActiveBorrower({
+                name: item.borrowerName,
+                loanId: item.loanId,
+                amount: item.amount,
+                phone: '+91 98201 54321',
+              });
+              setPtpModalOpen(false);
+              setUpiModalOpen(true);
+            }}
+          />
+
+          <MultiLanguageOutreachModal
+            isOpen={langModalOpen}
+            onClose={() => setLangModalOpen(false)}
+            borrowerName={activeBorrower.name}
+            amount={activeBorrower.amount}
+            loanId={activeBorrower.loanId}
+            dueDate="30 Sep 2026"
+          />
+
+          <OtsGeneratorModal
+            isOpen={otsModalOpen}
+            onClose={() => setOtsModalOpen(false)}
+            initialLoanId="LN1003"
+          />
+
+          <ExecutiveReportModal
+            isOpen={reportModalOpen}
+            onClose={() => setReportModalOpen(false)}
+          />
         </div>
       );
     }}

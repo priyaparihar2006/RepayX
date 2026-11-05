@@ -15,6 +15,8 @@ import { PaymentRecord } from '../../types';
 import { INITIAL_PAYMENTS } from '../../data/mockData';
 import { Modal } from '../common/Modal';
 import { useToast } from '../common/Toast';
+import { QrCode, Zap } from 'lucide-react';
+import { DynamicUpiModal } from '../features/DynamicUpiModal';
 
 export const PaymentsPage: React.FC = () => {
   const { addToast } = useToast();
@@ -22,6 +24,7 @@ export const PaymentsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [verifyingPayment, setVerifyingPayment] = useState<PaymentRecord | null>(null);
+  const [upiModalOpen, setUpiModalOpen] = useState(false);
 
   const filtered = payments.filter((p) => {
     const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
@@ -49,12 +52,21 @@ export const PaymentsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-[#171A17] tracking-tight font-heading">Payments & Ledger</h1>
-        <p className="text-xs sm:text-sm text-[#777E77] mt-0.5">
-          Verify inbound remittances, reconcile UTR bank references, and audit receipts.
-        </p>
+      {/* Header with 1-Click Dynamic UPI Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#171A17] tracking-tight font-heading">Payments & Ledger</h1>
+          <p className="text-xs sm:text-sm text-[#777E77] mt-0.5">
+            Verify inbound remittances, reconcile UTR bank references, and audit receipts.
+          </p>
+        </div>
+        <button
+          onClick={() => setUpiModalOpen(true)}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#245C35] hover:bg-[#1E4D2C] text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
+        >
+          <QrCode className="w-4 h-4 text-[#B5F078]" />
+          Generate Dynamic UPI QR & Intent
+        </button>
       </div>
 
       {/* Summary KPI Cards */}

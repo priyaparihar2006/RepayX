@@ -1,9 +1,11 @@
 import React from 'react';
 import { TrendingUp, Download, Calendar, BarChart2, CheckCircle2, AlertTriangle, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '../common/Toast';
+import { ExecutiveReportModal } from '../features/ExecutiveReportModal';
 
 export const ReportsPage: React.FC = () => {
   const { addToast } = useToast();
+  const [execReportOpen, setExecReportOpen] = useState(false);
 
   const handleExport = (reportName: string) => {
     addToast({
@@ -46,13 +48,22 @@ export const ReportsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-[#171A17] tracking-tight font-heading">
-          Recovery Reports & Ledgers
-        </h1>
-        <p className="text-xs sm:text-sm text-[#777E77] mt-0.5">
-          Audited reporting on delinquency migrations, settlement fulfillment, and collection executive performance.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#171A17] tracking-tight font-heading">
+            Recovery Reports & Ledgers
+          </h1>
+          <p className="text-xs sm:text-sm text-[#777E77] mt-0.5">
+            Audited reporting on delinquency migrations, settlement fulfillment, and collection executive performance.
+          </p>
+        </div>
+        <button
+          onClick={() => setExecReportOpen(true)}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#245C35] hover:bg-[#1E4D2C] text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
+        >
+          <FileSpreadsheet className="w-4 h-4 text-[#B5F078]" />
+          1-Click Executive PDF & CSV Report
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -87,6 +98,10 @@ export const ReportsPage: React.FC = () => {
           </div>
         ))}
       </div>
+      <ExecutiveReportModal
+        isOpen={execReportOpen}
+        onClose={() => setExecReportOpen(false)}
+      />
     </div>
   );
 };
