@@ -1,6 +1,7 @@
 import React from 'react';
-import { AlertTriangle, CircleDollarSign, Clock, Gauge, Users } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Bot, CheckCircle2, CircleDollarSign, Clock, Gauge, Mail, MessageSquare, Sparkles, Users, Zap } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useNavigate } from 'react-router';
 import { useAnalytics } from '../hooks/useAnalytics';
 import type { AnalyticsResponse } from '../types/api';
 import { RISK_COLORS } from '../lib/chartTheme';
@@ -74,14 +75,173 @@ export const AnalyticsPage: React.FC<{
   );
 };
 
-export const DashboardPage: React.FC = () => (
-  <AnalyticsPage title="Portfolio Risk Overview" description="Model-based default risk and repayment behaviour across the scored portfolio.">
-    {(data) => {
-      const { portfolio: p, repayment: r } = data;
-      const byCategory = Object.fromEntries(p.risk_categories.map((c) => [c.risk_category, c]));
-      return (
-        <div className="space-y-6">
-          {/* Top Metric Cards with Staggered Entrance */}
+export const DashboardPage: React.FC = () => {
+  const navigate = useNavigate();
+  return (
+    <AnalyticsPage title="Portfolio Risk Overview" description="Model-based default risk and repayment behaviour across the scored portfolio.">
+      {(data) => {
+        const { portfolio: p, repayment: r } = data;
+        const byCategory = Object.fromEntries(p.risk_categories.map((c) => [c.risk_category, c]));
+        return (
+          <div className="space-y-6">
+            {/* Core Autonomous Recovery & Outreach - Main Project Features */}
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              className="space-y-3"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="p-1 rounded-lg bg-[#EDF5E5] text-[#245C35]">
+                    <Sparkles className="w-4 h-4 text-[#245C35]" />
+                  </span>
+                  <div>
+                    <h2 className="text-sm font-bold text-[#171A17] font-heading flex items-center gap-2">
+                      Core Autonomous Recovery & Outreach
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#EDF5E5] text-[#245C35] border border-[#D1E8BC]">
+                        Main Features
+                      </span>
+                    </h2>
+                    <p className="text-xs text-[#777E77]">
+                      Multi-channel automated recovery engine and conversational AI borrower engagement
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Feature 1: Email Reminder Automation */}
+                <div
+                  onClick={() => navigate('/automation')}
+                  className="group relative bg-white hover:bg-[#FBFDF9] rounded-[20px] border border-[#E7EBE3] hover:border-[#245C35]/50 shadow-fintech-card hover:shadow-fintech-hover transition-all duration-200 p-5 cursor-pointer flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-[#EDF5E5] text-[#245C35] flex items-center justify-center font-bold shadow-2xs group-hover:scale-105 transition-transform">
+                          <Mail className="w-5 h-5 text-[#245C35]" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-[#171A17] font-heading group-hover:text-[#245C35] transition-colors">
+                              Email Reminder Automation
+                            </h3>
+                          </div>
+                          <p className="text-[11px] text-[#777E77]">
+                            Instant live mail dispatcher & 3-stage scheduled recovery
+                          </p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#EDF5E5] text-[#245C35] border border-[#D1E8BC]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
+                        Live Engine
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-[#525752] leading-relaxed mb-4">
+                      Send instant live payment reminder emails to borrowers, configure 24/7 background worker schedules, and import customer batches via CSV.
+                    </p>
+
+                    <div className="flex flex-wrap gap-1.5 mb-4">
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-[#F5F7F3] text-[#171A17] border border-[#E7EBE3]">
+                        ⚡ Instant Email Dispatcher
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-[#F5F7F3] text-[#171A17] border border-[#E7EBE3]">
+                        📅 24/7 Cloud Background Worker
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-[#F5F7F3] text-[#171A17] border border-[#E7EBE3]">
+                        📁 CSV Upload & Delivery Tracking
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-[#E7EBE3] flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-[#777E77] font-medium flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
+                      SMTP Ready
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate('/automation');
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#245C35] hover:bg-[#1B4728] text-white text-xs font-bold transition-all shadow-xs cursor-pointer group-hover:bg-[#1B4728]"
+                    >
+                      <span>Open Email Automation</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-[#B5F078] group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Feature 2: WhatsApp Outreach & Conversational AI */}
+                <div
+                  onClick={() => navigate('/whatsapp')}
+                  className="group relative bg-white hover:bg-[#FBFDF9] rounded-[20px] border border-[#E7EBE3] hover:border-[#245C35]/50 shadow-fintech-card hover:shadow-fintech-hover transition-all duration-200 p-5 cursor-pointer flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-[#EDF5E5] text-[#245C35] flex items-center justify-center font-bold shadow-2xs group-hover:scale-105 transition-transform">
+                          <MessageSquare className="w-5 h-5 text-[#245C35]" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-[#171A17] font-heading group-hover:text-[#245C35] transition-colors">
+                              WhatsApp Outreach
+                            </h3>
+                          </div>
+                          <p className="text-[11px] text-[#777E77]">
+                            Conversational AI recovery, NLP extraction & Meta Cloud API
+                          </p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#EDF5E5] text-[#245C35] border border-[#D1E8BC]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
+                        Two-Way AI Active
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-[#525752] leading-relaxed mb-4">
+                      Two-way conversational AI assistant in Hindi, Hinglish & English, automated PDF/document defaulter extraction, and scheduled WhatsApp messaging.
+                    </p>
+
+                    <div className="flex flex-wrap gap-1.5 mb-4">
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-[#F5F7F3] text-[#171A17] border border-[#E7EBE3]">
+                        🤖 Two-Way Multilingual Assistant
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-[#F5F7F3] text-[#171A17] border border-[#E7EBE3]">
+                        📄 NLP Document / PDF Extraction
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-[#F5F7F3] text-[#171A17] border border-[#E7EBE3]">
+                        📲 Meta Cloud & Baileys Dispatch
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-[#E7EBE3] flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-[#777E77] font-medium flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
+                      AI Assistant Ready
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate('/whatsapp');
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#245C35] hover:bg-[#1B4728] text-white text-xs font-bold transition-all shadow-xs cursor-pointer group-hover:bg-[#1B4728]"
+                    >
+                      <span>Open WhatsApp Outreach</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-[#B5F078] group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Top Metric Cards with Staggered Entrance */}
           <motion.div
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
@@ -122,7 +282,7 @@ export const DashboardPage: React.FC = () => (
                       <h2 className="text-sm font-bold text-[#171A17]">Default Probability Overview</h2>
                       <p className="text-[11px] text-[#777E77] mt-0.5">Model portfolio assessment</p>
                     </div>
-                    <DefaultProbabilityGauge probability={p.average_default_probability} size={92} />
+                    <DefaultProbabilityGauge probability={p.average_default_probability ?? 0} size={92} />
                   </div>
 
                   <dl className="mt-3 grid grid-cols-2 gap-4">
@@ -196,4 +356,5 @@ export const DashboardPage: React.FC = () => (
       );
     }}
   </AnalyticsPage>
-);
+  );
+};

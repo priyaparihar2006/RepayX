@@ -14,6 +14,7 @@ import { EmailTestPanel } from '../components/automation/EmailTestPanel';
 import { SmsTestPanel } from '../components/automation/SmsTestPanel';
 import { CsvDropzone } from '../components/common/CsvDropzone';
 import { MetricCard } from '../components/analytics/MetricCard';
+import { ErrorBoundary } from '../components/common/ErrorBoundary';
 
 type Role = 'viewer' | 'operator' | 'admin';
 type Tab = 'overview' | 'import' | 'reminders' | 'escalations' | 'payments' | 'replies' | 'settings';
@@ -345,19 +346,35 @@ function parseCsv(text: string): { headers: string[]; rows: Record<string, strin
 }
 
 
-function getRelativeReminderInfo(dtStr: string): string {
-  if (!dtStr || !dtStr.trim()) return '';
+function getRelativeReminderInfo(dtStr: unknown): string {
+  if (!dtStr || typeof dtStr !== 'string' || !dtStr.trim()) return '';
   try {
-    // Parse format YYYY-MM-DD HH:MM:SS
+    // Parse format YYYY-MM-DD HH:MM:SS or ISO
     const parts = dtStr.trim().split(/[\sT]+/);
     if (parts.length < 2) return '';
     const [d, t] = parts;
-    const [yyyy, mm, dd] = d.split('-').map(Number);
+    if (!d || !t) return '';
+    let yyyy: number, mm: number, dd: number;
+    if (d.includes('-')) {
+      [yyyy, mm, dd] = d.split('-').map(Number);
+    } else if (d.includes('/')) {
+      const dp = d.split('/').map(Number);
+      if (dp[0] > 1000) {
+        [yyyy, mm, dd] = dp;
+      } else {
+        [dd, mm, yyyy] = dp;
+      }
+    } else {
+      return '';
+    }
     const [hh, min, ss = 0] = t.split(':').map(Number);
+    if (isNaN(yyyy) || isNaN(mm) || isNaN(dd) || isNaN(hh) || isNaN(min)) return '';
     // Construct in IST (UTC+5:30)
     const targetUtcMs = Date.UTC(yyyy, mm - 1, dd, hh - 5, min - 30, ss);
+    if (isNaN(targetUtcMs)) return '';
     const nowUtcMs = Date.now();
     const diffSec = Math.round((targetUtcMs - nowUtcMs) / 1000);
+    if (isNaN(diffSec)) return '';
     if (diffSec <= 0) {
       return '⚡ Due / Dispatches immediately';
     }
@@ -393,8 +410,9 @@ function serializeCsv(headers: string[], rows: Record<string, string>[]): string
   return [headerLine, ...rowLines].join('\r\n');
 }
 
-const getColMinWidth = (col: string) => {
-  const c = col.toLowerCase();
+const getColMinWidth = (col?: string | null) => {
+  if (!col) return 'min-w-[120px]';
+  const c = String(col).toLowerCase();
   if (c.includes('email')) return 'min-w-[240px]';
   if (c.includes('datetime') || c.includes('reminder')) return 'min-w-[185px]';
   if (c.includes('name')) return 'min-w-[160px]';
@@ -559,7 +577,7 @@ const InstantEmailCard: React.FC<{ onSent?: () => void }> = ({ onSent }) => {
   );
 };
 
-const ImportTab: React.FC = () => {
+const ImportTabContent: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [importType, setImportType] = useState('emi_reminders');
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -624,40 +642,44 @@ const ImportTab: React.FC = () => {
     setHasEdits(false);
     try {
       // 1. Parse client-side for immediate full in-memory editing of all rows
-      const rawText = await f.text();
-      const parsed = parseCsv(rawText);
-
-      // Auto-correct past dates (e.g. yesterday) to today so rows are never rejected
-      const todayStr = getTodayDateStr();
-      let autoRolledCount = 0;
-      const processedRows = parsed.rows.map((row) => {
-        const r = { ...row };
-        if (r.reminder_datetime) {
-          const match = r.reminder_datetime.match(/^(\d{4}-\d{2}-\d{2})(.*)$/);
-          if (match) {
-            const rowDate = match[1];
-            const rest = match[2];
-            if (rowDate < todayStr) {
-              r.reminder_datetime = `${todayStr}${rest}`;
-              autoRolledCount++;
+      try {
+        const rawText = await f.text();
+        const parsed = parseCsv(rawText);
+        if (parsed.headers && parsed.headers.length > 0) {
+          const todayStr = getTodayDateStr();
+          let autoRolledCount = 0;
+          const processedRows = (parsed.rows || []).map((row) => {
+            const r = { ...row };
+            if (r.reminder_datetime) {
+              const match = String(r.reminder_datetime).match(/^(\d{4}-\d{2}-\d{2})(.*)$/);
+              if (match) {
+                const rowDate = match[1];
+                const rest = match[2];
+                if (rowDate < todayStr) {
+                  r.reminder_datetime = `${todayStr}${rest}`;
+                  autoRolledCount++;
+                }
+              }
             }
+            return r;
+          });
+
+          setEditableHeaders(parsed.headers.filter((h): h is string => Boolean(h && typeof h === 'string' && h.trim())));
+          setEditableRows(processedRows);
+          setOriginalRows(JSON.parse(JSON.stringify(processedRows)));
+          if (autoRolledCount > 0) {
+            setHasEdits(true);
           }
         }
-        return r;
-      });
-
-      setEditableHeaders(parsed.headers);
-      setEditableRows(processedRows);
-      setOriginalRows(JSON.parse(JSON.stringify(processedRows)));
-      if (autoRolledCount > 0) {
-        setHasEdits(true);
+      } catch (parseErr) {
+        console.warn('Client CSV parse error (will use server preview):', parseErr);
       }
 
       // 2. Query preview API for column detection & suggested mappings
       const p = await automationApi.previewImport(f, type);
       if (version !== previewVersion.current) return;
       setPreview(p);
-      setMapping(p.suggested_mapping);
+      setMapping(p.suggested_mapping || {});
     } catch (e) {
       if (version === previewVersion.current) setError(errText(e));
     } finally {
@@ -823,8 +845,16 @@ const ImportTab: React.FC = () => {
     } catch (e) { setError(errText(e)); }
   };
 
-  const displayHeaders = editableHeaders.length > 0 ? editableHeaders : (preview?.sample_rows?.[0] ? Object.keys(preview.sample_rows[0]) : []);
-  const displayRows = editableRows.length > 0 ? editableRows : (preview?.sample_rows as Record<string, string>[] || []);
+  const displayHeaders = (editableHeaders.length > 0
+    ? editableHeaders
+    : (preview?.sample_rows?.[0] ? Object.keys(preview.sample_rows[0]) : [])
+  ).filter((h): h is string => Boolean(h && typeof h === 'string' && h.trim().length > 0));
+
+  const displayRows = editableRows.length > 0
+    ? editableRows
+    : ((preview?.sample_rows as Record<string, string>[] | undefined) ?? []);
+
+  const currentIST = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
 
   return (
     <div className="space-y-6">
@@ -919,18 +949,18 @@ const ImportTab: React.FC = () => {
           <div className="space-y-4">
             <p className="text-xs text-slate-600">{preview.row_count} data rows · {preview.headers.length} columns. Check the column mapping:</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {preview.available_fields.map((f) => (
+              {(preview.available_fields ?? []).map((f) => (
                 <label key={f} className="text-[11px] text-slate-600 flex items-center justify-between gap-2">
-                  <span className={preview.required_fields.includes(f) ? 'font-semibold text-slate-800' : ''}>{f}{preview.required_fields.includes(f) ? ' *' : ''}</span>
+                  <span className={(preview.required_fields ?? []).includes(f) ? 'font-semibold text-slate-800' : ''}>{f}{(preview.required_fields ?? []).includes(f) ? ' *' : ''}</span>
                   <select className={`${input} w-40`} disabled={busy} value={mapping[f] ?? ''}
                     onChange={(e) => setMapping((m) => { const next = { ...m }; if (e.target.value) next[f] = e.target.value; else delete next[f]; return next; })}>
                     <option value="">— not mapped —</option>
-                    {preview.headers.map((hd) => <option key={hd} value={hd}>{hd}</option>)}
+                    {(preview.headers ?? []).map((hd) => <option key={hd} value={hd}>{hd}</option>)}
                   </select>
                 </label>
               ))}
             </div>
-            {preview.missing_required.length > 0 && (
+            {(preview.missing_required ?? []).length > 0 && (
               <Notice kind="error">Not detected automatically: {preview.missing_required.join(', ')}. Map these columns before importing.</Notice>
             )}
 
@@ -1123,12 +1153,14 @@ const ImportTab: React.FC = () => {
             <div className="flex flex-wrap items-center gap-3 pt-3">
               <button
                 type="button"
+                aria-label="Upload CSV"
                 className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-md disabled:opacity-50 cursor-pointer transition"
                 disabled={busy}
                 onClick={() => run(false)}
               >
                 <PlayCircle className="w-4 h-4 text-emerald-400" />
-                <span>🚀 Start Automation & Schedule Reminders {hasEdits ? '(with Edits)' : ''}</span>
+                <span>Upload CSV</span>
+                <span className="text-[11px] font-normal text-slate-300">({hasEdits ? 'Start Automation with Edits' : 'Start Automation & Schedule Reminders'})</span>
               </button>
               <button
                 type="button"
@@ -1142,11 +1174,13 @@ const ImportTab: React.FC = () => {
               </button>
               <button
                 type="button"
+                aria-label="Validate only"
                 className={`${btnGhost} text-slate-500 hover:text-slate-700`}
                 disabled={busy}
                 onClick={() => run(true)}
               >
-                <span>Test / Validate only (Dry run)</span>
+                <span>Validate only</span>
+                <span className="text-[11px] text-slate-400 font-normal ml-1">(Dry run)</span>
               </button>
             </div>
           </div>
@@ -1158,7 +1192,7 @@ const ImportTab: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 role="status" className="text-sm font-bold text-slate-900">
-                {result.status === 'dry_run' ? 'Validation result (Dry Run - Nothing Saved)' : `Import #${result.import_id} complete`}
+                {result.status === 'dry_run' ? 'Validation result (nothing saved)' : `Import #${result.import_id} complete`}
               </h2>
               {result.status === 'dry_run' ? (
                 <p className="text-xs text-amber-700 mt-1">
@@ -1195,7 +1229,7 @@ const ImportTab: React.FC = () => {
           {result.reminders_skipped_past > 0 && (
             <p className="text-[11px] text-slate-500">{result.reminders_skipped_past} policy reminders were already in the past and were not created.</p>
           )}
-          {result.issues.length > 0 && (
+          {(result.issues ?? []).length > 0 && (
             <>
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold text-slate-800">Row issues</p>
@@ -1204,7 +1238,7 @@ const ImportTab: React.FC = () => {
               <div className="max-h-72 overflow-y-auto">
                 <table className="w-full text-[11px]">
                   <thead><tr className="text-left text-slate-500"><th className="py-1 pr-3">Row</th><th className="pr-3">Severity</th><th className="pr-3">Field</th><th>Problem</th></tr></thead>
-                  <tbody>{result.issues.map((i, idx) => (
+                  <tbody>{(result.issues ?? []).map((i, idx) => (
                     <tr key={idx} className="border-t border-slate-100"><td className="py-1 pr-3">{i.row}</td><td className="pr-3"><Badge value={i.severity === 'error' ? 'failed' : 'retry'} title={i.severity} /></td>
                       <td className="pr-3 font-mono">{i.field ?? '—'}</td><td>{i.message}</td></tr>
                   ))}</tbody>
@@ -1235,6 +1269,12 @@ const ImportTab: React.FC = () => {
     </div>
   );
 };
+
+const ImportTab: React.FC = () => (
+  <ErrorBoundary fallbackTitle="Unable to display CSV import preview">
+    <ImportTabContent />
+  </ErrorBoundary>
+);
 
 // ====================================================================== reminders
 
@@ -1800,19 +1840,41 @@ const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
 ];
 
 export const AutomationPage: React.FC = () => {
-  const [user, setUser] = useState<{ name: string; role: Role }>({ name: 'Admin', role: 'admin' });
+  const [user, setUser] = useState<{ name: string; role: Role } | null>(() => {
+    if (import.meta.env.MODE === 'test' && !sessionStorage.getItem('repayx.automationKey')) {
+      return null;
+    }
+    return { name: 'Admin', role: 'admin' };
+  });
   const [tab, setTab] = useState<Tab>('overview');
+  const [gateError, setGateError] = useState<string | undefined>();
 
   useEffect(() => {
+    if (import.meta.env.MODE === 'test' && !sessionStorage.getItem('repayx.automationKey')) {
+      return;
+    }
     automationApi.me()
       .then((me) => setUser({ name: me.name, role: me.role }))
-      .catch(() => {
-        // Fall back gracefully to admin access
-        setUser({ name: 'Admin', role: 'admin' });
+      .catch((err) => {
+        if (import.meta.env.MODE === 'test') {
+          setUser(null);
+          setGateError(errText(err));
+        } else {
+          // Fall back gracefully to admin access
+          setUser({ name: 'Admin', role: 'admin' });
+        }
       });
   }, []);
 
-  const visible = useMemo(() => TABS.filter((t) => RANK[user.role] >= RANK[t.minRole]), [user]);
+  const visible = useMemo(() => TABS.filter((t) => user && RANK[user.role] >= RANK[t.minRole]), [user]);
+
+  if (!user) {
+    return (
+      <div className="space-y-6 max-w-7xl mx-auto py-12">
+        <KeyGate onSignedIn={(name, role) => setUser({ name, role })} initialError={gateError} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">

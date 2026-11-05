@@ -18,6 +18,7 @@ import { ToastProvider } from './components/common/Toast';
 import { DemoDataNotice } from './components/common/DemoDataNotice';
 import { AiAssistantDrawer } from './components/ai-drawer/AiAssistantDrawer';
 import { EmptyState, LoadingState } from './components/common/RequestState';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 // Pages are loaded on first visit to keep the initial bundle small.
 const OverviewDashboard = lazy(() => import('./components/dashboard/OverviewDashboard').then((m) => ({ default: m.OverviewDashboard })));
@@ -241,7 +242,8 @@ function AppContent() {
 
         <main className="flex-1 p-3.5 sm:p-6 lg:p-8 overflow-y-auto">
           <Suspense fallback={<LoadingState />}>
-          <Routes>
+            <ErrorBoundary fallbackTitle="Unable to load page content">
+              <Routes>
             {/* Connected to the RepayX API */}
             <Route path="/" element={<DashboardPage />} />
             <Route path="/analytics/risk" element={<RiskAnalyticsPage />} />
@@ -348,7 +350,8 @@ function AppContent() {
             <Route path="/reports" element={<Demo><ReportsPage /></Demo>} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFound />} />
-          </Routes>
+              </Routes>
+            </ErrorBoundary>
           </Suspense>
         </main>
       </div>

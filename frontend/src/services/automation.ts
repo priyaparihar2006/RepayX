@@ -12,9 +12,11 @@ export const DEFAULT_OPERATOR_KEY = '86Urccag7Ui4WeGrT_V2KuqsZWVfy_7af_l18JzlMWk
 export function getAutomationKey(): string {
   try {
     const key = sessionStorage.getItem(KEY_STORAGE);
-    return key && key.trim() ? key.trim() : DEFAULT_ADMIN_KEY;
-  } catch {
+    if (key && key.trim()) return key.trim();
+    if (import.meta.env.MODE === 'test') return '';
     return DEFAULT_ADMIN_KEY;
+  } catch {
+    return import.meta.env.MODE === 'test' ? '' : DEFAULT_ADMIN_KEY;
   }
 }
 

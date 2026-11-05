@@ -24,6 +24,11 @@ describe('Dashboard', () => {
     expect(document.querySelectorAll('.recharts-bar-rectangle').length).toBeGreaterThan(0);
 
     const table = await screen.findByRole('table');
+    expect(screen.getByText('Core Autonomous Recovery & Outreach')).toBeInTheDocument();
+    expect(screen.getByText('Email Reminder Automation')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open email automation/i })).toBeInTheDocument();
+    expect(screen.getByText('WhatsApp Outreach')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open whatsapp outreach/i })).toBeInTheDocument();
     expect(within(table).getByText('395476')).toBeInTheDocument();
     expect(calls.find((c) => c.path === '/api/customers')?.params.get('sort_by')).toBe('risk_score');
     expect(screen.getByText(/should not be treated as a final lending decision/)).toBeInTheDocument();
