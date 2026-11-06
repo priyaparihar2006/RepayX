@@ -117,6 +117,32 @@ export interface DemoContact {
   message?: string;
 }
 
+export const DEFAULT_WHATSAPP_OPERATOR_KEY = '8VBCrlyuhTcBEgiveY4rYIBt4X7wl30eeO0ytqgt27w';
+const OPERATOR_KEY_STORAGE = 'repayx.whatsappOperatorKey';
+
+export function getWhatsAppOperatorKey(): string {
+  try {
+    const stored = sessionStorage.getItem(OPERATOR_KEY_STORAGE) || localStorage.getItem(OPERATOR_KEY_STORAGE);
+    if (stored && stored.trim()) return stored.trim();
+    if (import.meta.env.MODE === 'test') return '';
+    return DEFAULT_WHATSAPP_OPERATOR_KEY;
+  } catch {
+    return import.meta.env.MODE === 'test' ? '' : DEFAULT_WHATSAPP_OPERATOR_KEY;
+  }
+}
+
+export function setWhatsAppOperatorKey(key: string | null): void {
+  try {
+    if (key) {
+      sessionStorage.setItem(OPERATOR_KEY_STORAGE, key.trim());
+      localStorage.setItem(OPERATOR_KEY_STORAGE, key.trim());
+    } else {
+      sessionStorage.removeItem(OPERATOR_KEY_STORAGE);
+      localStorage.removeItem(OPERATOR_KEY_STORAGE);
+    }
+  } catch {}
+}
+
 const CLOUD_API_BASE_URL = 'https://repayx-backend.onrender.com';
 let resolvedBaseUrl: string | null = null;
 
@@ -149,9 +175,22 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const timer = setTimeout(() => controller.abort(), 90_000);
   const primaryUrl = apiUrl(path);
 
+  const headers = new Headers(options?.headers);
+  if (!headers.has('Authorization')) {
+    const key = getWhatsAppOperatorKey();
+    if (key) {
+      headers.set('Authorization', `Bearer ${key}`);
+    }
+  }
+  const requestOptions: RequestInit = {
+    ...options,
+    headers,
+    signal: options?.signal || controller.signal,
+  };
+
   try {
     try {
-      response = await fetch(primaryUrl, { ...options, signal: options?.signal || controller.signal });
+      response = await fetch(primaryUrl, requestOptions);
     } catch (primaryError) {
       if (options?.signal?.aborted || controller.signal.aborted) {
         throw primaryError;
@@ -160,7 +199,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       if (!isTest && isLocalhost(primaryUrl) && !path.startsWith('http')) {
         try {
           const fallbackUrl = apiUrl(path, CLOUD_API_BASE_URL);
-          response = await fetch(fallbackUrl, { ...options, signal: options?.signal || controller.signal });
+          response = await fetch(fallbackUrl, requestOptions);
           resolvedBaseUrl = CLOUD_API_BASE_URL;
         } catch {
           throw primaryError;

@@ -167,11 +167,21 @@ class WhatsAppService:
         key = self.settings.operator_key
         if not key:
             return
+        supplied = authorization[7:] if authorization and authorization.startswith("Bearer ") else ""
+        if key and hmac.compare_digest(supplied.encode(), key.encode()):
+            return
+        # Also allow automation admin / operator keys so one key works across all modules
+        try:
+            from automation.config import load_automation_settings
+            auto_settings = load_automation_settings()
+            for api_key, (name, role) in auto_settings.api_keys.items():
+                if role in ("admin", "operator") and hmac.compare_digest(supplied.encode(), api_key.encode()):
+                    return
+        except Exception:
+            pass
         if len(key) < 32:
             raise APIError(503, "whatsapp_not_configured", "Set a WhatsApp operator key of at least 32 characters in the backend configuration.")
-        supplied = authorization[7:] if authorization and authorization.startswith("Bearer ") else ""
-        if not hmac.compare_digest(supplied.encode(), key.encode()):
-            raise APIError(401, "unauthorized", "Enter the WhatsApp operator key to access messaging.")
+        raise APIError(401, "unauthorized", "Enter the WhatsApp operator key to access messaging.")
 
     @contextmanager
     def database(self):
