@@ -46,6 +46,18 @@ export interface Loan {
   loanType: 'Personal Loan' | 'Business Loan' | 'Consumer Durable' | 'Auto Loan';
 }
 
+export interface UpiPaymentIntentData {
+  loanId: string;
+  borrowerName: string;
+  amount: number;
+  phone?: string;
+  vpa?: string;
+  upiUri?: string;
+  isSettled?: boolean;
+  settledUtr?: string;
+  settledAt?: string;
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'ai' | 'customer' | 'manager' | 'system';
@@ -57,6 +69,8 @@ export interface ChatMessage {
   error?: string;
   isApprovedByManager?: boolean;
   intentBadge?: AIIntent;
+  hasUpiQr?: boolean;
+  upiPayment?: UpiPaymentIntentData;
 }
 
 export interface RagContext {

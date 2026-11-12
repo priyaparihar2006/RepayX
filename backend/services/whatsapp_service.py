@@ -1014,6 +1014,8 @@ class WhatsAppService:
             "auto_reply": True,
             "reply": ai_reply,
             "reply_text": ai_reply,
+            "has_upi_qr": True,
+            "upi_uri": f"upi://pay?pa=repayx.recovery@icici&pn=RepayX%20Loan%20Recovery&am={left_emi}&cu=INR&tn=EMI%20Payment%20{cid}",
             "borrower": {
                 "customer_id": cid,
                 "name": name,

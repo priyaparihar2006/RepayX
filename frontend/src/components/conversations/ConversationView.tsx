@@ -22,10 +22,12 @@ import {
   CreditCard,
   Plus,
   HelpCircle,
+  QrCode,
 } from 'lucide-react';
 import { Conversation, Customer, Loan } from '../../types';
 import { useToast } from '../common/Toast';
 import { SendMessageModal } from '../common/SendMessageModal';
+import { ChatUpiQrCard } from '../features/ChatUpiQrCard';
 import { HowToUseModal } from '../common/HowToUseModal';
 
 interface ConversationViewProps {
@@ -111,6 +113,11 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
   const handleSendManualMessage = () => {
     if (!chatInputText.trim() || !currentConv) return;
 
+    const isPaymentManual =
+      chatInputText.includes('upi') ||
+      chatInputText.includes('pay') ||
+      chatInputText.includes('repayx.ai');
+
     const newMsg = {
       id: `M-${Date.now()}`,
       sender: 'manager' as const,
@@ -118,8 +125,17 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
       timestamp: 'Today, Just now',
       isApprovedByManager: true,
       status: 'sent' as const,
+      hasUpiQr: isPaymentManual,
+      upiPayment: isPaymentManual
+        ? {
+            loanId: currentConv.loanId,
+            borrowerName: currentConv.customerName,
+            amount: currentLoan?.outstanding || 14200,
+            phone: currentConv.customerPhone,
+            vpa: 'repayx.recovery@icici',
+          }
+        : undefined,
     };
-
     setConversationList((prev) =>
       prev.map((c) => {
         if (c.id === currentConv.id) {
@@ -141,6 +157,109 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
     });
   };
 
+  // Send Dynamic UPI QR Code directly embedded in WhatsApp chat
+  const handleSendUpiQrMessage = () => {
+    if (!currentConv) return;
+    const loanAmount = currentLoan?.outstanding || 14200;
+    const newMsg = {
+      id: `M-${Date.now()}`,
+      sender: 'manager' as const,
+      text: `Dear ${currentConv.customerName}, here is your verified Dynamic UPI Payment Intent QR code for loan ${currentConv.loanId} (₹${loanAmount.toLocaleString('en-IN')}). Scan with any UPI app (GPay, PhonePe, Paytm, WhatsApp Pay) or tap the button to pay directly.`,
+      timestamp: 'Today, Just now',
+      isApprovedByManager: true,
+      status: 'sent' as const,
+      hasUpiQr: isPaymentOutbound,
+      upiPayment: isPaymentOutbound
+        ? {
+            loanId: relatedLoan?.id || 'LN1002',
+            borrowerName: data.customerName,
+            amount: loanAmount,
+            phone: customers.find((c) => c.id === data.customerId)?.phone || '+91 98201 54321',
+            vpa: 'repayx.recovery@icici',
+          }
+        : undefined,
+      hasUpiQr: true,
+      upiPayment: {
+        loanId: currentConv.loanId,
+        borrowerName: currentConv.customerName,
+        amount: loanAmount,
+        phone: currentConv.customerPhone,
+        vpa: 'repayx.recovery@icici',
+      },
+    };
+
+    setConversationList((prev) =>
+      prev.map((c) => {
+        if (c.id === currentConv.id) {
+          return {
+            ...c,
+            channel: activeChannel,
+            messages: [...c.messages, newMsg],
+          };
+        }
+        return c;
+      })
+    );
+
+    addToast({
+      type: 'success',
+      title: 'Dynamic UPI QR Code Sent',
+      message: `Delivered to ${currentConv.customerName} via ${activeChannel}`,
+    });
+  };
+
+  // Handle instant payment settlement callback inside chat
+  const handlePaymentSettledInChat = (details: {
+    loanId: string;
+    amount: number;
+    utr: string;
+    borrowerName: string;
+  }) => {
+    if (!currentConv) return;
+
+    const receiptMsg = {
+      id: `M-SYS-${Date.now()}`,
+      sender: 'ai' as const,
+      text: `✅ NPCI UPI 2.0 Real-Time Settlement Reconciled:\n\nPayment of ₹${details.amount.toLocaleString(
+        'en-IN'
+      )} received successfully for ${details.borrowerName} (${details.loanId}) via UPI Webhook.\n\n• UTR Number: ${details.utr}\n• Ledger Status: PAID & SETTLED\n• NOC & e-Receipt dispatched to ${currentConv.customerPhone}.`,
+      timestamp: 'Today, Just now',
+      status: 'delivered' as const,
+      isApprovedByManager: true,
+    };
+
+    setConversationList((prev) =>
+      prev.map((c) => {
+        if (c.id === currentConv.id) {
+          const updatedMessages = c.messages.map((m) => {
+            if (m.hasUpiQr && m.upiPayment) {
+              return {
+                ...m,
+                upiPayment: {
+                  ...m.upiPayment,
+                  isSettled: true,
+                  settledUtr: details.utr,
+                },
+              };
+            }
+            return m;
+          });
+          return {
+            ...c,
+            messages: [...updatedMessages, receiptMsg],
+          };
+        }
+        return c;
+      })
+    );
+
+    addToast({
+      type: 'success',
+      title: 'Instant UPI Settlement Reconciled!',
+      message: `₹${details.amount.toLocaleString('en-IN')} received via UPI from ${details.borrowerName} (${details.utr})`,
+    });
+  };
+
   // Quick 1-tap chip insertion
   const handleInsertQuickChip = (text: string) => {
     setChatInputText(text);
@@ -157,6 +276,16 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
       timestamp: 'Today, Just now',
       isApprovedByManager: true,
       status: 'sent' as const,
+      hasUpiQr: isPaymentOutbound,
+      upiPayment: isPaymentOutbound
+        ? {
+            loanId: relatedLoan?.id || 'LN1002',
+            borrowerName: data.customerName,
+            amount: loanAmount,
+            phone: customers.find((c) => c.id === data.customerId)?.phone || '+91 98201 54321',
+            vpa: 'repayx.recovery@icici',
+          }
+        : undefined,
     };
 
     setConversationList((prev) =>
@@ -205,6 +334,13 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
     messageText: string;
   }) => {
     const existing = conversationList.find((c) => c.customerId === data.customerId);
+    const relatedLoan = loans.find((l) => l.customerId === data.customerId);
+    const loanAmount = relatedLoan?.outstanding || 14200;
+    const isPaymentOutbound =
+      (data as any).hasUpiQr ||
+      data.messageText.includes('upi') ||
+      data.messageText.includes('pay') ||
+      data.messageText.includes('repayx.ai');
     const newMsg = {
       id: `M-${Date.now()}`,
       sender: 'manager' as const,
@@ -212,6 +348,16 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
       timestamp: 'Today, Just now',
       isApprovedByManager: true,
       status: 'sent' as const,
+      hasUpiQr: isPaymentOutbound,
+      upiPayment: isPaymentOutbound
+        ? {
+            loanId: relatedLoan?.id || 'LN1002',
+            borrowerName: data.customerName,
+            amount: loanAmount,
+            phone: customers.find((c) => c.id === data.customerId)?.phone || '+91 98201 54321',
+            vpa: 'repayx.recovery@icici',
+          }
+        : undefined,
     };
 
     if (existing) {
@@ -546,6 +692,28 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
 
                     <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
 
+                    {/* Embedded Dynamic UPI QR Code in WhatsApp chat bubble */}
+                    {(msg.hasUpiQr ||
+                      msg.upiPayment ||
+                      msg.text.includes('upi://pay') ||
+                      msg.text.includes('pay.repayx.ai/upi') ||
+                      msg.text.includes('Dynamic UPI Payment Intent')) && (
+                      <div className="pt-2">
+                        <ChatUpiQrCard
+                          data={
+                            msg.upiPayment || {
+                              loanId: currentConv.loanId,
+                              borrowerName: currentConv.customerName,
+                              amount: currentLoan?.outstanding || 14200,
+                              phone: currentConv.customerPhone,
+                              vpa: 'repayx.recovery@icici',
+                            }
+                          }
+                          onPaymentSettled={handlePaymentSettledInChat}
+                        />
+                      </div>
+                    )}
+
                     {isMe && (
                       <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-slate-200">
                         <span>Delivered via {currentConv.channel}</span>
@@ -602,6 +770,15 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
             {/* Quick 1-tap chip templates */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
               <span className="text-[11px] font-bold text-slate-400 shrink-0">1-Tap:</span>
+              <button
+                type="button"
+                onClick={handleSendUpiQrMessage}
+                className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg border border-emerald-300 text-xs shrink-0 cursor-pointer transition-colors font-bold flex items-center gap-1 shadow-xs"
+                title="Send interactive Dynamic UPI QR code card in WhatsApp chat"
+              >
+                <QrCode className="w-3.5 h-3.5 text-emerald-700" />
+                <span>📱 Send UPI QR Code</span>
+              </button>
               <button
                 type="button"
                 onClick={() =>
@@ -676,6 +853,18 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
                         className="accent-[#245C35]"
                       />
                       <span className="text-[11px] font-medium text-slate-600">SMS</span>
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={handleSendUpiQrMessage}
+                      className="ml-2 text-[11px] font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-100/70 hover:bg-emerald-200/80 px-2.5 py-0.5 rounded-full border border-emerald-300 transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Attach & Send Dynamic UPI QR Code directly in this chat"
+                    >
+                      <QrCode className="w-3 h-3 text-emerald-700" />
+                      <span>Attach UPI QR</span>
+                    </button>
+                    <label className="hidden">
                     </label>
                   </div>
                   <span className="text-[10px] text-slate-400 hidden sm:inline">

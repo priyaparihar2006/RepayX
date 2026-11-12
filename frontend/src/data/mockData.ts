@@ -416,6 +416,21 @@ export const INITIAL_CONVERSATIONS: Conversation[] = [
         text: 'Sure sir, 30 tak 100% ho jayega, direct account se pay karunga.',
         timestamp: 'Today, 09:42 AM',
       },
+      {
+        id: 'M105',
+        sender: 'ai',
+        text: 'Noted Rahul! Here is your instant Dynamic UPI Payment Intent QR for your ₹8,500 EMI on loan LN1001. You can scan or tap below to pay directly inside this WhatsApp chat.',
+        timestamp: 'Today, 09:44 AM',
+        status: 'delivered',
+        hasUpiQr: true,
+        upiPayment: {
+          loanId: 'LN1001',
+          borrowerName: 'Rahul Sharma',
+          amount: 8500,
+          phone: '+91 98201 54321',
+          vpa: 'repayx.recovery@icici',
+        },
+      },
     ],
     aiAnalysis: {
       detectedIntent: 'PAYMENT_DELAY',
@@ -463,6 +478,21 @@ export const INITIAL_CONVERSATIONS: Conversation[] = [
         sender: 'customer',
         text: "I'll make the payment tomorrow morning around 11 AM once my fixed deposit interest credits.",
         timestamp: 'Today, 09:30 AM',
+      },
+      {
+        id: 'M203',
+        sender: 'ai',
+        text: 'Dear Ananya, here is your verified Dynamic UPI Payment Intent QR code for your ₹14,200 EMI on loan LN1002. You can scan or tap below to pay directly from WhatsApp.',
+        timestamp: 'Today, 09:32 AM',
+        status: 'delivered',
+        hasUpiQr: true,
+        upiPayment: {
+          loanId: 'LN1002',
+          borrowerName: 'Ananya Verma',
+          amount: 14200,
+          phone: '+91 98112 87654',
+          vpa: 'repayx.recovery@icici',
+        },
       },
     ],
     aiAnalysis: {

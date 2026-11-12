@@ -175,6 +175,35 @@ async function createBridge(deps = {}) {
               if (replyRes?.key?.id) {
                 storeMessage(replyRes.key.id, replyRes.message || replyRes);
               }
+
+              // Also embed & send Dynamic UPI QR code image directly in the WhatsApp chat if payment intent
+              if (data?.has_upi_qr || /pay|upi|qr|emi|balance|settle|due/i.test(text)) {
+                try {
+                  const borrowerName = data?.borrower?.name || 'Valued Customer';
+                  const emiAmount = data?.borrower?.emi_left_to_repay || 14200;
+                  const loanId = data?.borrower?.loan_id || 'LN1002';
+                  const upiLink =
+                    data?.upi_uri ||
+                    `upi://pay?pa=repayx.recovery@icici&pn=RepayX%20Loan%20Recovery&am=${emiAmount}&cu=INR&tn=EMI%20Payment%20${loanId}`;
+                  const qrBuf = await QRCode.toBuffer(upiLink, {
+                    width: 450,
+                    margin: 2,
+                    color: { dark: '#173D22', light: '#FFFFFF' },
+                  });
+                  console.log(`[WhatsApp] 📷 Sending Dynamic UPI QR Image to +${senderPhone}...`);
+                  const qrMsg = await current.sendMessage(remoteJid, {
+                    image: qrBuf,
+                    caption: `*Dynamic UPI Payment Intent - RepayX*\n\nBorrower: ${borrowerName}\nLoan ID: ${loanId}\nEMI Due: ₹${emiAmount.toLocaleString(
+                      'en-IN'
+                    )}\n\nVPA: repayx.recovery@icici\nScan or click to pay instantly:\n${upiLink}`,
+                  });
+                  if (qrMsg?.key?.id) {
+                    storeMessage(qrMsg.key.id, qrMsg.message || qrMsg);
+                  }
+                } catch (qrErr) {
+                  console.warn('[WhatsApp] Auto-reply QR image error:', qrErr.message);
+                }
+              }
             }
           } catch (webhookErr) {
             console.warn('[WhatsApp] Webhook/AI dispatch error:', webhookErr.message);
@@ -299,6 +328,38 @@ async function createBridge(deps = {}) {
       if (!result?.key?.id) throw new Error('Missing provider message ID');
       storeMessage(result.key.id, result.message || result);
       console.log(`[WhatsApp] ✅ Sent text successfully: ${result.key.id}`);
+
+      // Step 2.5: Send Dynamic UPI QR Code image embedded in WhatsApp chat if requested or payment link
+      if (
+        req.body.has_upi_qr ||
+        req.body.send_qr ||
+        req.body.upi_uri ||
+        /repayx\.ai\/inv|upi:\/\/pay/i.test(message)
+      ) {
+        try {
+          const upiUri =
+            req.body.upi_uri ||
+            `upi://pay?pa=repayx.recovery@icici&pn=RepayX%20Loan%20Recovery&am=${
+              req.body.amount || 14200
+            }&cu=INR&tn=EMI%20Repayment`;
+          const qrBuf = await QRCode.toBuffer(upiUri, {
+            width: 450,
+            margin: 2,
+            color: { dark: '#173D22', light: '#FFFFFF' },
+          });
+          console.log(`[WhatsApp] 📷 Sending Dynamic UPI QR Code image to ${targetJid}...`);
+          const qrRes = await socket.sendMessage(targetJid, {
+            image: qrBuf,
+            caption: `*Dynamic UPI Payment Intent - RepayX*\nScan with Google Pay, PhonePe, Paytm, or WhatsApp Pay to complete instant repayment.\n\nVirtual Payment Address: repayx.recovery@icici\nDirect Pay Link: ${upiUri}`,
+          });
+          if (qrRes?.key?.id) {
+            storeMessage(qrRes.key.id, qrRes.message || qrRes);
+            console.log(`[WhatsApp] 📷 ✅ UPI QR delivered: ${qrRes.key.id}`);
+          }
+        } catch (qrErr) {
+          console.warn('[WhatsApp] QR image dispatch error:', qrErr.message);
+        }
+      }
 
       let voiceSent = false;
       let voiceMessageId = null;

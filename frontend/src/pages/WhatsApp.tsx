@@ -47,7 +47,8 @@ import {
   type UserLoanEmiRecord,
   type WhatsAppHistoryItem,
   type WhatsAppStatus,
-} from '../services/whatsapp';
+} from '../services/whatsapp';
+import { ChatUpiQrCard } from '../components/features/ChatUpiQrCard';
 
 type Draft = DemoContact & {
   requestId: string;
@@ -1074,7 +1075,32 @@ export function WhatsAppPage() {
               </div>
 
               <div className="sm:col-span-2">
-                <label className="text-[11px] font-bold text-slate-600 uppercase">Incoming Borrower Question</label>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-[11px] font-bold text-slate-600 uppercase">Incoming Borrower Question</label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setChatUserQuery('How much EMI is left to repay on my loan?')}
+                      className="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded font-medium text-slate-700 cursor-pointer"
+                    >
+                      💰 Balance
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChatUserQuery('Please send me QR code to pay my EMI right now')}
+                      className="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded font-bold cursor-pointer"
+                    >
+                      📱 Send Payment QR
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChatUserQuery('Can I get a discount or late fee waiver to settle today?')}
+                      className="text-[10px] bg-purple-100 hover:bg-purple-200 text-purple-800 px-2 py-0.5 rounded font-medium cursor-pointer"
+                    >
+                      🏷️ Waiver
+                    </button>
+                  </div>
+                </div>
                 <div className="flex flex-col sm:flex-row gap-2 mt-1">
                   <input
                     type="text"
@@ -1099,7 +1125,39 @@ export function WhatsAppPage() {
                 <div className="flex items-center gap-2 text-xs font-bold text-indigo-900">
                   <Bot className="w-4 h-4 text-indigo-600" /> RepayX AI Live Auto-Response:
                 </div>
-                <p className="text-xs text-indigo-950 whitespace-pre-wrap font-sans leading-relaxed">{chatAiReply}</p>
+                <p className="text-xs text-indigo-950 whitespace-pre-wrap font-sans leading-relaxed">{chatAiReply}</p>
+
+                {/* Embedded Dynamic UPI QR Code in WhatsApp chat simulator */}
+                <div className="pt-2">
+                  <ChatUpiQrCard
+                    data={{
+                      loanId: chatPhone.includes('7060200849')
+                        ? 'LN1002'
+                        : chatPhone.includes('9105830551')
+                        ? 'LN1001'
+                        : 'LN1003',
+                      borrowerName: chatPhone.includes('7060200849')
+                        ? 'Ananya Verma'
+                        : chatPhone.includes('9105830551')
+                        ? 'Rahul Sharma'
+                        : 'Ajay Kumar',
+                      amount: chatPhone.includes('7060200849')
+                        ? 14200
+                        : chatPhone.includes('9105830551')
+                        ? 8500
+                        : 28900,
+                      phone: chatPhone,
+                      vpa: 'repayx.recovery@icici',
+                    }}
+                    onPaymentSettled={(details) => {
+                      setNotice(
+                        `✅ Instant UPI Payment of ₹${details.amount.toLocaleString(
+                          'en-IN'
+                        )} reconciled for ${details.borrowerName} (${details.utr}). Reconciled with WhatsApp!`
+                      );
+                    }}
+                  />
+                </div>
               </div>
             )}
           </div>

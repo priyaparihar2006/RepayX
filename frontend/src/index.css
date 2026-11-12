@@ -1,34 +1,34 @@
 @import "tailwindcss";
 
 :root {
-  /* Financial-Dashboard Green Theme Design Tokens */
-  --bg-main: #F5F7F3;
+  /* Modern Fintech Green Theme Design Tokens (Pixel-Matched to Inspiration) */
+  --bg-main: #F7FAF8;
   --bg-sidebar: #FFFFFF;
   --bg-card: #FFFFFF;
-  --surface-secondary: #EDF5E5;
-  --accent-lime: #B5F078;
-  --accent-lime-hover: #A2E85F;
-  --action-forest: #245C35;
-  --action-forest-hover: #1B4728;
-  --action-forest-active: #14351E;
-  --text-primary: #171A17;
-  --text-muted: #777E77;
-  --border-soft: #E7EBE3;
-  --border-hover: #D5DCD0;
+  --surface-secondary: #EAF5ED;
+  --accent-lime: #A3E635;
+  --accent-lime-hover: #84CC16;
+  --action-forest: #198754;
+  --action-forest-hover: #157347;
+  --action-forest-active: #0F5132;
+  --text-primary: #202B25;
+  --text-muted: #77827B;
+  --border-soft: #E5EBE7;
+  --border-hover: #D0DBD4;
 
   /* Legacy aliases mapped to refined green palette */
-  --color-slate-steel: #245C35;
-  --color-slate-steel-hover: #1B4728;
-  --color-slate-steel-dark: #171A17;
-  --color-slate-steel-light: #EDF5E5;
-  --color-slate-steel-border: #E7EBE3;
+  --color-slate-steel: #198754;
+  --color-slate-steel-hover: #157347;
+  --color-slate-steel-dark: #202B25;
+  --color-slate-steel-light: #EAF5ED;
+  --color-slate-steel-border: #E5EBE7;
 }
 
 @layer base {
   html, body {
     font-family: 'DM Sans', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #F5F7F3;
-    color: #171A17;
+    background-color: #F7FAF8;
+    color: #202B25;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -46,15 +46,15 @@
 
 /* Modern fintech soft shadow utilities */
 .shadow-fintech {
-  box-shadow: 0 1px 3px 0 rgba(23, 26, 23, 0.03), 0 1px 2px -1px rgba(23, 26, 23, 0.02);
+  box-shadow: 0 1px 3px 0 rgba(32, 43, 37, 0.03), 0 1px 2px -1px rgba(32, 43, 37, 0.02);
 }
 
 .shadow-fintech-card {
-  box-shadow: 0 4px 20px -2px rgba(23, 26, 23, 0.04), 0 2px 6px -1px rgba(23, 26, 23, 0.02);
+  box-shadow: 0 4px 20px -2px rgba(32, 43, 37, 0.03), 0 2px 6px -1px rgba(32, 43, 37, 0.02);
 }
 
 .shadow-fintech-hover {
-  box-shadow: 0 10px 25px -4px rgba(23, 26, 23, 0.07), 0 4px 10px -2px rgba(23, 26, 23, 0.03);
+  box-shadow: 0 10px 25px -4px rgba(32, 43, 37, 0.06), 0 4px 10px -2px rgba(32, 43, 37, 0.02);
 }
 
 /* Custom smooth scrollbar for dashboard panels */
@@ -68,10 +68,10 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D5DCD0;
+  background: #E5EBE7;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #B3BCAD;
+  background: #D0DBD4;
 }

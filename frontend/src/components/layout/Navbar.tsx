@@ -215,7 +215,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search borrower or loan ID..."
+              placeholder="Search customers, loan IDs..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -541,7 +541,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Search className="w-4 h-4 text-[#777E77] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search borrower or loan ID..."
+              placeholder="Search customers, loan IDs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               autoFocus
