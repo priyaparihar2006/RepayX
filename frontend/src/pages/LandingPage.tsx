@@ -11,7 +11,7 @@ import { FinalCtaSection } from '../components/landing/FinalCtaSection';
 import { LandingFooter } from '../components/landing/LandingFooter';
 import { DemoRequestModal } from '../components/landing/DemoRequestModal';
 import { LoginQuickModal } from '../components/landing/LoginQuickModal';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, MessageSquare, LayoutDashboard } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
 export const LandingPage: React.FC = () => {
@@ -68,14 +68,26 @@ export const LandingPage: React.FC = () => {
       {/* Footer */}
       <LandingFooter onOpenDemoModal={() => setDemoModalOpen(true)} />
 
-      {/* Floating Operational App Launcher Pill */}
-      <div className="fixed bottom-5 right-5 z-30">
+      {/* Floating Operational App Launcher Pills */}
+      <div className="fixed bottom-5 right-5 z-30 flex items-center gap-2">
+        <button
+          onClick={() => navigate('/whatsapp')}
+          className="group flex items-center gap-1.5 px-3.5 py-2.5 rounded-full bg-[#168653] hover:bg-[#157347] border border-[#5DE5A1]/40 text-white shadow-2xl shadow-black/80 backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer text-xs font-bold"
+          title="Open WhatsApp Automation"
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">WhatsApp</span>
+          <ArrowUpRight className="w-3.5 h-3.5 text-[#5DE5A1] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+        </button>
+
         <button
           onClick={() => navigate('/dashboard')}
           className="group flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#142630]/90 hover:bg-[#142630] border border-[#5DE5A1]/40 text-white shadow-2xl shadow-black/80 backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer text-xs font-bold"
+          title="Open RepayX Dashboard"
         >
           <span className="w-2 h-2 rounded-full bg-[#5DE5A1] animate-ping" />
-          <span>Launch Live Cockpit</span>
+          <LayoutDashboard className="w-3.5 h-3.5 text-[#5DE5A1]" />
+          <span>Dashboard</span>
           <ArrowUpRight className="w-4 h-4 text-[#5DE5A1] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
         </button>
       </div>

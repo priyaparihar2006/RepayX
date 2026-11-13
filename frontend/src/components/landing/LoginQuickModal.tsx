@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, LayoutDashboard, KeyRound, ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { X, LayoutDashboard, KeyRound, ArrowRight, ShieldCheck, CheckCircle2, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
 interface LoginQuickModalProps {
@@ -20,6 +20,11 @@ export const LoginQuickModal: React.FC<LoginQuickModalProps> = ({
   const handleGoDashboard = () => {
     onClose();
     navigate('/dashboard');
+  };
+
+  const handleGoWhatsApp = () => {
+    onClose();
+    navigate('/whatsapp');
   };
 
   const handleGoAutomation = () => {
@@ -80,6 +85,29 @@ export const LoginQuickModal: React.FC<LoginQuickModalProps> = ({
               <div className="mt-2 pl-10 flex items-center gap-1.5 text-[11px] text-[#5DE5A1]">
                 <CheckCircle2 className="w-3 h-3" />
                 <span>Pre-authenticated Session Active (Manager Priya Parihar)</span>
+              </div>
+            </button>
+
+            {/* Direct WhatsApp Assistant Entry */}
+            <button
+              onClick={handleGoWhatsApp}
+              className="w-full text-left p-4 rounded-xl bg-[#101D25] border border-emerald-500/30 hover:border-[#5DE5A1] hover:bg-[#162f3c] transition-all group cursor-pointer"
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2.5 font-bold text-sm text-white group-hover:text-[#5DE5A1] transition-colors">
+                  <div className="p-2 rounded-lg bg-[#168653]/40 text-[#5DE5A1]">
+                    <MessageSquare className="w-4 h-4" />
+                  </div>
+                  <span>WhatsApp Outreach Hub</span>
+                </div>
+                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-[#5DE5A1] group-hover:translate-x-1 transition-all" />
+              </div>
+              <p className="text-xs text-slate-300 pl-10">
+                Engage borrowers via bilingual WhatsApp chat, send EMI reminders, and collect repayments via UPI.
+              </p>
+              <div className="mt-2 pl-10 flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
+                <CheckCircle2 className="w-3 h-3" />
+                <span>Live Meta WhatsApp Engine Connected</span>
               </div>
             </button>
 

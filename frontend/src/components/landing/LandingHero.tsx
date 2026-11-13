@@ -76,8 +76,16 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onOpenDemoModal }) => 
               </button>
 
               <button
+                onClick={() => navigate('/whatsapp')}
+                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#142630]/90 border border-[#5DE5A1]/40 text-[#5DE5A1] font-bold text-sm sm:text-base hover:bg-[#168653]/20 hover:border-[#5DE5A1] backdrop-blur-md transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-black/20"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>WhatsApp Assistant</span>
+              </button>
+
+              <button
                 onClick={onOpenDemoModal}
-                className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-[#142630]/80 border border-white/15 text-white font-semibold text-sm sm:text-base hover:bg-white/10 hover:border-[#5DE5A1]/40 backdrop-blur-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto px-5 py-3.5 rounded-xl bg-transparent border border-white/15 text-slate-300 font-semibold text-sm hover:text-white hover:bg-white/5 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <span>Request a Demo</span>
               </button>
@@ -106,17 +114,20 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onOpenDemoModal }) => 
             <div className="relative w-full max-w-[460px] mx-auto">
               <HeroAiSphere3D />
 
-              {/* Floating Simulated Notification Card 1: WhatsApp Reminder */}
+              {/* Floating Simulated Notification Card 1: WhatsApp Reminder (Clickable) */}
               <div
-                className="absolute top-2 left-0 sm:-left-6 max-w-[185px] sm:max-w-[210px] p-2.5 sm:p-3 rounded-xl bg-[#142630]/90 border border-[#5DE5A1]/30 backdrop-blur-md shadow-xl shadow-black/40 animate-float"
+                onClick={() => navigate('/whatsapp')}
+                className="absolute top-2 left-0 sm:-left-6 max-w-[185px] sm:max-w-[210px] p-2.5 sm:p-3 rounded-xl bg-[#142630]/90 border border-[#5DE5A1]/40 backdrop-blur-md shadow-xl shadow-black/40 animate-float cursor-pointer hover:border-[#5DE5A1] hover:scale-105 transition-all group"
                 style={{ animationDuration: '6s' }}
+                title="Click to open WhatsApp Automation Hub"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-[#168653]/40 flex items-center justify-center text-[#5DE5A1]">
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-[#168653]/40 flex items-center justify-center text-[#5DE5A1] group-hover:bg-[#168653]">
                     <MessageSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   </div>
-                  <div className="text-[10px] sm:text-[11px] font-bold text-white leading-tight">
-                    WhatsApp Sent
+                  <div className="text-[10px] sm:text-[11px] font-bold text-white leading-tight flex items-center gap-1">
+                    <span>WhatsApp Sent</span>
+                    <span className="text-[9px] text-[#5DE5A1] font-mono">↗</span>
                   </div>
                 </div>
                 <p className="text-[9px] sm:text-[10px] text-slate-300">
@@ -124,7 +135,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onOpenDemoModal }) => 
                 </p>
                 <div className="mt-1 flex items-center justify-between text-[8px] sm:text-[9px] text-[#5DE5A1]">
                   <span>Status: Delivered</span>
-                  <span>Just now</span>
+                  <span className="underline group-hover:text-white transition-colors">Open Hub →</span>
                 </div>
               </div>
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
   Play,
   RotateCcw,
@@ -29,6 +30,7 @@ interface BorrowerScenario {
 }
 
 export const AiRecoverySimulator: React.FC = () => {
+  const navigate = useNavigate();
   const scenarios: BorrowerScenario[] = [
     {
       id: 'sc-1',
@@ -392,9 +394,17 @@ export const AiRecoverySimulator: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Illustrative simulation utilizing client-side mock data. Zero actual SMS/messages are transmitted.</span>
-            <span className="text-[#5DE5A1] font-semibold">Test Sandbox Environment</span>
+          <div className="mt-6 pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-400">
+            <span>Illustrative simulation utilizing client-side mock data. Ready to converse with real borrowers?</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/whatsapp')}
+                className="px-3.5 py-1.5 rounded-lg bg-[#168653] hover:bg-[#157347] text-white font-bold transition-all flex items-center gap-1.5 cursor-pointer text-xs"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Open Live WhatsApp Hub</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

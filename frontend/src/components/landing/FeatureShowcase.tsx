@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
   MessageSquare,
   Mic,
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react';
 
 export const FeatureShowcase: React.FC = () => {
+  const navigate = useNavigate();
   // Feature 1: WhatsApp state (Language toggle)
   const [waLanguage, setWaLanguage] = useState<'english' | 'hindi'>('english');
 
@@ -91,9 +93,9 @@ export const FeatureShowcase: React.FC = () => {
               </div>
             </div>
 
-            {/* Language Switcher Buttons */}
-            <div className="pt-2 flex items-center gap-3 text-xs">
-              <span className="font-semibold text-[#101D25]">Interactive Preview Language:</span>
+            {/* Language Switcher Buttons & Direct Link */}
+            <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
+              <span className="font-semibold text-[#101D25]">Interactive Preview:</span>
               <button
                 onClick={() => setWaLanguage('english')}
                 className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
@@ -113,6 +115,17 @@ export const FeatureShowcase: React.FC = () => {
                 }`}
               >
                 Hinglish / हिंदी
+              </button>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => navigate('/whatsapp')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#168653] hover:bg-[#157347] text-white text-xs font-bold transition-all shadow-md shadow-[#168653]/20 cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Open Live WhatsApp Assistant</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -596,6 +609,16 @@ export const FeatureShowcase: React.FC = () => {
                   <p className="text-xs text-[#718078]">Audit carrier receipts and delivery confirmations across WhatsApp, SMS, AI Voice, and Email.</p>
                 </div>
               </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#168653] hover:bg-[#157347] text-white text-xs font-bold transition-all shadow-md shadow-[#168653]/20 cursor-pointer"
+              >
+                <span>Launch Live Risk Dashboard</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
 

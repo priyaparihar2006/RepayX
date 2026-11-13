@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
+import { Menu, X, ArrowRight, ShieldCheck, Sparkles, MessageSquare, LayoutDashboard } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
 interface LandingNavbarProps {
@@ -103,10 +103,26 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
           </nav>
 
           {/* CTA Buttons */}
-          <div className="hidden sm:flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2 lg:gap-3">
+            <button
+              onClick={() => navigate('/whatsapp')}
+              className="px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer border border-white/10"
+              title="Launch Live WhatsApp Outreach Automation"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-[#5DE5A1]" />
+              <span>WhatsApp</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#5DE5A1] animate-pulse" />
+            </button>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5 text-slate-400" />
+              <span>Dashboard</span>
+            </button>
             <button
               onClick={onOpenLoginModal}
-              className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
+              className="px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
             >
               Login
             </button>
@@ -122,8 +138,15 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-2">
             <button
+              onClick={() => navigate('/whatsapp')}
+              className="px-2.5 py-1.5 rounded-lg bg-[#142630] border border-[#5DE5A1]/30 text-[#5DE5A1] font-bold text-xs flex items-center gap-1"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>WhatsApp</span>
+            </button>
+            <button
               onClick={() => navigate('/dashboard')}
-              className="px-3 py-1.5 rounded-lg bg-[#168653] text-white font-bold text-xs"
+              className="px-2.5 py-1.5 rounded-lg bg-[#168653] text-white font-bold text-xs"
             >
               Dashboard
             </button>
@@ -166,11 +189,12 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
-                onOpenLoginModal();
+                navigate('/whatsapp');
               }}
-              className="w-full py-2.5 px-4 text-center text-xs font-semibold text-slate-300 bg-white/5 border border-white/10 rounded-xl"
+              className="w-full py-2.5 px-4 rounded-xl bg-[#101D25] border border-[#5DE5A1]/40 text-[#5DE5A1] font-bold text-xs flex items-center justify-center gap-2"
             >
-              Login
+              <MessageSquare className="w-4 h-4" />
+              <span>Open WhatsApp Automation</span>
             </button>
             <button
               onClick={() => {
@@ -179,8 +203,17 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
               }}
               className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#168653] to-[#5DE5A1] text-[#101D25] font-bold text-xs shadow-md shadow-[#168653]/30 flex items-center justify-center gap-1.5"
             >
-              <span>Explore Dashboard</span>
+              <span>Explore Operational Dashboard</span>
               <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onOpenLoginModal();
+              }}
+              className="w-full py-2 text-center text-xs font-semibold text-slate-400 hover:text-white"
+            >
+              Sign In with API Key
             </button>
           </div>
         </div>

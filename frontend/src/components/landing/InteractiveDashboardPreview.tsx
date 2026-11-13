@@ -14,6 +14,9 @@ import {
   Smartphone,
   CreditCard,
   FileText,
+  Mail,
+  Plus,
+  Send,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
@@ -149,27 +152,177 @@ export const InteractiveDashboardPreview: React.FC = () => {
           <div className="p-4 sm:p-6 lg:p-8 bg-[#F7FAF8]">
             {activeTab === 'overview' && (
               <div className="space-y-6 animate-fadeIn">
-                {/* 4 Mini KPI Cards */}
+                {/* Operational Dashboard Greeting & Quick Action Banner (from live dashboard) */}
+                <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E5EBE7] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-xl sm:text-2xl font-extrabold text-[#101D25] font-heading flex items-center gap-2">
+                      <span>Good Morning, Priya!</span>
+                      <span className="text-2xl">👋</span>
+                    </h3>
+                    <p className="text-xs sm:text-sm text-[#718078] mt-1">
+                      Here&apos;s what&apos;s happening with your loan recovery today.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <button
+                      onClick={() => navigate('/automation')}
+                      className="px-4 py-2.5 rounded-xl bg-[#168653] hover:bg-[#157347] text-white text-xs font-bold transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Create New Reminder</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => navigate('/whatsapp')}
+                      className="px-4 py-2.5 rounded-xl bg-[#EAF6EF] hover:bg-[#d8efe2] text-[#168653] border border-[#168653]/30 text-xs font-bold transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+                    >
+                      <MessageSquare className="w-4 h-4 text-[#168653]" />
+                      <span>WhatsApp Hub</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4 KPI Cards (replicated from live dashboard) */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                  <div className="bg-white p-4 rounded-xl border border-[#E5EBE7] shadow-sm">
-                    <span className="text-[11px] font-semibold text-[#718078] block">Total Scored Borrowers</span>
-                    <div className="text-xl sm:text-2xl font-extrabold text-[#101D25] font-heading mt-1">61,503</div>
-                    <span className="text-[10px] text-emerald-600 font-bold mt-1 inline-block">+8.4% this month</span>
+                  <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E5EBE7] shadow-sm flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xl sm:text-2xl font-extrabold text-[#101D25] font-heading">61,503</div>
+                      <span className="text-[11px] font-semibold text-[#718078]">Total Customers</span>
+                    </div>
                   </div>
-                  <div className="bg-white p-4 rounded-xl border border-[#E5EBE7] shadow-sm">
-                    <span className="text-[11px] font-semibold text-[#718078] block">Automated Reminders</span>
-                    <div className="text-xl sm:text-2xl font-extrabold text-[#101D25] font-heading mt-1">2,450</div>
-                    <span className="text-[10px] text-emerald-600 font-bold mt-1 inline-block">100% Policy Compliant</span>
+
+                  <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E5EBE7] shadow-sm flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                      <CalendarClock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xl sm:text-2xl font-extrabold text-[#101D25] font-heading">24</div>
+                      <span className="text-[11px] font-semibold text-[#718078]">Active Reminders</span>
+                    </div>
                   </div>
-                  <div className="bg-white p-4 rounded-xl border border-[#E5EBE7] shadow-sm">
-                    <span className="text-[11px] font-semibold text-[#718078] block">Delivery Rate</span>
-                    <div className="text-xl sm:text-2xl font-extrabold text-[#101D25] font-heading mt-1">98.2%</div>
-                    <span className="text-[10px] text-emerald-600 font-bold mt-1 inline-block">Carrier Confirmed</span>
+
+                  <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E5EBE7] shadow-sm flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xl sm:text-2xl font-extrabold text-[#101D25] font-heading">98%</div>
+                      <span className="text-[11px] font-semibold text-[#718078]">Delivery Rate</span>
+                    </div>
                   </div>
-                  <div className="bg-white p-4 rounded-xl border border-[#E5EBE7] shadow-sm">
-                    <span className="text-[11px] font-semibold text-[#718078] block">Recovered Amount</span>
-                    <div className="text-xl sm:text-2xl font-extrabold text-[#168653] font-heading mt-1">₹1.25 Cr</div>
-                    <span className="text-[10px] text-emerald-600 font-bold mt-1 inline-block">+24% vs Manual Ops</span>
+
+                  <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E5EBE7] shadow-sm flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                      <TrendingUp className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xl sm:text-2xl font-extrabold text-[#168653] font-heading">₹12.5L</div>
+                      <span className="text-[11px] font-semibold text-[#718078]">Recovered</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Two Main Working Operational Cards (from Priya's Live Dashboard) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Card 1: Email Reminders */}
+                  <div className="bg-white p-6 rounded-2xl border border-[#E5EBE7] shadow-sm flex flex-col justify-between hover:border-emerald-300 transition-all">
+                    <div>
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                            <Mail className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h4 className="text-base font-bold text-[#101D25] font-heading">Email Reminders</h4>
+                            <p className="text-xs text-[#718078]">Send payment reminders automatically.</p>
+                          </div>
+                        </div>
+                        <div className="hidden sm:flex w-12 h-12 rounded-xl bg-sky-50 text-sky-500 items-center justify-center">
+                          <Mail className="w-6 h-6" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 py-3 border-y border-slate-100 text-xs text-[#718078]">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Upload CSV</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>View Schedule</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Track Delivery</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-4">
+                      <button
+                        onClick={() => navigate('/automation')}
+                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#168653] hover:bg-[#157347] text-white text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 shadow-sm cursor-pointer"
+                      >
+                        <span>Manage Email Reminders</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card 2: WhatsApp Assistant */}
+                  <div className="bg-white p-6 rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-white to-emerald-50/30 shadow-md flex flex-col justify-between hover:border-emerald-400 transition-all">
+                    <div>
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-[#168653] flex items-center justify-center">
+                            <MessageSquare className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-base font-bold text-[#101D25] font-heading">WhatsApp Assistant</h4>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-[#168653] font-bold">
+                                Live Engine
+                              </span>
+                            </div>
+                            <p className="text-xs text-[#718078]">Chat with customers on WhatsApp.</p>
+                          </div>
+                        </div>
+                        <div className="hidden sm:flex w-12 h-12 rounded-xl bg-emerald-100 text-[#168653] items-center justify-center">
+                          <MessageSquare className="w-6 h-6" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 py-3 border-y border-emerald-100 text-xs text-[#718078]">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Understand replies</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Support in Hindi & English</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Get payment updates</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 flex flex-col sm:flex-row items-center gap-2">
+                      <button
+                        onClick={() => navigate('/whatsapp')}
+                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#168653] hover:bg-[#157347] text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-[#168653]/25 cursor-pointer"
+                      >
+                        <span>Open WhatsApp Assistant</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-[11px] text-[#168653] font-semibold hidden sm:inline">
+                        Direct Live Access →
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -307,18 +460,27 @@ export const InteractiveDashboardPreview: React.FC = () => {
             )}
           </div>
 
-          {/* Bottom Bar with CTA */}
-          <div className="bg-white p-4 border-t border-[#E5EBE7] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-            <span className="text-[#718078]">
-              Ready to explore live borrower portfolios and custom campaigns?
+          {/* Bottom Bar with Direct Navigation CTAs */}
+          <div className="bg-white p-4 sm:p-5 border-t border-[#E5EBE7] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <span className="text-[#718078] text-center sm:text-left">
+              Live Production Operations · Switch between Borrower Cockpit and WhatsApp Automations
             </span>
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="px-5 py-2 rounded-xl bg-[#168653] hover:bg-[#157347] text-white font-bold transition-all flex items-center gap-1.5 shadow-md shadow-[#168653]/20 cursor-pointer"
-            >
-              <span>Access RepayX Dashboard</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-center sm:justify-end">
+              <button
+                onClick={() => navigate('/whatsapp')}
+                className="px-4 py-2 rounded-xl bg-[#EAF6EF] hover:bg-[#d5eee0] text-[#168653] font-bold border border-[#168653]/30 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Open WhatsApp Hub</span>
+              </button>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="px-5 py-2 rounded-xl bg-[#168653] hover:bg-[#157347] text-white font-bold transition-all flex items-center gap-1.5 shadow-md shadow-[#168653]/20 cursor-pointer"
+              >
+                <span>Access RepayX Dashboard</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
