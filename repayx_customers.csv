@@ -1,0 +1,5 @@
+customer_id,customer_name,email,phone_number,loan_id,emi_amount,unpaid_amount,due_date,days_past_due,payment_status,probability_of_default,risk_category,payment_link,scheduled_message_time,timezone,preferred_language,whatsapp_enabled,email_enabled
+RX-CUST-1001,Priya Parihar,priyaparihar240206@gmail.com,+916395300669,LN-2026-8801,12500.00,12500.00,2026-11-20,5,OVERDUE,0.78,High Risk,https://repayx.com/pay/RX-CUST-1001,10:30,Asia/Kolkata,English,true,true
+RX-CUST-1002,Rohit,kumarrohitt0976@gmail.com,+919258073878,LN-2026-8802,8500.00,8500.00,2026-11-18,12,OVERDUE,0.65,Medium Risk,https://repayx.com/pay/RX-CUST-1002,11:00,Asia/Kolkata,Hinglish,true,true
+RX-CUST-1003,Ajay Dhakrey,dhakreyajay444@gmail.com,+918077815522,LN-2026-8803,15750.00,15750.00,2026-11-15,18,OVERDUE,0.88,High Risk,https://repayx.com/pay/RX-CUST-1003,11:30,Asia/Kolkata,Hindi,true,true
+RX-CUST-1004,Nancy,nancysharmandmitteami@gmail.com,+917060200849,LN-2026-8804,9200.00,9200.00,2026-11-22,3,UNPAID,0.42,Low Risk,https://repayx.com/pay/RX-CUST-1004,12:00,Asia/Kolkata,English,true,true

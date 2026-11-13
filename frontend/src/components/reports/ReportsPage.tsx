@@ -1,5 +1,5 @@
-import React from 'react';
-import { TrendingUp, Download, Calendar, BarChart2, CheckCircle2, AlertTriangle, FileSpreadsheet } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '../common/Toast';
 import { ExecutiveReportModal } from '../features/ExecutiveReportModal';
 
@@ -50,18 +50,18 @@ export const ReportsPage: React.FC = () => {
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#171A17] tracking-tight font-heading">
+          <h1 className="text-xl sm:text-2xl font-bold text-[#202B25] tracking-tight font-heading">
             Recovery Reports & Ledgers
           </h1>
-          <p className="text-xs sm:text-sm text-[#777E77] mt-0.5">
+          <p className="text-xs sm:text-sm text-[#77827B] mt-0.5">
             Audited reporting on delinquency migrations, settlement fulfillment, and collection executive performance.
           </p>
         </div>
         <button
           onClick={() => setExecReportOpen(true)}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#245C35] hover:bg-[#1E4D2C] text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#198754] hover:bg-[#157347] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
         >
-          <FileSpreadsheet className="w-4 h-4 text-[#B5F078]" />
+          <FileSpreadsheet className="w-4 h-4 text-[#A3E635]" />
           1-Click Executive PDF & CSV Report
         </button>
       </div>
@@ -70,28 +70,28 @@ export const ReportsPage: React.FC = () => {
         {reports.map((rep) => (
           <div
             key={rep.title}
-            className="bg-white rounded-[20px] p-5 border border-[#E7EBE3] shadow-fintech-card flex flex-col justify-between transition-all duration-200"
+            className="bg-white rounded-2xl p-5 border border-[#E5EBE7] shadow-fintech flex flex-col justify-between transition-all duration-200 hover:border-[#198754]/40"
           >
             <div>
               <div className="flex items-center justify-between mb-2.5">
-                <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-[#EDF5E5] text-[#245C35] border border-[#D1E8BC]">
+                <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-[#EAF5ED] text-[#198754] border border-[#D5E6D9]">
                   {rep.type}
                 </span>
-                <span className="text-xs font-mono text-[#777E77]">{rep.period}</span>
+                <span className="text-xs font-mono text-[#77827B]">{rep.period}</span>
               </div>
-              <h3 className="font-bold text-[#171A17] text-sm font-heading">{rep.title}</h3>
-              <p className="text-xs text-[#777E77] mt-1">
+              <h3 className="font-bold text-[#202B25] text-sm font-heading">{rep.title}</h3>
+              <p className="text-xs text-[#77827B] mt-1">
                 {rep.records} · File size: {rep.size}
               </p>
             </div>
 
-            <div className="mt-5 pt-3.5 border-t border-[#E7EBE3] flex items-center justify-between">
-              <span className="text-[11px] text-[#777E77] font-mono">Format: .xlsx / .csv</span>
+            <div className="mt-5 pt-3.5 border-t border-[#E5EBE7] flex items-center justify-between">
+              <span className="text-[11px] text-[#77827B] font-mono">Format: .xlsx / .csv</span>
               <button
                 onClick={() => handleExport(rep.title)}
-                className="px-4 py-2 rounded-full bg-[#245C35] hover:bg-[#1B4728] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                className="px-4 py-2 rounded-xl bg-[#198754] hover:bg-[#157347] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
               >
-                <Download className="w-3.5 h-3.5 text-[#B5F078]" />
+                <Download className="w-3.5 h-3.5 text-[#A3E635]" />
                 <span>Download Report</span>
               </button>
             </div>

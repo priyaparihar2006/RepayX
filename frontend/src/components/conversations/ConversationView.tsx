@@ -168,16 +168,6 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
       timestamp: 'Today, Just now',
       isApprovedByManager: true,
       status: 'sent' as const,
-      hasUpiQr: isPaymentOutbound,
-      upiPayment: isPaymentOutbound
-        ? {
-            loanId: relatedLoan?.id || 'LN1002',
-            borrowerName: data.customerName,
-            amount: loanAmount,
-            phone: customers.find((c) => c.id === data.customerId)?.phone || '+91 98201 54321',
-            vpa: 'repayx.recovery@icici',
-          }
-        : undefined,
       hasUpiQr: true,
       upiPayment: {
         loanId: currentConv.loanId,
@@ -269,6 +259,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
   const handleSendAiSuggestedDirectly = () => {
     if (!currentConv || !suggestedText) return;
 
+    const isPaymentOutbound = suggestedText.toLowerCase().includes('upi') || suggestedText.toLowerCase().includes('pay');
     const newMsg = {
       id: `M-${Date.now()}`,
       sender: 'ai' as const,
@@ -279,10 +270,10 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
       hasUpiQr: isPaymentOutbound,
       upiPayment: isPaymentOutbound
         ? {
-            loanId: relatedLoan?.id || 'LN1002',
-            borrowerName: data.customerName,
-            amount: loanAmount,
-            phone: customers.find((c) => c.id === data.customerId)?.phone || '+91 98201 54321',
+            loanId: currentConv.loanId,
+            borrowerName: currentConv.customerName,
+            amount: 8500,
+            phone: currentConv.customerPhone,
             vpa: 'repayx.recovery@icici',
           }
         : undefined,

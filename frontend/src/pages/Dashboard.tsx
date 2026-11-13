@@ -531,8 +531,8 @@ export const DashboardPage: React.FC = () => {
                   <div className="bg-[#F7FAF8] rounded-xl p-3 border border-[#E5EBE7]">
                     <RiskScoreHistogram
                       bins={data.risk_score_histogram}
-                      mediumFrom={data.model.risk_band_medium_from}
-                      highFrom={data.model.risk_band_high_from}
+                      mediumFrom={data.model?.risk_band_medium_from ?? 30}
+                      highFrom={data.model?.risk_band_high_from ?? 60}
                     />
                   </div>
                   <div className="bg-[#F7FAF8] rounded-xl p-3 border border-[#E5EBE7]">
@@ -767,7 +767,7 @@ export const DashboardPage: React.FC = () => {
                 </div>
 
                 <div className="pt-3 border-t border-[#E5EBE7] text-[11px] text-[#77827B] flex items-center justify-between">
-                  <span>ML Model Version: {data.model.model_version || 'v1.4-tuned'}</span>
+                  <span>ML Model Version: {data.model?.model_version || 'v1.4-tuned'}</span>
                   <span className="font-semibold text-[#198754]">Balanced Thresholds</span>
                 </div>
               </div>
@@ -846,42 +846,27 @@ export const DashboardPage: React.FC = () => {
             <DynamicUpiModal
               isOpen={upiModalOpen}
               onClose={() => setUpiModalOpen(false)}
-              borrower={{
-                name: 'Rahul Sharma',
-                loanId: 'LN1001',
-                amount: 8500,
-                phone: '+91 98201 54321',
-              }}
+              borrowerName="Rahul Sharma"
+              loanId="LN1001"
+              amount={8500}
+              phone="+91 98201 54321"
             />
             <PtpTrackerModal
               isOpen={ptpModalOpen}
               onClose={() => setPtpModalOpen(false)}
-              borrower={{
-                name: 'Rahul Sharma',
-                loanId: 'LN1001',
-                amount: 8500,
-                phone: '+91 98201 54321',
-              }}
             />
             <MultiLanguageOutreachModal
               isOpen={langModalOpen}
               onClose={() => setLangModalOpen(false)}
-              borrower={{
-                name: 'Rahul Sharma',
-                loanId: 'LN1001',
-                amount: 8500,
-                phone: '+91 98201 54321',
-              }}
+              borrowerName="Rahul Sharma"
+              loanId="LN1001"
+              amount={8500}
+              dueDate="30 Sep 2026"
             />
             <OtsGeneratorModal
               isOpen={otsModalOpen}
               onClose={() => setOtsModalOpen(false)}
-              borrower={{
-                name: 'Rahul Sharma',
-                loanId: 'LN1001',
-                amount: 85000,
-                phone: '+91 98201 54321',
-              }}
+              initialLoanId="LN1003"
             />
             <ExecutiveReportModal
               isOpen={reportModalOpen}
