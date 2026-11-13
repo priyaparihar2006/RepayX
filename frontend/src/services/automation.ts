@@ -31,7 +31,12 @@ export function setAutomationKey(key: string | null): void {
 
 function baseUrl(): string {
   const value = import.meta.env.VITE_API_BASE_URL;
-  if (!value) throw new ApiError('config', 'The API address is not configured. Set VITE_API_BASE_URL in .env.');
+  if (!value) {
+    if (typeof window !== 'undefined' && window.location) {
+      return '';
+    }
+    return 'https://repayx-backend.onrender.com';
+  }
   return value.replace(/\/+$/, '');
 }
 

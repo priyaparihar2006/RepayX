@@ -21,6 +21,7 @@ import { EmptyState, LoadingState } from './components/common/RequestState';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 // Pages are loaded on first visit to keep the initial bundle small.
+const LandingPage = lazy(() => import('./pages/LandingPage').then((m) => ({ default: m.LandingPage })));
 const OverviewDashboard = lazy(() => import('./components/dashboard/OverviewDashboard').then((m) => ({ default: m.OverviewDashboard })));
 const ConversationView = lazy(() => import('./components/conversations/ConversationView').then((m) => ({ default: m.ConversationView })));
 const DemoCustomersPage = lazy(() => import('./components/customers/CustomersPage').then((m) => ({ default: m.CustomersPage })));
@@ -44,7 +45,7 @@ const AutomationPage = lazy(() => import('./pages/Automation').then((m) => ({ de
 
 // URL for each sidebar tab. 'ai-assistant' opens the drawer instead of a page.
 const TAB_PATHS: Record<Exclude<NavTab, 'ai-assistant'>, string> = {
-  overview: '/',
+  overview: '/dashboard',
   customers: '/customers',
   whatsapp: '/whatsapp',
   automation: '/automation',
@@ -65,6 +66,7 @@ const TAB_PATHS: Record<Exclude<NavTab, 'ai-assistant'>, string> = {
 
 function tabForPath(pathname: string): NavTab {
   if (pathname.startsWith('/customers') || pathname.startsWith('/demo-customers')) return 'customers';
+  if (pathname === '/dashboard' || pathname === '/overview') return 'overview';
   const match = (Object.entries(TAB_PATHS) as [NavTab, string][]).find(([, path]) => path !== '/' && pathname.startsWith(path));
   return match ? match[0] : 'overview';
 }
@@ -75,7 +77,7 @@ function pageMeta(pathname: string): { title: string; breadcrumb: string } {
   if (pathname.startsWith('/demo-customers')) return { title: 'Demo Customer Workflow', breadcrumb: 'Demo / Customers' };
   switch (tabForPath(pathname)) {
     case 'overview':
-      return pathname === '/' ? { title: 'Risk Dashboard', breadcrumb: 'Dashboard' } : { title: 'Page not found', breadcrumb: 'RepayX' };
+      return { title: 'Risk Dashboard', breadcrumb: 'Dashboard' };
     case 'customers':
       return { title: 'Customer Risk Portfolio', breadcrumb: 'Customers' };
     case 'whatsapp':
@@ -123,7 +125,22 @@ const Demo: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 
 function AppContent() {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+
+  // Route directly to public marketing landing page on '/' and '/landing' unless app explicitly requested
+  const isLandingPage =
+    (pathname === '/' || pathname === '/landing') &&
+    !search.includes('app=true') &&
+    !search.includes('dashboard=true');
+
+  if (isLandingPage) {
+    return (
+      <Suspense fallback={<LoadingState />}>
+        <LandingPage />
+      </Suspense>
+    );
+  }
+
   const currentTab = tabForPath(pathname);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -246,6 +263,8 @@ function AppContent() {
               <Routes>
             {/* Connected to the RepayX API */}
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/overview" element={<DashboardPage />} />
             <Route path="/analytics/risk" element={<RiskAnalyticsPage />} />
             <Route path="/analytics/repayment" element={<RepaymentAnalyticsPage />} />
             <Route path="/customers" element={<CustomersPage />} />
@@ -395,7 +414,7 @@ const DemoCustomerDetail: React.FC<{
 const NotFound: React.FC = () => (
   <div className="max-w-7xl mx-auto bg-white rounded-2xl border border-slate-200/80 text-center">
     <EmptyState title="Page not found" message="The page you requested does not exist." />
-    <Link to="/" className="inline-block mb-10 text-xs font-semibold text-blue-600 hover:underline">
+    <Link to="/dashboard" className="inline-block mb-10 text-xs font-semibold text-blue-600 hover:underline">
       Go to the dashboard
     </Link>
   </div>
