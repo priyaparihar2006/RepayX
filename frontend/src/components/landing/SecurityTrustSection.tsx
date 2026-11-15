@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router';
 import {
   ShieldCheck,
   Lock,
@@ -10,9 +11,11 @@ import {
   AlertCircle,
   Database,
   Fingerprint,
+  ArrowRight,
 } from 'lucide-react';
 
 export const SecurityTrustSection: React.FC = () => {
+  const navigate = useNavigate();
   const securityFeatures = [
     {
       icon: UserCheck,
@@ -59,7 +62,7 @@ export const SecurityTrustSection: React.FC = () => {
   ];
 
   return (
-    <section id="security" className="py-20 lg:py-28 bg-[#F5F8F6] text-[#202B25] relative">
+    <section id="security" className="scroll-mt-24 py-20 lg:py-28 bg-[#F5F8F6] text-[#202B25] relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
@@ -107,11 +110,20 @@ export const SecurityTrustSection: React.FC = () => {
         </div>
 
         {/* Institutional Disclosure Box */}
-        <div className="mt-12 p-5 rounded-xl bg-white border border-[#E5EBE7] flex items-center gap-4 text-xs text-[#718078]">
-          <AlertCircle className="w-5 h-5 text-[#168653] shrink-0" />
-          <div>
-            <span className="font-bold text-[#101D25]">Institutional Compliance Notice:</span> RepayX complies strictly with Indian Telecommunications regulatory mandates (TRAI DLT registrations) and Fair Recovery Practices. Automated calls or notifications outside approved business windows are strictly blocked by system logic.
+        <div className="mt-12 p-5 sm:p-6 rounded-2xl bg-white border border-[#E5EBE7] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-[#718078] shadow-sm">
+          <div className="flex items-start sm:items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-[#168653] shrink-0 mt-0.5 sm:mt-0" />
+            <div>
+              <span className="font-bold text-[#101D25]">Institutional Compliance Notice:</span> RepayX complies strictly with Indian Telecommunications regulatory mandates (TRAI DLT registrations) and Fair Recovery Practices. Automated calls or notifications outside approved business windows are strictly blocked by system logic.
+            </div>
           </div>
+          <button
+            onClick={() => navigate('/settings')}
+            className="shrink-0 px-4 py-2 rounded-xl bg-[#EAF6EF] hover:bg-[#d8efe2] text-[#168653] font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-[#168653]/30"
+          >
+            <span>Policy Settings</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
     </section>

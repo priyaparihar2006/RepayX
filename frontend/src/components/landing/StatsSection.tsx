@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, BellRing, CheckCircle, IndianRupee, TrendingUp, Sparkles } from 'lucide-react';
+import { Users, BellRing, CheckCircle, IndianRupee, TrendingUp, Sparkles, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router';
 
 interface MetricItem {
   id: string;
@@ -10,9 +11,11 @@ interface MetricItem {
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   trend: string;
+  route: string;
 }
 
 export const StatsSection: React.FC = () => {
+  const navigate = useNavigate();
   const [hasAnimated, setHasAnimated] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
 
@@ -25,6 +28,7 @@ export const StatsSection: React.FC = () => {
       description: 'Active loan accounts scored and categorized for delinquency',
       icon: Users,
       trend: '+14% MoM Scale',
+      route: '/customers',
     },
     {
       id: 'reminders',
@@ -34,6 +38,7 @@ export const StatsSection: React.FC = () => {
       description: 'Omnichannel multi-touch nudges dispatched on schedule',
       icon: BellRing,
       trend: 'Real-Time Automation',
+      route: '/automation',
     },
     {
       id: 'delivery-rate',
@@ -43,6 +48,7 @@ export const StatsSection: React.FC = () => {
       description: 'Carrier-verified inbox & handset delivery across channels',
       icon: CheckCircle,
       trend: '99.9% WhatsApp Uptime',
+      route: '/whatsapp',
     },
     {
       id: 'amount-recovered',
@@ -53,6 +59,7 @@ export const StatsSection: React.FC = () => {
       description: 'Directly collected through automated conversational nudges',
       icon: IndianRupee,
       trend: '3.4x ROI vs Manual Callers',
+      route: '/dashboard',
     },
   ];
 
@@ -131,8 +138,9 @@ export const StatsSection: React.FC = () => {
 
   return (
     <section
+      id="stats"
       ref={sectionRef}
-      className="relative z-20 -mt-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+      className="relative z-20 -mt-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 scroll-mt-24"
       aria-label="Platform Statistics"
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -141,7 +149,9 @@ export const StatsSection: React.FC = () => {
           return (
             <div
               key={metric.id}
-              className="group relative bg-[#142630]/95 border border-white/10 hover:border-[#5DE5A1]/40 rounded-2xl p-5 shadow-xl shadow-black/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1"
+              onClick={() => navigate(metric.route)}
+              className="group relative bg-[#142630]/95 border border-white/10 hover:border-[#5DE5A1]/40 rounded-2xl p-5 shadow-xl shadow-black/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+              title={`Click to open ${metric.label} on Dashboard`}
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="w-10 h-10 rounded-xl bg-[#168653]/30 border border-[#5DE5A1]/20 flex items-center justify-center text-[#5DE5A1] group-hover:scale-110 transition-transform">
@@ -156,8 +166,11 @@ export const StatsSection: React.FC = () => {
                 {formatDisplayValue(metric, counts[metric.id] ?? 0)}
               </div>
 
-              <div className="text-xs font-semibold text-slate-200 mb-1">
-                {metric.label}
+              <div className="text-xs font-semibold text-slate-200 mb-1 flex items-center justify-between">
+                <span>{metric.label}</span>
+                <span className="text-[10px] text-[#5DE5A1] opacity-0 group-hover:opacity-100 transition-opacity font-mono">
+                  View →
+                </span>
               </div>
 
               <p className="text-[11px] text-slate-400 line-clamp-2">
@@ -169,7 +182,7 @@ export const StatsSection: React.FC = () => {
       </div>
 
       <p className="mt-3 text-center text-[11px] text-slate-400">
-        Illustrative performance metrics based on the RepayX portfolio recovery benchmarks.
+        Illustrative performance metrics based on the RepayX portfolio recovery benchmarks. Click any card to inspect.
       </p>
     </section>
   );

@@ -15,8 +15,12 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({ onOpenDemoModal })
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 pb-12 border-b border-white/10">
           {/* Col 1: Brand & Bio */}
           <div className="lg:col-span-5 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#168653] to-[#5DE5A1] p-0.5 shadow-md shadow-[#168653]/30">
+            <button
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="flex items-center gap-3 text-left cursor-pointer group"
+              title="Back to top"
+            >
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#168653] to-[#5DE5A1] p-0.5 shadow-md shadow-[#168653]/30 group-hover:scale-105 transition-transform">
                 <div className="w-full h-full bg-[#101D25] rounded-[10px] flex items-center justify-center text-white font-extrabold text-sm">
                   <span className="text-[#5DE5A1]">R</span>
                 </div>
@@ -24,7 +28,7 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({ onOpenDemoModal })
               <span className="font-extrabold text-lg tracking-tight text-white font-heading">
                 Repay<span className="text-[#5DE5A1]">X</span>
               </span>
-            </div>
+            </button>
 
             <p className="text-slate-400 text-xs leading-relaxed max-w-sm">
               AI-powered loan recovery and EMI reminder automation platform transforming collections for forward-thinking banks, NBFCs, and FinTech lenders.
@@ -99,12 +103,54 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({ onOpenDemoModal })
               Capabilities
             </h4>
             <ul className="space-y-2">
-              <li className="text-slate-400">Conversational WhatsApp</li>
-              <li className="text-slate-400">AI Voice Calling Agent</li>
-              <li className="text-slate-400">Dynamic UPI QR Intent</li>
-              <li className="text-slate-400">3-Stage Escalation Ladder</li>
-              <li className="text-slate-400">RAG Policy Retrieval</li>
-              <li className="text-slate-400">Executive OTS Authorizations</li>
+              <li>
+                <button
+                  onClick={() => navigate('/whatsapp')}
+                  className="hover:text-white transition-colors cursor-pointer text-left"
+                >
+                  Conversational WhatsApp
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => navigate('/automation')}
+                  className="hover:text-white transition-colors cursor-pointer text-left"
+                >
+                  AI Voice Calling Agent
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className="hover:text-white transition-colors cursor-pointer text-left"
+                >
+                  Dynamic UPI QR Intent
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => navigate('/escalations')}
+                  className="hover:text-white transition-colors cursor-pointer text-left"
+                >
+                  3-Stage Escalation Ladder
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => navigate('/knowledge-base')}
+                  className="hover:text-white transition-colors cursor-pointer text-left"
+                >
+                  RAG Policy Retrieval
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => navigate('/escalations')}
+                  className="hover:text-white transition-colors cursor-pointer text-left"
+                >
+                  Executive OTS Authorizations
+                </button>
+              </li>
             </ul>
           </div>
 

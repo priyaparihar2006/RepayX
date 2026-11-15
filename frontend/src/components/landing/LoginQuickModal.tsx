@@ -1,6 +1,7 @@
-import React from 'react';
-import { X, LayoutDashboard, KeyRound, ArrowRight, ShieldCheck, CheckCircle2, MessageSquare } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, LayoutDashboard, KeyRound, ArrowRight, ShieldCheck, CheckCircle2, MessageSquare, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import { setAutomationKey } from '../../services/automation';
 
 interface LoginQuickModalProps {
   isOpen: boolean;
@@ -14,6 +15,8 @@ export const LoginQuickModal: React.FC<LoginQuickModalProps> = ({
   onOpenContactModal,
 }) => {
   const navigate = useNavigate();
+  const [customKey, setCustomKey] = useState('');
+  const [keyError, setKeyError] = useState('');
 
   if (!isOpen) return null;
 
@@ -28,6 +31,17 @@ export const LoginQuickModal: React.FC<LoginQuickModalProps> = ({
   };
 
   const handleGoAutomation = () => {
+    onClose();
+    navigate('/automation');
+  };
+
+  const handleCustomKeySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customKey.trim()) {
+      setKeyError('Please enter an API authorization key');
+      return;
+    }
+    setAutomationKey(customKey.trim());
     onClose();
     navigate('/automation');
   };
@@ -131,7 +145,35 @@ export const LoginQuickModal: React.FC<LoginQuickModalProps> = ({
             </button>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
+          {/* Direct API Key Form */}
+          <form onSubmit={handleCustomKeySubmit} className="mt-4 pt-4 border-t border-white/10">
+            <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
+              Or Sign In with Institutional API Key:
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={customKey}
+                onChange={(e) => {
+                  setCustomKey(e.target.value);
+                  setKeyError('');
+                }}
+                placeholder="Enter API authorization key..."
+                className="flex-1 bg-[#101D25] border border-white/15 focus:border-[#5DE5A1] rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#168653] to-[#5DE5A1] text-[#101D25] font-bold text-xs hover:brightness-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              >
+                Sign In
+              </button>
+            </div>
+            {keyError && (
+              <p className="text-[11px] text-rose-400 mt-1">{keyError}</p>
+            )}
+          </form>
+
+          <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
             <span>Need institutional onboarding?</span>
             <button
               onClick={() => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LandingPage } from './LandingPage';
-import { renderAt } from '../test/render';
+import { location, renderAt } from '../test/render';
 
 describe('LandingPage', () => {
   it('renders hero headline, tagline, and CTA buttons', () => {
@@ -97,5 +97,49 @@ describe('LandingPage', () => {
     expect(screen.getByText('Welcome to RepayX')).toBeInTheDocument();
     expect(screen.getByText('Recovery Operational Cockpit')).toBeInTheDocument();
     expect(screen.getByText('Reminder Automation Key Gate')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Enter API authorization key/i)).toBeInTheDocument();
+  });
+
+  it('switches steps in How It Works section and shows corresponding action buttons', async () => {
+    const user = userEvent.setup();
+    renderAt(<LandingPage />, { url: '/', path: '/' });
+
+    // Step 01 default
+    expect(screen.getByRole('button', { name: /Try CSV Customer Ingestion/i })).toBeInTheDocument();
+
+    // Click step 2
+    const [step2] = screen.getAllByText('STEP 02');
+    await user.click(step2);
+    expect(screen.getByRole('button', { name: /Explore Delinquency Risk Models/i })).toBeInTheDocument();
+
+    // Click step 3
+    const [step3] = screen.getAllByText('STEP 03');
+    await user.click(step3);
+    expect(screen.getByRole('button', { name: /Launch WhatsApp & Channel Outreach/i })).toBeInTheDocument();
+
+    // Click step 4
+    const [step4] = screen.getAllByText('STEP 04');
+    await user.click(step4);
+    expect(screen.getByRole('button', { name: /View Settlement Cockpit on Dashboard/i })).toBeInTheDocument();
+  });
+
+  it('navigates to dashboard when clicking Explore RepayX', async () => {
+    const user = userEvent.setup();
+    renderAt(<LandingPage />, { url: '/', path: '/' });
+
+    const [exploreBtn] = screen.getAllByRole('button', { name: /Explore RepayX/i });
+    await user.click(exploreBtn);
+
+    expect(location()).toBe('/dashboard');
+  });
+
+  it('navigates to whatsapp when clicking floating WhatsApp quick launcher', async () => {
+    const user = userEvent.setup();
+    renderAt(<LandingPage />, { url: '/', path: '/' });
+
+    const [waFloatingBtn] = screen.getAllByRole('button', { name: /WhatsApp/i });
+    await user.click(waFloatingBtn);
+
+    expect(location()).toBe('/whatsapp');
   });
 });

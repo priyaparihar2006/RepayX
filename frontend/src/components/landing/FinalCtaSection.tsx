@@ -10,7 +10,7 @@ export const FinalCtaSection: React.FC<FinalCtaSectionProps> = ({ onOpenDemoModa
   const navigate = useNavigate();
 
   return (
-    <section className="relative py-24 lg:py-32 bg-[#101D25] text-white overflow-hidden border-t border-white/10">
+    <section id="contact" className="scroll-mt-24 relative py-24 lg:py-32 bg-[#101D25] text-white overflow-hidden border-t border-white/10">
       {/* Background ambient lighting */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[radial-gradient(circle_at_center,rgba(93,229,161,0.18)_0%,rgba(16,29,37,0)_70%)] pointer-events-none" />
       <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-[#168653]/25 rounded-full blur-[100px] pointer-events-none" />

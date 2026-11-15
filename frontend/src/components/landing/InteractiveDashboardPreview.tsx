@@ -68,7 +68,7 @@ export const InteractiveDashboardPreview: React.FC = () => {
   ];
 
   return (
-    <section id="platform" className="py-20 lg:py-28 bg-[#F5F8F6] text-[#202B25] relative">
+    <section id="platform" className="scroll-mt-24 py-20 lg:py-28 bg-[#F5F8F6] text-[#202B25] relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
@@ -182,45 +182,73 @@ export const InteractiveDashboardPreview: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 4 KPI Cards (replicated from live dashboard) */}
+                {/* 4 KPI Cards (replicated from live dashboard & clickable) */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                  <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E5EBE7] shadow-sm flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                  <div
+                    onClick={() => navigate('/customers')}
+                    className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E5EBE7] shadow-sm flex items-center gap-3.5 cursor-pointer hover:border-[#168653] hover:shadow-md transition-all group"
+                    title="Click to view Customer Risk Portfolio"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                       <Users className="w-5 h-5" />
                     </div>
                     <div>
                       <div className="text-xl sm:text-2xl font-extrabold text-[#101D25] font-heading">61,503</div>
-                      <span className="text-[11px] font-semibold text-[#718078]">Total Customers</span>
+                      <span className="text-[11px] font-semibold text-[#718078] flex items-center gap-1">
+                        <span>Total Customers</span>
+                        <span className="text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                      </span>
                     </div>
                   </div>
 
-                  <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E5EBE7] shadow-sm flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <div
+                    onClick={() => navigate('/automation')}
+                    className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E5EBE7] shadow-sm flex items-center gap-3.5 cursor-pointer hover:border-blue-400 hover:shadow-md transition-all group"
+                    title="Click to view Active Reminders in Automation Hub"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                       <CalendarClock className="w-5 h-5" />
                     </div>
                     <div>
                       <div className="text-xl sm:text-2xl font-extrabold text-[#101D25] font-heading">24</div>
-                      <span className="text-[11px] font-semibold text-[#718078]">Active Reminders</span>
+                      <span className="text-[11px] font-semibold text-[#718078] flex items-center gap-1">
+                        <span>Active Reminders</span>
+                        <span className="text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                      </span>
                     </div>
                   </div>
 
-                  <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E5EBE7] shadow-sm flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                  <div
+                    onClick={() => navigate('/whatsapp')}
+                    className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E5EBE7] shadow-sm flex items-center gap-3.5 cursor-pointer hover:border-emerald-400 hover:shadow-md transition-all group"
+                    title="Click to view Delivery Status in WhatsApp Hub"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                       <CheckCircle2 className="w-5 h-5" />
                     </div>
                     <div>
                       <div className="text-xl sm:text-2xl font-extrabold text-[#101D25] font-heading">98%</div>
-                      <span className="text-[11px] font-semibold text-[#718078]">Delivery Rate</span>
+                      <span className="text-[11px] font-semibold text-[#718078] flex items-center gap-1">
+                        <span>Delivery Rate</span>
+                        <span className="text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                      </span>
                     </div>
                   </div>
 
-                  <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E5EBE7] shadow-sm flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                  <div
+                    onClick={() => navigate('/dashboard')}
+                    className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E5EBE7] shadow-sm flex items-center gap-3.5 cursor-pointer hover:border-amber-400 hover:shadow-md transition-all group"
+                    title="Click to view Recovered Ledgers on Dashboard"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                       <TrendingUp className="w-5 h-5" />
                     </div>
                     <div>
                       <div className="text-xl sm:text-2xl font-extrabold text-[#168653] font-heading">₹12.5L</div>
-                      <span className="text-[11px] font-semibold text-[#718078]">Recovered</span>
+                      <span className="text-[11px] font-semibold text-[#718078] flex items-center gap-1">
+                        <span>Recovered</span>
+                        <span className="text-[#168653] opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -434,6 +462,16 @@ export const InteractiveDashboardPreview: React.FC = () => {
                       <p className="text-[11px] text-rose-700 mt-1">OTS settlement proposal requiring executive approval.</p>
                     </div>
                   </div>
+
+                  <div className="mt-5 pt-3 border-t border-[#E5EBE7] flex justify-end">
+                    <button
+                      onClick={() => navigate('/analytics/risk')}
+                      className="px-4 py-2 rounded-xl bg-[#168653] hover:bg-[#157347] text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    >
+                      <span>Explore Live Risk Analytics</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -455,6 +493,16 @@ export const InteractiveDashboardPreview: React.FC = () => {
                     <span className="text-emerald-700">[2026-11-13 11:40:12] UPI_INTENT_PAID: ₹8,500 Ref: UPI/6391204</span>
                     <span className="text-emerald-700 font-sans text-[10px] font-bold">SETTLED</span>
                   </div>
+                </div>
+
+                <div className="mt-5 pt-3 border-t border-[#E5EBE7] flex justify-end">
+                  <button
+                    onClick={() => navigate('/whatsapp')}
+                    className="px-4 py-2 rounded-xl bg-[#168653] hover:bg-[#157347] text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    <span>Launch Live WhatsApp & Multi-Channel Console</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             )}

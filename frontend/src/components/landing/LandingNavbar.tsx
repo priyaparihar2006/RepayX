@@ -27,13 +27,19 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
     setMobileMenuOpen(false);
     const element = document.getElementById(id);
     if (element) {
-      const navOffset = 80;
+      const navOffset = 84;
       const elementPosition = element.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.pageYOffset - navOffset;
+      const currentScroll = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+      const offsetPosition = elementPosition + currentScroll - navOffset;
       window.scrollTo({
-        top: offsetPosition,
+        top: Math.max(0, offsetPosition),
         behavior: 'smooth',
       });
+      try {
+        window.history.pushState(null, '', `#${id}`);
+      } catch {}
+    } else if (id === 'contact') {
+      onOpenDemoModal();
     }
   };
 
@@ -44,6 +50,7 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
     { label: 'How It Works', id: 'how-it-works' },
     { label: 'Simulator', id: 'simulator' },
     { label: 'Security', id: 'security' },
+    { label: 'Contact', id: 'contact' },
   ];
 
   return (
@@ -94,12 +101,6 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
                 {link.label}
               </button>
             ))}
-            <button
-              onClick={onOpenDemoModal}
-              className="px-3.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 rounded-full transition-all cursor-pointer"
-            >
-              Contact
-            </button>
           </nav>
 
           {/* CTA Buttons */}

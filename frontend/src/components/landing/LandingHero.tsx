@@ -23,7 +23,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onOpenDemoModal }) => 
   return (
     <section
       id="hero"
-      className="relative min-h-screen pt-28 pb-16 lg:pt-36 lg:pb-24 flex items-center bg-[#101D25] text-white overflow-hidden"
+      className="relative min-h-screen pt-28 pb-16 lg:pt-36 lg:pb-24 flex items-center bg-[#101D25] text-white overflow-hidden scroll-mt-24"
     >
       {/* Background ambient radial gradients & grid pattern */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(22,134,83,0.25),rgba(255,255,255,0))]" />
@@ -91,7 +91,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onOpenDemoModal }) => 
               </button>
             </div>
 
-            {/* Trust Micro-Badges */}
+            {/* Trust Micro-Badges & Quick Section Links */}
             <div className="pt-6 border-t border-white/10 flex flex-wrap items-center justify-center lg:justify-start gap-y-3 gap-x-6 text-xs text-slate-400">
               <div className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-[#5DE5A1]" />
@@ -105,6 +105,42 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onOpenDemoModal }) => 
                 <Zap className="w-4 h-4 text-[#5DE5A1]" />
                 <span>Instant Dynamic UPI QR</span>
               </div>
+            </div>
+
+            {/* Quick Exploration Jump Links */}
+            <div className="flex items-center justify-center lg:justify-start gap-3 pt-1 text-xs">
+              <button
+                onClick={() => {
+                  const el = document.getElementById('features');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="text-slate-400 hover:text-[#5DE5A1] transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <span>View Features</span>
+                <span>↓</span>
+              </button>
+              <span className="text-white/20">•</span>
+              <button
+                onClick={() => {
+                  const el = document.getElementById('how-it-works');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="text-slate-400 hover:text-[#5DE5A1] transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <span>How It Works</span>
+                <span>↓</span>
+              </button>
+              <span className="text-white/20">•</span>
+              <button
+                onClick={() => {
+                  const el = document.getElementById('platform');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="text-slate-400 hover:text-[#5DE5A1] transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <span>Dashboard Preview</span>
+                <span>↓</span>
+              </button>
             </div>
           </div>
 
@@ -139,39 +175,48 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onOpenDemoModal }) => 
                 </div>
               </div>
 
-              {/* Floating Simulated Notification Card 2: AI Voice Reminder */}
+              {/* Floating Simulated Notification Card 2: AI Voice Reminder (Clickable) */}
               <div
-                className="absolute -bottom-2 left-0 sm:-left-4 max-w-[190px] sm:max-w-[220px] p-2.5 sm:p-3 rounded-xl bg-[#142630]/90 border border-white/15 backdrop-blur-md shadow-xl shadow-black/40 animate-float"
+                onClick={() => navigate('/automation')}
+                className="absolute -bottom-2 left-0 sm:-left-4 max-w-[190px] sm:max-w-[220px] p-2.5 sm:p-3 rounded-xl bg-[#142630]/90 border border-white/15 backdrop-blur-md shadow-xl shadow-black/40 animate-float cursor-pointer hover:border-[#5DE5A1] hover:scale-105 transition-all group"
                 style={{ animationDuration: '7s', animationDelay: '1.5s' }}
+                title="Click to view Voice & Automation Reminders"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-emerald-500/20 flex items-center justify-center text-[#5DE5A1]">
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-emerald-500/20 flex items-center justify-center text-[#5DE5A1] group-hover:bg-[#168653]">
                     <PhoneCall className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   </div>
-                  <div className="text-[10px] sm:text-[11px] font-bold text-white leading-tight">
-                    AI Voice Call Answered
+                  <div className="text-[10px] sm:text-[11px] font-bold text-white leading-tight flex items-center gap-1">
+                    <span>AI Voice Call Answered</span>
+                    <span className="text-[9px] text-[#5DE5A1] font-mono">↗</span>
                   </div>
                 </div>
                 <p className="text-[9px] sm:text-[10px] text-slate-300">
                   Customer promised repayment: &quot;Salary on 15th&quot;
                 </p>
-                <div className="mt-1 flex items-center gap-1 text-[8px] sm:text-[9px] text-emerald-400 font-medium">
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span>PTP Logged Automatically</span>
+                <div className="mt-1 flex items-center justify-between text-[8px] sm:text-[9px]">
+                  <div className="flex items-center gap-1 text-emerald-400 font-medium">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>PTP Logged</span>
+                  </div>
+                  <span className="underline text-[#5DE5A1] group-hover:text-white transition-colors">Reminders →</span>
                 </div>
               </div>
 
-              {/* Floating Simulated Notification Card 3: Payment Recovered */}
+              {/* Floating Simulated Notification Card 3: Payment Recovered (Clickable) */}
               <div
-                className="absolute top-1/2 right-0 sm:-right-8 -translate-y-1/2 max-w-[185px] sm:max-w-[210px] p-2.5 sm:p-3 rounded-xl bg-[#142630]/95 border border-[#5DE5A1]/40 backdrop-blur-md shadow-2xl shadow-[#168653]/30 animate-float"
+                onClick={() => navigate('/dashboard')}
+                className="absolute top-1/2 right-0 sm:-right-8 -translate-y-1/2 max-w-[185px] sm:max-w-[210px] p-2.5 sm:p-3 rounded-xl bg-[#142630]/95 border border-[#5DE5A1]/40 backdrop-blur-md shadow-2xl shadow-[#168653]/30 animate-float cursor-pointer hover:border-[#5DE5A1] hover:scale-105 transition-all group"
                 style={{ animationDuration: '6.5s', animationDelay: '0.8s' }}
+                title="Click to view Recovered Ledgers on Dashboard"
               >
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-[#5DE5A1] flex items-center justify-center text-[#101D25]">
                     <CreditCard className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   </div>
-                  <div className="text-[10px] sm:text-[11px] font-bold text-white leading-tight">
-                    Payment Recovered
+                  <div className="text-[10px] sm:text-[11px] font-bold text-white leading-tight flex items-center gap-1">
+                    <span>Payment Recovered</span>
+                    <span className="text-[9px] text-[#5DE5A1] font-mono">↗</span>
                   </div>
                 </div>
                 <p className="text-[9px] sm:text-[10px] text-slate-300">
@@ -179,7 +224,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({ onOpenDemoModal }) => 
                 </p>
                 <div className="mt-1 flex items-center justify-between text-[8px] sm:text-[9px] text-[#5DE5A1] font-bold">
                   <span>Reconciled</span>
-                  <span>+₹12,450</span>
+                  <span className="underline group-hover:text-white transition-colors">+₹12,450 · Dashboard →</span>
                 </div>
               </div>
             </div>

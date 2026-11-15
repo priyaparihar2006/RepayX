@@ -103,7 +103,7 @@ export const AiRecoverySimulator: React.FC = () => {
   };
 
   return (
-    <section id="simulator" className="py-20 lg:py-28 bg-[#101D25] text-white relative overflow-hidden">
+    <section id="simulator" className="scroll-mt-24 py-20 lg:py-28 bg-[#101D25] text-white relative overflow-hidden">
       {/* Background glow & subtle grid */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-[#168653]/15 rounded-full blur-[160px] pointer-events-none" />
 

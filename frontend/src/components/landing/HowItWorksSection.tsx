@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
   FileSpreadsheet,
   BrainCircuit,
@@ -8,9 +9,11 @@ import {
   Sparkles,
   ShieldCheck,
   ChevronRight,
+  ExternalLink,
 } from 'lucide-react';
 
 export const HowItWorksSection: React.FC = () => {
+  const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
 
   const steps = [
@@ -22,6 +25,8 @@ export const HowItWorksSection: React.FC = () => {
         'Import customer records with loan account numbers, overdue EMI values, due dates, and contact channels. Built-in instant CSV validation checks ensure phone and email accuracy before outreach.',
       icon: FileSpreadsheet,
       badge: 'Zero Schema Drift',
+      actionLabel: 'Try CSV Customer Ingestion',
+      route: '/automation',
       details: [
         'Instant CSV column auto-mapping',
         'Duplicate & invalid mobile sanitization',
@@ -40,6 +45,8 @@ export const HowItWorksSection: React.FC = () => {
         'Machine learning models assess borrower default probability, past repayment patterns, and Days Past Due (DPD) to segment accounts into personalized outreach cadences.',
       icon: BrainCircuit,
       badge: 'Automated Prioritization',
+      actionLabel: 'Explore Delinquency Risk Models',
+      route: '/analytics/risk',
       details: [
         'Risk-tiered recovery prioritization',
         'Optimal contact-hour prediction',
@@ -58,6 +65,8 @@ export const HowItWorksSection: React.FC = () => {
         'Dispatches contextual reminders across WhatsApp, AI Voice calls, SMS, and Email. Messages feature borrower-specific dynamic UPI QR payment links and vernacular messaging.',
       icon: Send,
       badge: 'TRAI & DLT Compliant',
+      actionLabel: 'Launch WhatsApp & Channel Outreach',
+      route: '/whatsapp',
       details: [
         'WhatsApp Business Cloud templates',
         'Interactive AI conversational voice assistant',
@@ -76,6 +85,8 @@ export const HowItWorksSection: React.FC = () => {
         'Inbound borrower replies are classified by natural language processing (salary delays, dispute claims, payment promises). Unresolved cases automatically progress to manager review.',
       icon: CheckCheck,
       badge: 'Settlement Reconciliation',
+      actionLabel: 'View Settlement Cockpit on Dashboard',
+      route: '/dashboard',
       details: [
         'Real-time PTP (Promise to Pay) calendar tracking',
         'Manager sign-off for One-Time Settlement (OTS)',
@@ -89,7 +100,7 @@ export const HowItWorksSection: React.FC = () => {
   ];
 
   return (
-    <section id="how-it-works" className="py-20 lg:py-28 bg-[#101D25] text-white relative overflow-hidden">
+    <section id="how-it-works" className="scroll-mt-24 py-20 lg:py-28 bg-[#101D25] text-white relative overflow-hidden">
       {/* Background glow effects */}
       <div className="absolute top-1/3 -right-40 w-96 h-96 bg-[#168653]/15 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-10 -left-40 w-96 h-96 bg-[#5DE5A1]/10 rounded-full blur-[140px] pointer-events-none" />
@@ -192,6 +203,15 @@ export const HowItWorksSection: React.FC = () => {
               <p className="mt-2 text-sm text-slate-300 max-w-2xl">
                 {steps[activeStep].description}
               </p>
+              <div className="mt-5">
+                <button
+                  onClick={() => navigate(steps[activeStep].route)}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#168653] to-[#5DE5A1] text-[#101D25] font-extrabold text-xs shadow-md shadow-[#168653]/30 hover:brightness-105 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <span>{steps[activeStep].actionLabel}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             <div className="bg-[#101D25] border border-white/10 rounded-xl p-4 sm:p-5 min-w-[280px]">

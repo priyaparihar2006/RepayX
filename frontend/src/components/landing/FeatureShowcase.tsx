@@ -35,7 +35,7 @@ export const FeatureShowcase: React.FC = () => {
   const [activeEscalationStage, setActiveEscalationStage] = useState<1 | 2 | 3>(1);
 
   return (
-    <section id="features" className="py-20 lg:py-32 bg-white text-[#202B25] relative">
+    <section id="features" className="scroll-mt-24 py-20 lg:py-32 bg-white text-[#202B25] relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-28 lg:space-y-36">
         {/* Section Master Header */}
         <div className="text-center max-w-3xl mx-auto">
@@ -387,6 +387,17 @@ export const FeatureShowcase: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => navigate('/automation')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#168653] hover:bg-[#157347] text-white text-xs font-bold transition-all shadow-md shadow-[#168653]/20 cursor-pointer"
+              >
+                <PhoneCall className="w-4 h-4" />
+                <span>Configure AI Voice Reminders</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -490,6 +501,17 @@ export const FeatureShowcase: React.FC = () => {
               </div>
             </div>
           </div>
+
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={() => navigate('/escalations')}
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#168653] hover:bg-[#157347] text-white text-xs font-bold transition-all shadow-md shadow-[#168653]/20 cursor-pointer"
+            >
+              <GitBranch className="w-4 h-4" />
+              <span>Open Live Escalations Queue</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* ========================================================
@@ -528,6 +550,17 @@ export const FeatureShowcase: React.FC = () => {
                   <div className="font-bold text-xs text-[#5DE5A1]">Official Email Notices</div>
                   <div className="text-[11px] text-slate-400 mt-0.5">Legally compliant loan ledgers & notices</div>
                 </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={() => navigate('/automation')}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#168653] to-[#5DE5A1] text-[#101D25] text-xs font-extrabold transition-all shadow-md shadow-[#168653]/30 cursor-pointer"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Configure Multi-Channel Automations</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
 
