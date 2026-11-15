@@ -169,9 +169,15 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
         if assets_dir.exists():
             app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
+        SPA_HTML_HEADERS = {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+
         @app.get("/")
         async def serve_root():
-            return FileResponse(frontend_dist / "index.html")
+            return FileResponse(frontend_dist / "index.html", headers=SPA_HTML_HEADERS)
 
         def _get_routes():
             routes = []
@@ -198,10 +204,15 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
                         elif "GET" not in methods:
                             raise HTTPException(status_code=405, detail="Method Not Allowed")
                 raise HTTPException(status_code=404, detail="Not Found")
+
+            # Missing assets must return 404, never index.html (to prevent MIME type errors in browsers)
+            if full_path.startswith("assets/"):
+                raise HTTPException(status_code=404, detail="Asset not found")
+
             target_file = frontend_dist / full_path
             if target_file.is_file():
                 return FileResponse(target_file)
-            return FileResponse(frontend_dist / "index.html")
+            return FileResponse(frontend_dist / "index.html", headers=SPA_HTML_HEADERS)
     else:
         @app.get("/")
         def root():

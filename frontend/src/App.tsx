@@ -20,28 +20,53 @@ import { AiAssistantDrawer } from './components/ai-drawer/AiAssistantDrawer';
 import { EmptyState, LoadingState } from './components/common/RequestState';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
+// Helper for lazy loading that gracefully reloads once if a build deployment replaced asset chunks
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+) {
+  return lazy(async () => {
+    try {
+      const mod = await factory();
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('repayx_chunk_reload_' + window.location.pathname);
+      }
+      return mod;
+    } catch (error) {
+      if (typeof window !== 'undefined') {
+        const key = 'repayx_chunk_reload_' + window.location.pathname;
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, '1');
+          window.location.reload();
+          return new Promise(() => {}) as unknown as { default: T };
+        }
+      }
+      throw error;
+    }
+  });
+}
+
 // Pages are loaded on first visit to keep the initial bundle small.
-const LandingPage = lazy(() => import('./pages/LandingPage').then((m) => ({ default: m.LandingPage })));
-const OverviewDashboard = lazy(() => import('./components/dashboard/OverviewDashboard').then((m) => ({ default: m.OverviewDashboard })));
-const ConversationView = lazy(() => import('./components/conversations/ConversationView').then((m) => ({ default: m.ConversationView })));
-const DemoCustomersPage = lazy(() => import('./components/customers/CustomersPage').then((m) => ({ default: m.CustomersPage })));
-const CustomerDetailView = lazy(() => import('./components/customers/CustomerDetailView').then((m) => ({ default: m.CustomerDetailView })));
-const FollowupsPage = lazy(() => import('./components/followups/FollowupsPage').then((m) => ({ default: m.FollowupsPage })));
-const RagKnowledgeBasePage = lazy(() => import('./components/rag/RagKnowledgeBasePage').then((m) => ({ default: m.RagKnowledgeBasePage })));
-const PaymentsPage = lazy(() => import('./components/payments/PaymentsPage').then((m) => ({ default: m.PaymentsPage })));
-const EscalationsPage = lazy(() => import('./components/escalations/EscalationsPage').then((m) => ({ default: m.EscalationsPage })));
-const AiInsightsPage = lazy(() => import('./components/insights/AiInsightsPage').then((m) => ({ default: m.AiInsightsPage })));
-const LoansPage = lazy(() => import('./components/loans/LoansPage').then((m) => ({ default: m.LoansPage })));
-const SettingsPage = lazy(() => import('./components/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
-const ReportsPage = lazy(() => import('./components/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
-const CustomersPage = lazy(() => import('./pages/Customers').then((m) => ({ default: m.CustomersPage })));
-const AIInsightsPage = lazy(() => import('./pages/AIInsights').then((m) => ({ default: m.AIInsightsPage })));
-const DashboardPage = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.DashboardPage })));
-const RiskAnalyticsPage = lazy(() => import('./pages/RiskAnalytics').then((m) => ({ default: m.RiskAnalyticsPage })));
-const RepaymentAnalyticsPage = lazy(() => import('./pages/RepaymentAnalytics').then((m) => ({ default: m.RepaymentAnalyticsPage })));
-const CustomerDetailsPage = lazy(() => import('./pages/CustomerDetails').then((m) => ({ default: m.CustomerDetailsPage })));
-const WhatsAppPage = lazy(() => import('./pages/WhatsApp').then((m) => ({ default: m.WhatsAppPage })));
-const AutomationPage = lazy(() => import('./pages/Automation').then((m) => ({ default: m.AutomationPage })));
+const LandingPage = lazyWithRetry(() => import('./pages/LandingPage').then((m) => ({ default: m.LandingPage })));
+const OverviewDashboard = lazyWithRetry(() => import('./components/dashboard/OverviewDashboard').then((m) => ({ default: m.OverviewDashboard })));
+const ConversationView = lazyWithRetry(() => import('./components/conversations/ConversationView').then((m) => ({ default: m.ConversationView })));
+const DemoCustomersPage = lazyWithRetry(() => import('./components/customers/CustomersPage').then((m) => ({ default: m.CustomersPage })));
+const CustomerDetailView = lazyWithRetry(() => import('./components/customers/CustomerDetailView').then((m) => ({ default: m.CustomerDetailView })));
+const FollowupsPage = lazyWithRetry(() => import('./components/followups/FollowupsPage').then((m) => ({ default: m.FollowupsPage })));
+const RagKnowledgeBasePage = lazyWithRetry(() => import('./components/rag/RagKnowledgeBasePage').then((m) => ({ default: m.RagKnowledgeBasePage })));
+const PaymentsPage = lazyWithRetry(() => import('./components/payments/PaymentsPage').then((m) => ({ default: m.PaymentsPage })));
+const EscalationsPage = lazyWithRetry(() => import('./components/escalations/EscalationsPage').then((m) => ({ default: m.EscalationsPage })));
+const AiInsightsPage = lazyWithRetry(() => import('./components/insights/AiInsightsPage').then((m) => ({ default: m.AiInsightsPage })));
+const LoansPage = lazyWithRetry(() => import('./components/loans/LoansPage').then((m) => ({ default: m.LoansPage })));
+const SettingsPage = lazyWithRetry(() => import('./components/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const ReportsPage = lazyWithRetry(() => import('./components/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
+const CustomersPage = lazyWithRetry(() => import('./pages/Customers').then((m) => ({ default: m.CustomersPage })));
+const AIInsightsPage = lazyWithRetry(() => import('./pages/AIInsights').then((m) => ({ default: m.AIInsightsPage })));
+const DashboardPage = lazyWithRetry(() => import('./pages/Dashboard').then((m) => ({ default: m.DashboardPage })));
+const RiskAnalyticsPage = lazyWithRetry(() => import('./pages/RiskAnalytics').then((m) => ({ default: m.RiskAnalyticsPage })));
+const RepaymentAnalyticsPage = lazyWithRetry(() => import('./pages/RepaymentAnalytics').then((m) => ({ default: m.RepaymentAnalyticsPage })));
+const CustomerDetailsPage = lazyWithRetry(() => import('./pages/CustomerDetails').then((m) => ({ default: m.CustomerDetailsPage })));
+const WhatsAppPage = lazyWithRetry(() => import('./pages/WhatsApp').then((m) => ({ default: m.WhatsAppPage })));
+const AutomationPage = lazyWithRetry(() => import('./pages/Automation').then((m) => ({ default: m.AutomationPage })));
 
 // URL for each sidebar tab. 'ai-assistant' opens the drawer instead of a page.
 const TAB_PATHS: Record<Exclude<NavTab, 'ai-assistant'>, string> = {
@@ -135,9 +160,11 @@ function AppContent() {
 
   if (isLandingPage) {
     return (
-      <Suspense fallback={<LoadingState />}>
-        <LandingPage />
-      </Suspense>
+      <ErrorBoundary fallbackTitle="Unable to load landing page">
+        <Suspense fallback={<LoadingState />}>
+          <LandingPage />
+        </Suspense>
+      </ErrorBoundary>
     );
   }
 
@@ -258,8 +285,8 @@ function AppContent() {
         />
 
         <main className="flex-1 p-3.5 sm:p-6 lg:p-8 overflow-y-auto">
-          <Suspense fallback={<LoadingState />}>
-            <ErrorBoundary fallbackTitle="Unable to load page content">
+          <ErrorBoundary fallbackTitle="Unable to load page content">
+            <Suspense fallback={<LoadingState />}>
               <Routes>
             {/* Connected to the RepayX API */}
             <Route path="/" element={<DashboardPage />} />
@@ -370,8 +397,8 @@ function AppContent() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFound />} />
               </Routes>
-            </ErrorBoundary>
-          </Suspense>
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
 
@@ -422,10 +449,12 @@ const NotFound: React.FC = () => (
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
-    </BrowserRouter>
+    <ErrorBoundary fallbackTitle="RepayX application encountered an unexpected error">
+      <BrowserRouter>
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

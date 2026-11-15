@@ -152,6 +152,15 @@ function isLocalhost(url: string): boolean {
 
 function getBaseUrl(): string {
   if (resolvedBaseUrl) return resolvedBaseUrl;
+
+  // In production browser, when hosted on Render or Vercel, always use same-origin relative path /api
+  if (typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname;
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+      return '';
+    }
+  }
+
   const envBase = import.meta.env.VITE_API_BASE_URL;
   if (envBase) return envBase.replace(/\/+$/, '');
   if (typeof window !== 'undefined' && window.location) {

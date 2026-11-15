@@ -35,12 +35,24 @@ export class ApiError extends Error {
 const REQUEST_TIMEOUT_MS = 90_000; // Allow 90s for cloud instances (e.g. Render free tier cold starts)
 
 function baseUrl(): string {
-  const value = import.meta.env.VITE_API_BASE_URL;
-  if (!value) {
-    if (import.meta.env.MODE === 'test') {
+  if (import.meta.env.MODE === 'test') {
+    const value = import.meta.env.VITE_API_BASE_URL;
+    if (!value) {
       throw new ApiError('config', 'The API address is not configured. Set VITE_API_BASE_URL in .env and restart the dev server.');
     }
-    // In production browser environment on Vercel, relative path /api works via proxy
+    return value.replace(/\/+$/, '');
+  }
+
+  // In production browser, when hosted on Render or Vercel, always use same-origin relative path /api
+  if (typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname;
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+      return '';
+    }
+  }
+
+  const value = import.meta.env.VITE_API_BASE_URL;
+  if (!value) {
     if (typeof window !== 'undefined' && window.location) {
       return '';
     }
