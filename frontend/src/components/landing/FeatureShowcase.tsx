@@ -20,12 +20,165 @@ import {
   Play,
   Pause,
   Repeat,
+  Check,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
+
+interface ConversationMessage {
+  sender: 'ai' | 'borrower';
+  badge?: string;
+  en: string;
+  hi: string;
+  time: string;
+  hasUpiCard?: boolean;
+}
+
+interface RealBorrowerConversation {
+  id: 'rahul' | 'nancy' | 'ananya';
+  customerName: string;
+  phone: string;
+  loanId: string;
+  amount: string;
+  overdueInfo: string;
+  avatarText: string;
+  tag: string;
+  vpa: string;
+  messages: ConversationMessage[];
+}
+
+const REAL_CONVERSATIONS: RealBorrowerConversation[] = [
+  {
+    id: 'rahul',
+    customerName: 'Rahul Sharma',
+    phone: '+91 98201 54321',
+    loanId: 'LN1001',
+    amount: '₹8,500',
+    overdueInfo: '5 days overdue',
+    avatarText: 'RS',
+    tag: 'Salary Delay · PTP Logged',
+    vpa: 'repayx.recovery@icici',
+    messages: [
+      {
+        sender: 'ai',
+        time: '10:30 AM',
+        en: 'Hello Rahul, your scheduled payment of ₹8,500 for Loan LN1001 was due on 25 September. Please let us know when you expect to complete the payment.',
+        hi: 'नमस्ते Rahul जी, लोन LN1001 की आपकी ₹8,500 की EMI 25 सितम्बर को देय थी। कृपया बताएं कि आप भुगतान कब तक पूरा करेंगे।',
+      },
+      {
+        sender: 'borrower',
+        time: '11:15 AM',
+        en: 'Sir salary late ho gayi hai, 5 din mein payment kar dunga.',
+        hi: 'Sir salary late ho gayi hai, 5 din mein payment kar dunga.',
+      },
+      {
+        sender: 'ai',
+        time: '11:16 AM',
+        badge: 'RepayX AI · PTP Logged (Salary Delay · 94% Confidence)',
+        en: 'Thank you for letting us know. We have noted your expected payment timeline. We will follow up with you on 30 September 2026.',
+        hi: 'धन्यवाद राहुल जी। हमने आपकी 30 सितम्बर 2026 तक की समय-सीमा नोट कर ली है। हमारी प्रणाली ने फॉलो-अप ऑटो-शेड्यूल कर दिया है।',
+      },
+      {
+        sender: 'borrower',
+        time: '09:42 AM',
+        en: 'Sure sir, 30 tak 100% ho jayega, direct account se pay karunga.',
+        hi: 'Sure sir, 30 tak 100% ho jayega, direct account se pay karunga.',
+      },
+      {
+        sender: 'ai',
+        time: '09:44 AM',
+        hasUpiCard: true,
+        en: 'Noted Rahul! Here is your instant Dynamic UPI Payment Intent QR for your ₹8,500 EMI on loan LN1001. You can scan or tap below to pay directly inside this WhatsApp chat.',
+        hi: 'नोट कर लिया राहुल जी! लोन LN1001 की ₹8,500 EMI के लिए आपका इंस्टेंट डायनामिक UPI QR कोड तैयार है। आप सीधे व्हाट्सएप से भुगतान कर सकते हैं।',
+      },
+    ],
+  },
+  {
+    id: 'nancy',
+    customerName: 'Nancy Sharma',
+    phone: '+91 70602 00849',
+    loanId: '#385057',
+    amount: '₹12,000',
+    overdueInfo: '40 days overdue · Balance ₹63,502',
+    avatarText: 'NS',
+    tag: 'Live Database · EMI Balance',
+    vpa: 'repayx.recovery@icici',
+    messages: [
+      {
+        sender: 'ai',
+        time: '10:00 AM',
+        en: 'URGENT EMI NOTICE: Dear Nancy, your RepayX Loan Account #385057 has an overdue balance of ₹63,502.51 (40 days past due). Total Loan: ₹1,00,000 | Paid: ₹36,497.49 (3 EMIs cleared). Please complete your EMI payment today: https://pay.repayx.ai/inv/385057',
+        hi: 'अति आवश्यक EMI सूचना: प्रिय Nancy, आपके RepayX लोन खाता #385057 में ₹63,502.51 बकाया है (40 दिन overdue)। कुल लोन: ₹1,00,000 | चुकाया गया: ₹36,497.49 (3 किस्तें जमा)। आज ही भुगतान करें: https://pay.repayx.ai/inv/385057',
+      },
+      {
+        sender: 'borrower',
+        time: '10:14 AM',
+        en: 'How much EMI is left to repay on my loan? Can I pay right now?',
+        hi: 'मेरे लोन पर कुल कितनी EMI बची हुई है? क्या मैं अभी पे कर सकती हूँ?',
+      },
+      {
+        sender: 'ai',
+        time: '10:15 AM',
+        badge: 'RepayX AI Two-Way NLU · Ledger Match',
+        en: 'Hello Nancy, here are your RepayX Loan #385057 details:\n• Total Loan: ₹1,00,000.00\n• Total EMI Paid: ₹36,497.49\n• Remaining EMI Balance Left: ₹63,502.51 (Monthly EMI: ₹12,000.00)',
+        hi: 'नमस्ते Nancy, आपके RepayX लोन #385057 का विवरण:\n• कुल लोन: ₹1,00,000.00\n• कुल चुकाया गया: ₹36,497.49\n• कुल शेष EMI: ₹63,502.51 (मासिक किस्त: ₹12,000.00)',
+      },
+      {
+        sender: 'borrower',
+        time: '10:18 AM',
+        en: 'Please send me QR code to pay my monthly EMI of ₹12,000 right now.',
+        hi: 'कृपया मुझे अभी ₹12,000 की मासिक किस्त भरने के लिए QR कोड भेजें।',
+      },
+      {
+        sender: 'ai',
+        time: '10:19 AM',
+        hasUpiCard: true,
+        en: 'Hello Nancy! Here is your verified Dynamic UPI Payment Intent QR for your ₹12,000.00 monthly EMI on loan #385057. Tap below to pay instantly without penal charges.',
+        hi: 'नमस्ते Nancy! लोन #385057 की ₹12,000.00 मासिक किस्त के लिए आपका सत्यापित Dynamic UPI QR कोड नीचे तैयार है। सीधे भुगतान के लिए टैप करें।',
+      },
+    ],
+  },
+  {
+    id: 'ananya',
+    customerName: 'Ananya Verma',
+    phone: '+91 98112 87654',
+    loanId: 'LN1002',
+    amount: '₹14,200',
+    overdueInfo: '1 day overdue · Consumer Durable',
+    avatarText: 'AV',
+    tag: 'FD Interest · PTP Confirmed',
+    vpa: 'repayx.recovery@icici',
+    messages: [
+      {
+        sender: 'ai',
+        time: 'Yesterday, 11:00 AM',
+        en: 'Dear Ananya, gentle reminder that your EMI of ₹14,200 for Consumer Durable loan LN1002 was due yesterday.',
+        hi: 'नमस्ते Ananya जी, आपके कंज्यूमर ड्यूरेबल लोन LN1002 की ₹14,200 की EMI कल देय थी।',
+      },
+      {
+        sender: 'borrower',
+        time: 'Today, 09:30 AM',
+        en: "I'll make the payment tomorrow morning around 11 AM once my fixed deposit interest credits.",
+        hi: 'मैं कल सुबह 11 बजे फिक्स्ड डिपॉजिट ब्याज क्रेडिट होते ही पूरा भुगतान कर दूंगी।',
+      },
+      {
+        sender: 'ai',
+        time: 'Today, 09:32 AM',
+        badge: 'RepayX AI · PTP Confirmed (FD Interest · 97% Confidence)',
+        hasUpiCard: true,
+        en: 'Thank you Ananya. We have registered your commitment to pay ₹14,200 tomorrow by 11:00 AM. Here is your verified Dynamic UPI Payment Intent QR for loan LN1002.',
+        hi: 'धन्यवाद Ananya जी। हमने कल सुबह 11:00 बजे तक ₹14,200 भुगतान करने का आपका वादा दर्ज कर लिया है। आपका सत्यापित Dynamic UPI QR कोड नीचे तैयार है।',
+      },
+    ],
+  },
+];
 
 export const FeatureShowcase: React.FC = () => {
   const navigate = useNavigate();
-  // Feature 1: WhatsApp state (Language toggle)
+  // Feature 1: WhatsApp state (Language toggle & Active real conversation)
   const [waLanguage, setWaLanguage] = useState<'english' | 'hindi'>('english');
+  const [activeConvKey, setActiveConvKey] = useState<'rahul' | 'nancy' | 'ananya'>('rahul');
+  const [copiedUpi, setCopiedUpi] = useState(false);
 
   // Feature 2: Voice state (Playback simulation)
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
@@ -33,6 +186,15 @@ export const FeatureShowcase: React.FC = () => {
 
   // Feature 3: Escalation stage selection
   const [activeEscalationStage, setActiveEscalationStage] = useState<1 | 2 | 3>(1);
+
+  const activeConv = REAL_CONVERSATIONS.find((c) => c.id === activeConvKey) || REAL_CONVERSATIONS[0];
+
+  const handleCopyUpi = (vpa: string, amount: string, loanId: string) => {
+    const upiUri = `upi://pay?pa=${encodeURIComponent(vpa)}&pn=RepayX%20Loan%20Recovery&am=${amount.replace(/[^0-9]/g, '')}&cu=INR&tn=${encodeURIComponent(`EMI Payment ${loanId}`)}`;
+    navigator.clipboard?.writeText(upiUri);
+    setCopiedUpi(true);
+    setTimeout(() => setCopiedUpi(false), 2500);
+  };
 
   return (
     <section id="features" className="scroll-mt-24 py-20 lg:py-32 bg-white text-[#202B25] relative">
@@ -93,24 +255,61 @@ export const FeatureShowcase: React.FC = () => {
               </div>
             </div>
 
-            {/* Language Switcher Buttons & Direct Link */}
-            <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
-              <span className="font-semibold text-[#101D25]">Interactive Preview:</span>
+            {/* Real Borrower Scenario Selector */}
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-[#101D25]">Select Real Borrower Conversation:</span>
+                <span className="text-[10px] text-[#168653] font-bold flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-[#168653] animate-pulse" />
+                  Live RepayX NLU
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {REAL_CONVERSATIONS.map((conv) => {
+                  const isSelected = activeConvKey === conv.id;
+                  return (
+                    <button
+                      key={conv.id}
+                      type="button"
+                      onClick={() => setActiveConvKey(conv.id)}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#168653]/10 border-[#168653] text-[#101D25] shadow-sm ring-1 ring-[#168653]'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#101D25] truncate">{conv.customerName}</span>
+                        <span className="text-[10px] font-mono font-bold text-[#168653] shrink-0 ml-1">{conv.amount}</span>
+                      </div>
+                      <div className="text-[10px] text-[#718078] truncate mt-0.5">{conv.tag}</div>
+                      <div className="text-[9px] text-slate-400 font-mono mt-0.5">Loan {conv.loanId}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Language Switcher Buttons */}
+            <div className="pt-1 flex flex-wrap items-center gap-3 text-xs">
+              <span className="font-semibold text-[#101D25]">Dialogue Language:</span>
               <button
+                type="button"
                 onClick={() => setWaLanguage('english')}
                 className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
                   waLanguage === 'english'
-                    ? 'bg-[#168653] text-white'
+                    ? 'bg-[#168653] text-white shadow-sm'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
                 English
               </button>
               <button
+                type="button"
                 onClick={() => setWaLanguage('hindi')}
                 className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
                   waLanguage === 'hindi'
-                    ? 'bg-[#168653] text-white'
+                    ? 'bg-[#168653] text-white shadow-sm'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
@@ -138,111 +337,115 @@ export const FeatureShowcase: React.FC = () => {
                 <div className="bg-[#1f2c34] px-4 py-3 flex items-center justify-between border-b border-white/5">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-full bg-[#168653] flex items-center justify-center font-bold text-xs text-white">
-                      RX
+                      {activeConv.avatarText}
                     </div>
                     <div>
                       <div className="text-xs font-bold text-white flex items-center gap-1">
                         <span>RepayX Collections</span>
                         <CheckCheck className="w-3.5 h-3.5 text-[#5DE5A1]" />
                       </div>
-                      <span className="text-[10px] text-[#5DE5A1]">Verified Official Business</span>
+                      <div className="text-[10px] text-[#5DE5A1] flex items-center gap-1">
+                        <span>{activeConv.customerName}</span>
+                        <span className="text-slate-400 font-mono">({activeConv.loanId})</span>
+                      </div>
                     </div>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-mono">11:42 AM</span>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 font-mono block">11:42 AM</span>
+                    <span className="text-[9px] text-[#5DE5A1] font-mono">{activeConv.amount}</span>
+                  </div>
                 </div>
 
                 {/* Conversation Thread */}
-                <div className="p-4 space-y-3 min-h-[340px] bg-[#0b141a] text-xs">
+                <div className="p-3.5 space-y-3 max-h-[380px] overflow-y-auto bg-[#0b141a] text-xs">
                   {/* Timestamp */}
                   <div className="text-center">
                     <span className="text-[10px] bg-[#182229] px-2 py-0.5 rounded text-slate-400">
-                      TODAY
+                      TODAY · VERIFIED BORROWER THREAD
                     </span>
                   </div>
 
-                  {/* Outbound AI Reminder */}
-                  <div className="max-w-[85%] bg-[#005c4b] text-white p-3 rounded-xl rounded-tl-none space-y-2 shadow-sm">
-                    {waLanguage === 'english' ? (
-                      <>
-                        <p>
-                          Dear <strong>Rahul Verma</strong>, your EMI of <strong>₹8,500</strong> for Loan #LN-84920 is overdue by 5 days.
-                        </p>
-                        <p className="text-[11px] text-emerald-100">
-                          Please tap below to settle securely via UPI without penal interest:
-                        </p>
-                        <div className="p-2 rounded-lg bg-black/30 border border-white/10 flex items-center gap-2">
-                          <QrCode className="w-6 h-6 text-[#5DE5A1] shrink-0" />
-                          <div className="text-[10px] leading-tight">
-                            <div className="font-bold text-white">Instant UPI Intent</div>
-                            <span className="text-[#5DE5A1]">repayx@axisbank</span>
+                  {activeConv.messages.map((msg, index) => {
+                    const isAi = msg.sender === 'ai';
+                    const text = waLanguage === 'english' ? msg.en : msg.hi;
+
+                    if (isAi) {
+                      return (
+                        <div
+                          key={index}
+                          className="max-w-[88%] bg-[#005c4b] text-white p-3 rounded-xl rounded-tl-none space-y-2 shadow-sm"
+                        >
+                          {msg.badge && (
+                            <div className="text-[10px] font-bold text-[#5DE5A1] flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 shrink-0" />
+                              <span>{msg.badge}</span>
+                            </div>
+                          )}
+                          <p className="whitespace-pre-line leading-relaxed">{text}</p>
+
+                          {msg.hasUpiCard && (
+                            <div className="p-2.5 rounded-xl bg-black/40 border border-[#5DE5A1]/30 space-y-2 mt-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-7 h-7 rounded-lg bg-[#168653]/30 border border-[#5DE5A1]/40 flex items-center justify-center">
+                                    <QrCode className="w-4 h-4 text-[#5DE5A1]" />
+                                  </div>
+                                  <div>
+                                    <div className="text-[11px] font-bold text-white flex items-center gap-1">
+                                      <span>Dynamic UPI Intent</span>
+                                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-[#5DE5A1] font-mono">
+                                        LIVE
+                                      </span>
+                                    </div>
+                                    <div className="text-[10px] text-emerald-200/80 font-mono">{activeConv.vpa}</div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-xs font-black text-[#5DE5A1] font-mono">{activeConv.amount}</div>
+                                  <div className="text-[9px] text-slate-300">Loan {activeConv.loanId}</div>
+                                </div>
+                              </div>
+
+                              <div className="pt-1 flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyUpi(activeConv.vpa, activeConv.amount, activeConv.loanId)}
+                                  className="flex-1 py-1.5 px-2 rounded-lg bg-[#168653] hover:bg-[#157347] text-white text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all shadow cursor-pointer"
+                                >
+                                  {copiedUpi ? (
+                                    <>
+                                      <Check className="w-3 h-3 text-[#5DE5A1]" />
+                                      <span>UPI Intent Copied!</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ExternalLink className="w-3 h-3" />
+                                      <span>Tap to Pay via UPI</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="text-[9px] text-right text-emerald-200 flex items-center justify-end gap-1">
+                            <span>{msg.time}</span>
+                            <CheckCheck className="w-3 h-3 text-[#5DE5A1]" />
                           </div>
                         </div>
-                      </>
-                    ) : (
-                      <>
-                        <p>
-                          नमस्ते <strong>Rahul Verma जी</strong>, आपके लोन #LN-84920 की EMI <strong>₹8,500</strong> पिछले 5 दिनों से बकाया है।
-                        </p>
-                        <p className="text-[11px] text-emerald-100">
-                          कृपया पेनल्टी से बचने के लिए नीचे दिए गए UPI लिंक से तुरंत भुगतान करें:
-                        </p>
-                        <div className="p-2 rounded-lg bg-black/30 border border-white/10 flex items-center gap-2">
-                          <QrCode className="w-6 h-6 text-[#5DE5A1] shrink-0" />
-                          <div className="text-[10px] leading-tight">
-                            <div className="font-bold text-white">तुरंत UPI भुगतान</div>
-                            <span className="text-[#5DE5A1]">repayx@axisbank</span>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                    <div className="text-[9px] text-right text-emerald-200 flex items-center justify-end gap-1">
-                      <span>11:40 AM</span>
-                      <CheckCheck className="w-3 h-3 text-[#5DE5A1]" />
-                    </div>
-                  </div>
+                      );
+                    }
 
-                  {/* Inbound Borrower Response */}
-                  <div className="max-w-[80%] ml-auto bg-[#202c33] text-white p-3 rounded-xl rounded-tr-none space-y-1 shadow-sm">
-                    {waLanguage === 'english' ? (
-                      <p>
-                        Hi, my salary got delayed. Can I pay ₹4,000 today and the remaining ₹4,500 on Friday 15th?
-                      </p>
-                    ) : (
-                      <p>
-                        Salary abhi tak aayi nahi hai. Kya main abhi ₹4,000 aur baaki 15 tareekh ko de sakta hoon?
-                      </p>
-                    )}
-                    <div className="text-[9px] text-right text-slate-400">11:41 AM</div>
-                  </div>
-
-                  {/* Outbound AI Intelligent Resolution */}
-                  <div className="max-w-[85%] bg-[#005c4b] text-white p-3 rounded-xl rounded-tl-none space-y-1.5 shadow-sm">
-                    {waLanguage === 'english' ? (
-                      <>
-                        <div className="text-[10px] font-bold text-[#5DE5A1] flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" />
-                          <span>RepayX AI Approved Split Arrangement</span>
-                        </div>
-                        <p>
-                          Thank you Rahul. We have accepted your split plan! Here is the link for partial payment of ₹4,000 today. Balance scheduled for Friday.
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-[10px] font-bold text-[#5DE5A1] flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" />
-                          <span>AI अनुमोदित किश्त योजना</span>
-                        </div>
-                        <p>
-                          धन्यवाद राहुल जी। हमने आपकी सुविधा के लिए आज ₹4,000 स्वीकार कर लिए हैं। शेष ₹4,500 के लिए 15 तारीख को रिमाइंडर भेजा जाएगा।
-                        </p>
-                      </>
-                    )}
-                    <div className="text-[9px] text-right text-emerald-200 flex items-center justify-end gap-1">
-                      <span>11:42 AM</span>
-                      <CheckCheck className="w-3 h-3 text-[#5DE5A1]" />
-                    </div>
-                  </div>
+                    return (
+                      <div
+                        key={index}
+                        className="max-w-[85%] ml-auto bg-[#202c33] text-white p-3 rounded-xl rounded-tr-none space-y-1 shadow-sm"
+                      >
+                        <p className="whitespace-pre-line leading-relaxed">{text}</p>
+                        <div className="text-[9px] text-right text-slate-400">{msg.time}</div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Bottom WhatsApp bar */}
