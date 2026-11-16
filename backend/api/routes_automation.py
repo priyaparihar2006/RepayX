@@ -974,6 +974,12 @@ def toggle_human_takeover(case_id: int, body: EscalationAction, request: Request
     return {"success": True, "human_takeover": bool(new_takeover), "assigned_to": assigned}
 
 
+class VoiceDemoRequest(BaseModel):
+    text: str = Field(..., max_length=1500)
+    language: Literal["hindi", "hinglish", "english"] = "hindi"
+    voice_id: str | None = None
+
+
 @router.get("/media/voice/{filename}")
 def get_voice_audio(filename: str, request: Request):
     from fastapi.responses import FileResponse
@@ -982,7 +988,67 @@ def get_voice_audio(filename: str, request: Request):
     if not path.is_file():
         raise APIError(404, "not_found", "Audio file not found.")
     media_type = "audio/ogg" if filename.endswith((".ogg", ".opus")) else "audio/mpeg"
-    return FileResponse(path, media_type=media_type)
+    response = FileResponse(path, media_type=media_type)
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    response.headers["Accept-Ranges"] = "bytes"
+    return response
+
+
+@router.post("/voice/synthesize")
+def synthesize_voice_demo(body: VoiceDemoRequest, request: Request):
+    """Public voice synthesis endpoint for the interactive AI Voice Assistant demo."""
+    service = svc(request)
+    from automation.voice_service import VoiceService
+    vs = VoiceService(service.config)
+    try:
+        path, duration, filename, cached = vs.synthesize_cached(
+            text=body.text,
+            language=body.language,
+            voice_id=body.voice_id,
+        )
+        audio_url = f"/api/media/voice/{filename}"
+        return {
+            "success": True,
+            "audio_url": audio_url,
+            "duration_seconds": duration,
+            "filename": filename,
+            "language": body.language,
+            "cached": cached,
+        }
+    except Exception as exc:
+        raise APIError(500, "voice_synthesis_failed", f"Failed to synthesize voice audio: {exc}")
+
+
+@router.get("/voice/demo-audio")
+def get_voice_demo_audio(
+    request: Request,
+    language: Literal["hindi", "english"] = "hindi",
+):
+    """Quick public endpoint to retrieve or pre-generate the default RepayX AI voice demo audio."""
+    service = svc(request)
+    from automation.voice_service import VoiceService
+    vs = VoiceService(service.config)
+
+    default_scripts = {
+        "hindi": "नमस्ते राहुल जी, मैं RepayX से बोल रही हूँ। आपके लोन की EMI देय तिथि से आगे निकल चुकी है। क्या आप आज शाम तक भुगतान कर पाएंगे?",
+        "english": "Hello Rahul, this is RepayX calling. Your loan EMI payment is overdue. Would you be able to complete your payment by this evening?",
+    }
+    script = default_scripts.get(language, default_scripts["hindi"])
+    try:
+        path, duration, filename, cached = vs.synthesize_cached(
+            text=script,
+            language=language,
+        )
+        return {
+            "success": True,
+            "audio_url": f"/api/media/voice/{filename}",
+            "duration_seconds": duration,
+            "script": script,
+            "language": language,
+            "cached": cached,
+        }
+    except Exception as exc:
+        raise APIError(500, "voice_demo_failed", f"Failed to load demo voice audio: {exc}")
 
 
 @router.get("/voice-messages")

@@ -211,3 +211,41 @@ export const api = {
   query: (query: string, signal?: AbortSignal) =>
     request('/api/query', isQuery, { method: 'POST', body: { query }, signal }),
 };
+
+export interface VoiceDemoResponse {
+  success: boolean;
+  audio_url: string;
+  duration_seconds: number;
+  language: 'hindi' | 'english';
+  script?: string;
+  cached?: boolean;
+}
+
+export const voiceApi = {
+  resolveAudioUrl: (url: string): string => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const root = baseUrl();
+    return `${root}${url.startsWith('/') ? '' : '/'}${url}`;
+  },
+  getDemoAudio: async (language: 'hindi' | 'english'): Promise<VoiceDemoResponse> => {
+    const root = baseUrl();
+    const res = await fetch(`${root}/api/voice/demo-audio?language=${language}`);
+    if (!res.ok) {
+      throw new Error(`Failed to load voice audio: HTTP ${res.status}`);
+    }
+    return res.json();
+  },
+  synthesize: async (text: string, language: 'hindi' | 'english'): Promise<VoiceDemoResponse> => {
+    const root = baseUrl();
+    const res = await fetch(`${root}/api/voice/synthesize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, language }),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to synthesize voice audio: HTTP ${res.status}`);
+    }
+    return res.json();
+  },
+};

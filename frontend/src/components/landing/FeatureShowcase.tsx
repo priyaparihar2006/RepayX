@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
+import { voiceApi } from '../../services/api';
 import {
   MessageSquare,
   Mic,
@@ -23,6 +24,9 @@ import {
   Check,
   Copy,
   ExternalLink,
+  RotateCcw,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 
 interface ConversationMessage {
@@ -180,9 +184,130 @@ export const FeatureShowcase: React.FC = () => {
   const [activeConvKey, setActiveConvKey] = useState<'rahul' | 'nancy' | 'ananya'>('rahul');
   const [copiedUpi, setCopiedUpi] = useState(false);
 
-  // Feature 2: Voice state (Playback simulation)
+  // Feature 2: Real Voice state & Web Audio controller
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
+  const [isLoadingVoice, setIsLoadingVoice] = useState(false);
   const [voiceLanguage, setVoiceLanguage] = useState<'hindi' | 'english'>('hindi');
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [loadedAudioUrl, setLoadedAudioUrl] = useState<string | null>(null);
+
+  // Audio lifecycle cleanup
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleLanguageSwitch = (lang: 'hindi' | 'english') => {
+    if (lang === voiceLanguage) return;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setIsPlayingVoice(false);
+    setIsLoadingVoice(false);
+    setCurrentTime(0);
+    setVoiceError(null);
+    setVoiceLanguage(lang);
+    setLoadedAudioUrl(null);
+  };
+
+  const handleTogglePlay = async () => {
+    setVoiceError(null);
+
+    // If currently playing, pause
+    if (isPlayingVoice && audioRef.current) {
+      audioRef.current.pause();
+      setIsPlayingVoice(false);
+      return;
+    }
+
+    // If audio already loaded and just paused, resume it
+    if (audioRef.current && loadedAudioUrl && !audioRef.current.ended && audioRef.current.currentTime > 0) {
+      try {
+        await audioRef.current.play();
+        setIsPlayingVoice(true);
+        return;
+      } catch {
+        // Fall through to re-fetching/reloading if resume failed
+      }
+    }
+
+    // Load fresh or cached audio via API
+    setIsLoadingVoice(true);
+    try {
+      const data = await voiceApi.getDemoAudio(voiceLanguage);
+      const fullUrl = voiceApi.resolveAudioUrl(data.audio_url);
+
+      if (!audioRef.current) {
+        audioRef.current = new Audio();
+      }
+      const audio = audioRef.current;
+      audio.src = fullUrl;
+
+      audio.onplay = () => {
+        setIsPlayingVoice(true);
+        setIsLoadingVoice(false);
+      };
+      audio.onpause = () => {
+        setIsPlayingVoice(false);
+      };
+      audio.onended = () => {
+        setIsPlayingVoice(false);
+        setCurrentTime(0);
+      };
+      audio.ontimeupdate = () => {
+        setCurrentTime(audio.currentTime);
+        if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+          setDuration(audio.duration);
+        }
+      };
+      audio.onloadedmetadata = () => {
+        if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+          setDuration(audio.duration);
+        }
+      };
+      audio.onerror = () => {
+        setIsLoadingVoice(false);
+        setIsPlayingVoice(false);
+        setVoiceError('Audio playback failed. Please check network connection or try again.');
+      };
+
+      setLoadedAudioUrl(fullUrl);
+      if (data.duration_seconds) {
+        setDuration(data.duration_seconds);
+      }
+
+      await audio.play();
+    } catch (err: any) {
+      setIsLoadingVoice(false);
+      setIsPlayingVoice(false);
+      setVoiceError(err?.message || 'Unable to generate speech. Please try again.');
+    }
+  };
+
+  const handleResetAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setIsPlayingVoice(false);
+    setCurrentTime(0);
+  };
+
+  const formatAudioTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds) || !isFinite(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   // Feature 3: Escalation stage selection
   const [activeEscalationStage, setActiveEscalationStage] = useState<1 | 2 | 3>(1);
@@ -482,17 +607,19 @@ export const FeatureShowcase: React.FC = () => {
 
                 <div className="flex gap-1.5 text-[10px]">
                   <button
-                    onClick={() => setVoiceLanguage('hindi')}
-                    className={`px-2.5 py-1 rounded font-bold cursor-pointer ${
-                      voiceLanguage === 'hindi' ? 'bg-[#168653] text-white' : 'bg-white/10 text-slate-300'
+                    type="button"
+                    onClick={() => handleLanguageSwitch('hindi')}
+                    className={`px-2.5 py-1 rounded font-bold cursor-pointer transition-all ${
+                      voiceLanguage === 'hindi' ? 'bg-[#168653] text-white shadow-sm' : 'bg-white/10 text-slate-300 hover:bg-white/15'
                     }`}
                   >
                     Hindi
                   </button>
                   <button
-                    onClick={() => setVoiceLanguage('english')}
-                    className={`px-2.5 py-1 rounded font-bold cursor-pointer ${
-                      voiceLanguage === 'english' ? 'bg-[#168653] text-white' : 'bg-white/10 text-slate-300'
+                    type="button"
+                    onClick={() => handleLanguageSwitch('english')}
+                    className={`px-2.5 py-1 rounded font-bold cursor-pointer transition-all ${
+                      voiceLanguage === 'english' ? 'bg-[#168653] text-white shadow-sm' : 'bg-white/10 text-slate-300 hover:bg-white/15'
                     }`}
                   >
                     English
@@ -501,45 +628,118 @@ export const FeatureShowcase: React.FC = () => {
               </div>
 
               {/* Animated Waveform Display */}
-              <div className="my-8 p-6 rounded-2xl bg-[#142630] border border-white/10 flex flex-col items-center justify-center">
+              <div className="my-8 p-6 rounded-2xl bg-[#142630] border border-white/10 flex flex-col items-center justify-center relative">
+                {/* Visual Audio Waveform */}
                 <div className="flex items-center justify-center gap-1.5 h-16 w-full">
                   {[24, 45, 18, 60, 35, 70, 52, 85, 40, 68, 30, 78, 44, 90, 55, 30, 48, 65, 20].map(
-                    (height, idx) => (
-                      <span
-                        key={idx}
-                        className={`w-1.5 rounded-full transition-all duration-300 ${
-                          isPlayingVoice
-                            ? 'bg-gradient-to-t from-[#168653] to-[#5DE5A1] animate-pulse'
-                            : 'bg-slate-700'
-                        }`}
-                        style={{
-                          height: isPlayingVoice ? `${height}%` : '20%',
-                          animationDelay: `${idx * 0.05}s`,
-                        }}
-                      />
-                    )
+                    (height, idx) => {
+                      const progressRatio = duration > 0 ? currentTime / duration : 0;
+                      const barPosition = idx / 19;
+                      const hasPlayed = barPosition <= progressRatio;
+
+                      let barStyleClass = 'bg-slate-700';
+                      if (isLoadingVoice) {
+                        barStyleClass = 'bg-[#5DE5A1]/40 animate-pulse';
+                      } else if (isPlayingVoice) {
+                        barStyleClass = 'bg-gradient-to-t from-[#168653] to-[#5DE5A1] animate-pulse';
+                      } else if (currentTime > 0) {
+                        barStyleClass = hasPlayed ? 'bg-[#168653]' : 'bg-slate-700';
+                      }
+
+                      return (
+                        <span
+                          key={idx}
+                          className={`w-1.5 rounded-full transition-all duration-200 ${barStyleClass}`}
+                          style={{
+                            height: isPlayingVoice
+                              ? `${Math.max(15, Math.min(100, height + Math.sin(currentTime * 8 + idx) * 20))}%`
+                              : currentTime > 0 && hasPlayed
+                              ? `${Math.max(25, height * 0.7)}%`
+                              : '20%',
+                            animationDelay: `${(idx % 5) * 0.1}s`,
+                          }}
+                        />
+                      );
+                    }
                   )}
                 </div>
 
-                <div className="mt-4 flex items-center gap-3">
-                  <button
-                    onClick={() => setIsPlayingVoice(!isPlayingVoice)}
-                    className="p-3 rounded-full bg-gradient-to-r from-[#168653] to-[#5DE5A1] text-[#101D25] font-bold shadow-lg shadow-[#168653]/30 hover:scale-105 transition-all cursor-pointer"
-                    aria-label={isPlayingVoice ? 'Pause voice preview' : 'Play voice preview'}
-                  >
-                    {isPlayingVoice ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
-                  </button>
-                  <span className="text-xs font-semibold text-slate-300">
-                    {isPlayingVoice ? 'Simulating Active Voice Stream...' : 'Click to preview AI voice generation'}
-                  </span>
+                {/* Player Controls & Status */}
+                <div className="mt-5 flex items-center justify-between w-full pt-3 border-t border-white/5">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleTogglePlay}
+                      disabled={isLoadingVoice}
+                      className="p-3 rounded-full bg-gradient-to-r from-[#168653] to-[#5DE5A1] text-[#101D25] font-bold shadow-lg shadow-[#168653]/30 hover:scale-105 active:scale-95 transition-all cursor-pointer disabled:opacity-75 disabled:cursor-wait"
+                      aria-label={isPlayingVoice ? 'Pause voice audio' : 'Play voice audio'}
+                    >
+                      {isLoadingVoice ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-[#101D25]" />
+                      ) : isPlayingVoice ? (
+                        <Pause className="w-4 h-4 fill-current" />
+                      ) : (
+                        <Play className="w-4 h-4 fill-current ml-0.5" />
+                      )}
+                    </button>
+
+                    {currentTime > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleResetAudio}
+                        className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all cursor-pointer"
+                        title="Replay from beginning"
+                        aria-label="Replay audio"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-slate-200">
+                        {isLoadingVoice
+                          ? 'Synthesizing Neural Speech...'
+                          : isPlayingVoice
+                          ? `Playing ${voiceLanguage === 'hindi' ? 'Hindi' : 'English'} Audio...`
+                          : currentTime > 0
+                          ? 'Paused'
+                          : `Listen in ${voiceLanguage === 'hindi' ? 'Hindi' : 'English'}`}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {formatAudioTime(currentTime)} / {formatAudioTime(duration || (voiceLanguage === 'hindi' ? 7 : 6))}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] text-[#5DE5A1] font-mono">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#5DE5A1] animate-ping" />
+                    <span>Neural Voice</span>
+                  </div>
                 </div>
+
+                {/* Error Banner */}
+                {voiceError && (
+                  <div className="mt-3 w-full p-2.5 rounded-lg bg-red-950/60 border border-red-500/30 text-red-300 text-[11px] flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                      <span>{voiceError}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleTogglePlay}
+                      className="px-2 py-0.5 text-[10px] font-bold bg-red-500/20 hover:bg-red-500/30 text-red-200 rounded cursor-pointer"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Spoken Script Transcription */}
               <div className="p-3.5 rounded-xl bg-[#0b141a] border border-white/5 text-xs text-slate-300 font-mono">
                 <div className="text-[10px] text-[#5DE5A1] uppercase font-bold mb-1 flex items-center gap-1.5">
                   <Volume2 className="w-3.5 h-3.5" />
-                  <span>Synthesized Outbound Dialogue:</span>
+                  <span>Synthesized Outbound Dialogue ({voiceLanguage === 'hindi' ? 'Hindi' : 'English'}):</span>
                 </div>
                 {voiceLanguage === 'hindi' ? (
                   <p className="leading-relaxed">
@@ -547,7 +747,7 @@ export const FeatureShowcase: React.FC = () => {
                   </p>
                 ) : (
                   <p className="leading-relaxed">
-                    &quot;Hello Rahul, this is an automated reminder from RepayX. Your EMI of ₹8,500 is currently overdue. Would you like us to send an instant UPI link to your WhatsApp?&quot;
+                    &quot;Hello Rahul, this is RepayX calling. Your loan EMI payment is overdue. Would you be able to complete your payment by this evening?&quot;
                   </p>
                 )}
               </div>

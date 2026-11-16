@@ -192,6 +192,8 @@ class VoiceService:
         text: str,
         voice_id: str | None = None,
         language: str = "hinglish",
+        target_filename: str | None = None,
+        convert_ogg: bool = True,
     ) -> tuple[Path, float, str]:
         """Synthesize natural girl/female speech audio.
 
@@ -202,7 +204,7 @@ class VoiceService:
         4. Offline synthetic MP3
         """
         voice = voice_id or self.config.openai_tts_voice
-        filename = f"voice_{uuid.uuid4().hex[:12]}.mp3"
+        filename = target_filename or f"voice_{uuid.uuid4().hex[:12]}.mp3"
         out_path = self.media_dir / filename
         lang = (language or "hinglish").lower()
 
@@ -239,8 +241,10 @@ class VoiceService:
                 words = len(text.split())
                 duration = max(2.5, round((words / 140.0) * 60.0, 1))
                 logger.info("Synthesized Edge-TTS neural girl voice (%s) to %s (%s s)", chosen_voice, filename, duration)
-                final_path = self._convert_to_ogg_opus(out_path)
-                return final_path, duration, final_path.name
+                if convert_ogg:
+                    final_path = self._convert_to_ogg_opus(out_path)
+                    return final_path, duration, final_path.name
+                return out_path, duration, out_path.name
         except Exception as edge_err:
             logger.warning("Edge-TTS synthesis error: %s, checking OpenAI/gTTS", edge_err)
 
@@ -269,8 +273,10 @@ class VoiceService:
                     words = len(text.split())
                     duration = max(2.5, round((words / 150.0) * 60.0, 1))
                     logger.info("Synthesized OpenAI female voice (%s) to %s (%s s)", female_voice, filename, duration)
-                    final_path = self._convert_to_ogg_opus(out_path)
-                    return final_path, duration, final_path.name
+                    if convert_ogg:
+                        final_path = self._convert_to_ogg_opus(out_path)
+                        return final_path, duration, final_path.name
+                    return out_path, duration, out_path.name
             except Exception as exc:
                 logger.warning("OpenAI speech synthesis failed: %s, falling back to gTTS", exc)
 
@@ -285,8 +291,10 @@ class VoiceService:
                 words = len(text.split())
                 duration = max(2.5, round((words / 130.0) * 60.0, 1))
                 logger.info("Synthesized gTTS girl voice (%s) to %s (%s s)", lang_code, filename, duration)
-                final_path = self._convert_to_ogg_opus(out_path)
-                return final_path, duration, final_path.name
+                if convert_ogg:
+                    final_path = self._convert_to_ogg_opus(out_path)
+                    return final_path, duration, final_path.name
+                return out_path, duration, out_path.name
         except Exception as gtts_err:
             logger.warning("gTTS synthesis error: %s, falling back to synthetic", gtts_err)
 
@@ -296,8 +304,43 @@ class VoiceService:
         audio_bytes = _generate_synthetic_mp3(duration)
         out_path.write_bytes(audio_bytes)
         logger.info("Generated fallback voice audio file %s (%s s)", filename, duration)
-        final_path = self._convert_to_ogg_opus(out_path)
-        return final_path, duration, final_path.name
+        if convert_ogg:
+            final_path = self._convert_to_ogg_opus(out_path)
+            return final_path, duration, final_path.name
+        return out_path, duration, out_path.name
+
+    def synthesize_cached(
+        self,
+        text: str,
+        voice_id: str | None = None,
+        language: str = "hindi",
+    ) -> tuple[Path, float, str, bool]:
+        """Synthesize speech with deterministic disk caching based on text & language hash.
+
+        Returns (path, duration_seconds, filename, was_cached).
+        """
+        import hashlib
+        clean_text = text.strip()
+        lang = (language or "hindi").lower()
+        content_hash = hashlib.sha256(f"{lang}:{clean_text}".encode("utf-8")).hexdigest()[:16]
+        cached_filename = f"voice_cache_{lang}_{content_hash}.mp3"
+        cached_path = self.media_dir / cached_filename
+
+        # If already cached and valid on disk, return immediately
+        if cached_path.is_file() and cached_path.stat().st_size > 500:
+            words = len(clean_text.split())
+            duration = max(2.5, round((words / 130.0) * 60.0, 1))
+            logger.info("Voice synthesis cache hit for %s (%s)", cached_filename, lang)
+            return cached_path, duration, cached_filename, True
+
+        out_path, duration, _ = self.synthesize(
+            clean_text,
+            voice_id=voice_id,
+            language=lang,
+            target_filename=cached_filename,
+            convert_ogg=False,
+        )
+        return out_path, duration, out_path.name, False
 
     def record_voice_message(
         self,
