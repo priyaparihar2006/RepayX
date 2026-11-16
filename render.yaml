@@ -2,7 +2,7 @@ services:
   - type: web
     name: repayx-backend
     runtime: docker
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: Dockerfile
     dockerContext: .
     plan: free
     region: oregon
