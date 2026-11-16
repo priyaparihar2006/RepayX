@@ -53,6 +53,8 @@ export interface UpiPaymentIntentData {
   phone?: string;
   vpa?: string;
   upiUri?: string;
+  paymentUrl?: string;
+  paymentLinkId?: string;
   isSettled?: boolean;
   settledUtr?: string;
   settledAt?: string;
