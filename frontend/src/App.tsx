@@ -148,26 +148,9 @@ const Demo: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </>
 );
 
-function AppContent() {
+function DashboardLayout() {
   const navigate = useNavigate();
-  const { pathname, search } = useLocation();
-
-  // Route directly to public marketing landing page on '/' and '/landing' unless app explicitly requested
-  const isLandingPage =
-    (pathname === '/' || pathname === '/landing') &&
-    !search.includes('app=true') &&
-    !search.includes('dashboard=true');
-
-  if (isLandingPage) {
-    return (
-      <ErrorBoundary fallbackTitle="Unable to load landing page">
-        <Suspense fallback={<LoadingState />}>
-          <LandingPage />
-        </Suspense>
-      </ErrorBoundary>
-    );
-  }
-
+  const { pathname } = useLocation();
   const currentTab = tabForPath(pathname);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -288,114 +271,114 @@ function AppContent() {
           <ErrorBoundary fallbackTitle="Unable to load page content">
             <Suspense fallback={<LoadingState />}>
               <Routes>
-            {/* Connected to the RepayX API */}
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/overview" element={<DashboardPage />} />
-            <Route path="/analytics/risk" element={<RiskAnalyticsPage />} />
-            <Route path="/analytics/repayment" element={<RepaymentAnalyticsPage />} />
-            <Route path="/customers" element={<CustomersPage />} />
-            <Route path="/customers/:customerId" element={<CustomerDetailsPage />} />
-            <Route path="/whatsapp" element={<WhatsAppPage />} />
-            <Route path="/automation" element={<AutomationPage />} />
+                {/* Connected to the RepayX API */}
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/overview" element={<DashboardPage />} />
+                <Route path="/analytics/risk" element={<RiskAnalyticsPage />} />
+                <Route path="/analytics/repayment" element={<RepaymentAnalyticsPage />} />
+                <Route path="/customers" element={<CustomersPage />} />
+                <Route path="/customers/:customerId" element={<CustomerDetailsPage />} />
+                <Route path="/whatsapp" element={<WhatsAppPage />} />
+                <Route path="/automation" element={<AutomationPage />} />
 
-            {/* Demo workflow pages (sample data) */}
-            <Route
-              path="/demo/overview"
-              element={
-                <Demo>
-                  <OverviewDashboard
-                    loans={loans}
-                    customers={customers}
-                    followups={followups}
-                    onSelectCustomer={openDemoCustomer}
-                    onOpenConversation={openConversation}
-                    onNavigateTab={(tab) => handleNavigate(tab)}
-                  />
-                </Demo>
-              }
-            />
-            <Route
-              path="/demo-customers"
-              element={
-                <Demo>
-                  <DemoCustomersPage
-                    customers={customers}
-                    loans={loans}
-                    onSelectCustomer={openDemoCustomer}
-                    onOpenConversation={() => openConversation()}
-                  />
-                </Demo>
-              }
-            />
-            <Route
-              path="/demo-customers/:demoId"
-              element={
-                <Demo>
-                  <DemoCustomerDetail customers={customers} loans={loans} conversations={conversations} onOpenConversation={openConversation} />
-                </Demo>
-              }
-            />
-            <Route
-              path="/conversations"
-              element={
-                <Demo>
-                  <ConversationView
-                    conversations={conversations}
-                    activeConversationId={activeConversationId}
-                    onSelectConversation={(id) => setActiveConversationId(id)}
-                    customers={customers}
-                    loans={loans}
-                    onScheduleFollowup={handleScheduleFollowup}
-                    onNavigateToCustomer={openDemoCustomer}
-                  />
-                </Demo>
-              }
-            />
-            <Route
-              path="/loans"
-              element={
-                <Demo>
-                  <LoansPage
-                    loans={loans}
-                    customers={customers}
-                    onSelectCustomer={openDemoCustomer}
-                    onOpenConversation={(loanId) => openConversation(conversations.find((c) => c.loanId === loanId)?.id)}
-                  />
-                </Demo>
-              }
-            />
-            <Route
-              path="/follow-ups"
-              element={
-                <Demo>
-                  <FollowupsPage
-                    followups={followups}
-                    onOpenConversation={() => openConversation()}
-                    onUpdateFollowupStatus={handleUpdateFollowupStatus}
-                  />
-                </Demo>
-              }
-            />
-            <Route path="/knowledge-base" element={<Demo><RagKnowledgeBasePage /></Demo>} />
-            <Route path="/payments" element={<Demo><PaymentsPage /></Demo>} />
-            <Route
-              path="/escalations"
-              element={
-                <Demo>
-                  <EscalationsPage
-                    onOpenConversation={(cId) =>
-                      openConversation(cId ? conversations.find((c) => c.customerId === cId)?.id : undefined)
-                    }
-                  />
-                </Demo>
-              }
-            />
-            <Route path="/insights" element={<AIInsightsPage />} />
-            <Route path="/demo/insights" element={<Demo><AiInsightsPage /></Demo>} />
-            <Route path="/reports" element={<Demo><ReportsPage /></Demo>} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<NotFound />} />
+                {/* Demo workflow pages (sample data) */}
+                <Route
+                  path="/demo/overview"
+                  element={
+                    <Demo>
+                      <OverviewDashboard
+                        loans={loans}
+                        customers={customers}
+                        followups={followups}
+                        onSelectCustomer={openDemoCustomer}
+                        onOpenConversation={openConversation}
+                        onNavigateTab={(tab) => handleNavigate(tab)}
+                      />
+                    </Demo>
+                  }
+                />
+                <Route
+                  path="/demo-customers"
+                  element={
+                    <Demo>
+                      <DemoCustomersPage
+                        customers={customers}
+                        loans={loans}
+                        onSelectCustomer={openDemoCustomer}
+                        onOpenConversation={() => openConversation()}
+                      />
+                    </Demo>
+                  }
+                />
+                <Route
+                  path="/demo-customers/:demoId"
+                  element={
+                    <Demo>
+                      <DemoCustomerDetail customers={customers} loans={loans} conversations={conversations} onOpenConversation={openConversation} />
+                    </Demo>
+                  }
+                />
+                <Route
+                  path="/conversations"
+                  element={
+                    <Demo>
+                      <ConversationView
+                        conversations={conversations}
+                        activeConversationId={activeConversationId}
+                        onSelectConversation={(id) => setActiveConversationId(id)}
+                        customers={customers}
+                        loans={loans}
+                        onScheduleFollowup={handleScheduleFollowup}
+                        onNavigateToCustomer={openDemoCustomer}
+                      />
+                    </Demo>
+                  }
+                />
+                <Route
+                  path="/loans"
+                  element={
+                    <Demo>
+                      <LoansPage
+                        loans={loans}
+                        customers={customers}
+                        onSelectCustomer={openDemoCustomer}
+                        onOpenConversation={(loanId) => openConversation(conversations.find((c) => c.loanId === loanId)?.id)}
+                      />
+                    </Demo>
+                  }
+                />
+                <Route
+                  path="/follow-ups"
+                  element={
+                    <Demo>
+                      <FollowupsPage
+                        followups={followups}
+                        onOpenConversation={() => openConversation()}
+                        onUpdateFollowupStatus={handleUpdateFollowupStatus}
+                      />
+                    </Demo>
+                  }
+                />
+                <Route path="/knowledge-base" element={<Demo><RagKnowledgeBasePage /></Demo>} />
+                <Route path="/payments" element={<Demo><PaymentsPage /></Demo>} />
+                <Route
+                  path="/escalations"
+                  element={
+                    <Demo>
+                      <EscalationsPage
+                        onOpenConversation={(cId) =>
+                          openConversation(cId ? conversations.find((c) => c.customerId === cId)?.id : undefined)
+                        }
+                      />
+                    </Demo>
+                  }
+                />
+                <Route path="/insights" element={<AIInsightsPage />} />
+                <Route path="/demo/insights" element={<Demo><AiInsightsPage /></Demo>} />
+                <Route path="/reports" element={<Demo><ReportsPage /></Demo>} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
           </ErrorBoundary>
@@ -409,6 +392,28 @@ function AppContent() {
       />
     </div>
   );
+}
+
+function AppContent() {
+  const { pathname, search } = useLocation();
+
+  // Route directly to public marketing landing page on '/' and '/landing' unless app explicitly requested
+  const isLandingPage =
+    (pathname === '/' || pathname === '/landing') &&
+    !search.includes('app=true') &&
+    !search.includes('dashboard=true');
+
+  if (isLandingPage) {
+    return (
+      <ErrorBoundary fallbackTitle="Unable to load landing page">
+        <Suspense fallback={<LoadingState />}>
+          <LandingPage />
+        </Suspense>
+      </ErrorBoundary>
+    );
+  }
+
+  return <DashboardLayout />;
 }
 
 /** Sample-data customer detail. Unknown IDs show a not-found state instead of another customer's data. */
