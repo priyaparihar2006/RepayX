@@ -548,7 +548,18 @@ class WhatsAppService:
 
     def generate_qr(self) -> dict:
         try:
-            return self._bridge("qr/generate", {})
+            res = self._bridge("qr/generate", {})
+            if isinstance(res, dict) and not res.get("connected") and not res.get("qr_code"):
+                # Bridge may be in a zombie reconnect state; force disconnect and retry
+                try:
+                    self._bridge("disconnect", {})
+                    time.sleep(0.5)
+                    retry_res = self._bridge("qr/generate", {})
+                    if retry_res.get("qr_code"):
+                        return retry_res
+                except Exception:
+                    pass
+            return res
         except APIError as exc:
             if self.ensure_local_bridge():
                 try:

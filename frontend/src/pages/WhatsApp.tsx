@@ -85,6 +85,7 @@ export function WhatsAppPage() {
   const sendingRef = useRef(false);
   const [qrDeadline, setQrDeadline] = useState(0);
   const [now, setNow] = useState(Date.now());
+  const autoQrAttempted = useRef(false);
 
   // Interactive AI Two-Way Chat Test State
   const [chatPhone, setChatPhone] = useState<string>('+917060200849');
@@ -560,8 +561,21 @@ export function WhatsAppPage() {
   };
 
   const acceptStatus = (value: WhatsAppStatus) => {
-    setStatus(value);
-    setQrDeadline(value.qr_code ? Date.now() + (value.qr_expires_in || 60) * 1000 : 0);
+    setStatus((prev) => {
+      if (!value.connected && !value.qr_code && prev?.qr_code && qrDeadline > Date.now()) {
+        return {
+          ...value,
+          qr_code: prev.qr_code,
+          qr_expires_in: Math.max(1, Math.ceil((qrDeadline - Date.now()) / 1000)),
+        };
+      }
+      return value;
+    });
+    if (value.qr_code) {
+      setQrDeadline(Date.now() + (value.qr_expires_in || 60) * 1000);
+    } else if (value.connected) {
+      setQrDeadline(0);
+    }
     if (value.connected) setPairCode('');
     if (value.connected || value.qr_code || value.status === 'SCAN_QR_CODE' || value.status === 'CONNECTED') {
       setError((prev) => (prev && (prev.includes('waking up') || prev.includes('offline') || prev.includes('502')) ? '' : prev));
@@ -597,7 +611,13 @@ export function WhatsAppPage() {
     const poll = async () => {
       try {
         const value = await whatsapp.getStatus(controller.signal);
-        if (!cancelled) acceptStatus(value);
+        if (!cancelled) {
+          acceptStatus(value);
+          if (!autoQrAttempted.current && !value.connected && !value.qr_code) {
+            autoQrAttempted.current = true;
+            void generateQR();
+          }
+        }
       } catch (err) {
         if (!cancelled) {
           setStatus(null);
@@ -686,17 +706,17 @@ export function WhatsAppPage() {
     setError('');
     try {
       const res = await whatsapp.generateQR();
-      if (res && res.qr_code) {
+      if (res?.qr_code) {
         acceptStatus(res);
-      } else if (res && !res.success && (res as any).error) {
-        setError((res as any).error);
-      }
-      const latest = await whatsapp.getStatus();
-      acceptStatus(latest);
-      if (!latest.qr_code && !latest.connected && (latest.error_message || (latest as any).error)) {
-        setError(latest.error_message || (latest as any).error);
-      } else {
         setError('');
+      } else {
+        const latest = await whatsapp.getStatus();
+        acceptStatus(latest);
+        if (!latest.qr_code && !latest.connected && (latest.error_message || (latest as any).error)) {
+          setError(latest.error_message || (latest as any).error);
+        } else {
+          setError('');
+        }
       }
       setNotice('Open WhatsApp on +91 8650629360 → Linked devices → Link a device, then scan the QR.');
     } catch (err) {
@@ -928,13 +948,21 @@ export function WhatsAppPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                <button
-                  onClick={generateQR}
-                  disabled={generating}
-                  className={`w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 ${button}`}
-                >
-                  <QrCode className="w-4 h-4" /> {generating ? 'Generating QR...' : 'Show Pairing QR'}
-                </button>
+                {generating ? (
+                  <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl text-center space-y-3">
+                    <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mx-auto" />
+                    <div className="text-sm font-bold text-slate-800">Generating WhatsApp QR...</div>
+                    <div className="text-xs text-slate-500">Establishing secure bridge connection...</div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={generateQR}
+                    disabled={generating}
+                    className={`w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 ${button}`}
+                  >
+                    <QrCode className="w-4 h-4" /> Show Pairing QR
+                  </button>
+                )}
                 <button
                   onClick={requestPairCode}
                   disabled={pairing}

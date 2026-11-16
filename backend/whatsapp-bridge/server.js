@@ -269,7 +269,25 @@ async function createBridge(deps = {}) {
     res.json(snapshot());
   });
   app.post('/qr/generate', async (_req, res) => {
-    if (!socket || state === 'DISCONNECTED' || state === 'ERROR') {
+    const validQR = qrImage && qrExpires > Date.now();
+    if (!validQR && state !== 'CONNECTED') {
+      clearTimeout(reconnectTimer);
+      ++generation;
+      const current = socket;
+      socket = null;
+      qrImage = null;
+      pairingReady = false;
+      state = 'DISCONNECTED';
+      if (current) {
+        try { current.end(undefined); } catch {}
+      }
+      try {
+        if (fs.existsSync(authDir)) {
+          fs.rmSync(authDir, { recursive: true, force: true });
+        }
+      } catch (rmErr) {
+        console.warn('[WhatsApp] Could not clean authDir:', rmErr.message);
+      }
       reconnects = 0;
       await connect();
     }
