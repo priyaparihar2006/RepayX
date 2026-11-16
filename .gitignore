@@ -2,6 +2,7 @@ node_modules/
 build/
 dist/
 !frontend/dist/
+!backend/frontend/dist/
 coverage/
 .env
 .env.*

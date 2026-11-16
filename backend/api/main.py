@@ -164,7 +164,11 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
     # Serve production frontend SPA if built
     frontend_dist = BACKEND_DIR.parent / "frontend" / "dist"
     if not frontend_dist.exists():
+        frontend_dist = BACKEND_DIR / "frontend" / "dist"
+    if not frontend_dist.exists():
         frontend_dist = Path("/app/frontend/dist")
+    if not frontend_dist.exists():
+        frontend_dist = Path("/app/dist")
 
     if frontend_dist.exists() and (frontend_dist / "index.html").is_file():
         assets_dir = frontend_dist / "assets"
