@@ -19,7 +19,8 @@ export interface WhatsAppStatus {
   enabled: boolean;
   ready: boolean;
   connected: boolean;
-  status: 'DISCONNECTED' | 'SCAN_QR_CODE' | 'CONNECTING' | 'CONNECTED' | 'OFFLINE' | 'ERROR' | 'WAKING_UP';
+  status: 'DISCONNECTED' | 'SCAN_QR_CODE' | 'CONNECTING' | 'AUTHENTICATING' | 'GENERATING' | 'QR_EXPIRED' | 'CONNECTED' | 'OFFLINE' | 'ERROR' | 'WAKING_UP';
+  authenticated_phone?: string | null;
   is_waking_up?: boolean;
   error_message?: string | null;
   expected_sender?: string;
@@ -266,6 +267,7 @@ export interface UploadFileResponse {
 export const whatsapp = {
   getStatus: (signal?: AbortSignal) => request<WhatsAppStatus>('/api/whatsapp/status', { signal }),
   generateQR: () => request<WhatsAppStatus>('/api/whatsapp/qr/generate', { method: 'POST' }),
+  reconnect: () => request<WhatsAppStatus>('/api/whatsapp/reconnect', { method: 'POST' }),
   pairByCode: (phone: string = '+918650629360') =>
     request<{ success: boolean; pairing_code: string; phone: string }>('/api/whatsapp/pair-code', {
       method: 'POST',

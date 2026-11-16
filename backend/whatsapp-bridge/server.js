@@ -111,14 +111,45 @@ async function createBridge(deps = {}) {
     state = 'CONNECTING';
     error = null;
     try {
+      // 1. Resolve dynamic live WhatsApp Web client version to prevent mobile "Couldn't link device" reject
+      let waVersion = [2, 3000, 1054741204];
+      try {
+        if (baileys.fetchLatestWaWebVersion) {
+          const vData = await baileys.fetchLatestWaWebVersion({});
+          if (vData && vData.version) waVersion = vData.version;
+        } else if (baileys.fetchLatestBaileysVersion) {
+          const vData = await baileys.fetchLatestBaileysVersion();
+          if (vData && vData.version) waVersion = vData.version;
+        }
+      } catch (verErr) {
+        console.warn('[WhatsApp] Version fetch notice (using fallback):', verErr.message);
+      }
+
+      // 2. Load Multi-File Auth State
       const { state: auth, saveCreds } = await baileys.useMultiFileAuthState(authDir);
       if (currentGeneration !== generation) return;
+
+      // 3. Wrap keys in makeCacheableSignalKeyStore for Signal protocol transaction stability
+      const pinoLogger = pino({ level: 'silent' });
+      const signalKeys = baileys.makeCacheableSignalKeyStore
+        ? baileys.makeCacheableSignalKeyStore(auth.keys, pinoLogger)
+        : (auth.keys || {});
+
+      // 4. Stable browser signature recognized by WhatsApp multi-device
+      const browserSig = baileys.Browsers && baileys.Browsers.macOS
+        ? baileys.Browsers.macOS('Chrome')
+        : (baileys.Browsers && baileys.Browsers.ubuntu ? baileys.Browsers.ubuntu('Chrome') : ['Mac OS', 'Chrome', '14.4.1']);
+
       const current = baileys.default({
-        auth,
-        logger: pino({ level: 'silent' }),
-        browser: baileys.Browsers.ubuntu('Chrome'),
-        connectTimeoutMs: 30000,
-        defaultQueryTimeoutMs: 20000,
+        version: waVersion,
+        auth: {
+          creds: auth.creds,
+          keys: signalKeys,
+        },
+        logger: pinoLogger,
+        browser: browserSig,
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: 60000,
         qrTimeout: 60000,
         syncFullHistory: false,
         markOnlineOnConnect: true,
@@ -217,39 +248,79 @@ async function createBridge(deps = {}) {
           pairingReady = true;
           const expires = Date.now() + 60000;
           try {
-            const image = await QRCode.toDataURL(update.qr, { width: 320, margin: 4 });
+            const image = await QRCode.toDataURL(update.qr, { width: 360, margin: 3 });
             if (socket !== current || state === 'CONNECTED') return;
             qrImage = image;
             qrExpires = expires;
             state = 'SCAN_QR_CODE';
-            console.log('[WhatsApp] Live pairing QR ready.');
-          } catch { error = 'Could not render QR. Try a pairing code.'; }
+            error = null;
+            console.log('[WhatsApp] Live pairing QR code ready (expires in 60s).');
+          } catch { error = 'Could not render QR code.'; }
+        }
+        if (update.connection === 'connecting') {
+          if (state === 'SCAN_QR_CODE' && !update.qr) {
+            state = 'AUTHENTICATING';
+            console.log('[WhatsApp] Phone scanned QR. Authenticating session...');
+          }
         }
         if (update.connection === 'open') {
-          const phone = (current.user?.id || '').split('@')[0].split(':')[0];
+          const rawId = current.user?.id || '';
+          const phone = rawId.split('@')[0].split(':')[0].replace(/\D/g, '');
           user = {
-            phone_number: '+' + phone, user_name: current.user?.name || 'WhatsApp',
-            connected_at: new Date().toISOString(), device: 'WhatsApp linked device',
+            phone_number: '+' + phone,
+            user_name: current.user?.name || 'WhatsApp Operator',
+            connected_at: new Date().toISOString(),
+            device: 'WhatsApp Linked Device',
           };
           state = 'CONNECTED';
           qrImage = null;
+          qrExpires = 0;
           reconnects = 0;
           error = null;
-          console.log('[WhatsApp] Account linked: +' + phone);
+          console.log('[WhatsApp] ✅ Account linked successfully: +' + phone);
         }
         if (update.connection === 'close') {
-          const code = update.lastDisconnect?.error?.output?.statusCode;
-          socket = null; user = null; qrImage = null; pairingReady = false;
-          if (code === baileys.DisconnectReason.loggedOut) {
+          const closeCode = update.lastDisconnect?.error?.output?.statusCode;
+          const isLoggedOut = closeCode === baileys.DisconnectReason.loggedOut || closeCode === 401;
+          const isRestart = closeCode === baileys.DisconnectReason.restartRequired || closeCode === 515;
+          socket = null;
+          pairingReady = false;
+
+          if (isLoggedOut) {
             state = 'DISCONNECTED';
-            error = 'Session logged out. Generate a new QR to link again.';
-            if (fs.existsSync(authDir)) fs.renameSync(authDir, authDir + '.logged-out-' + Date.now());
+            user = null;
+            qrImage = null;
+            error = 'WhatsApp account was logged out. Scan QR to link again.';
+            console.log('[WhatsApp] Session logged out (401). Wiping credentials.');
+            if (fs.existsSync(authDir)) {
+              try { fs.rmSync(authDir, { recursive: true, force: true }); }
+              catch { fs.renameSync(authDir, authDir + '.logged-out-' + Date.now()); }
+            }
+          } else if (isRestart) {
+            // CRITICAL: Code 515 restart required during pairing handshake must NEVER wipe credentials!
+            console.log('[WhatsApp] Stream restart required (code 515). Re-establishing socket in 300ms...');
+            state = 'AUTHENTICATING';
+            reconnectTimer = setTimeout(() => void connect(), 300);
           } else {
-            // Keep reconnecting with exponential backoff capped at 15s instead of giving up permanently
-            state = 'CONNECTING';
-            error = 'Reconnecting to WhatsApp...';
-            const delay = code === baileys.DisconnectReason.restartRequired ? 250 : Math.min(Math.max(reconnects++, 1) * 3000, 15000);
-            reconnectTimer = setTimeout(() => void connect(), delay);
+            // Check if credentials exist and are registered
+            const credsPath = path.join(authDir, 'creds.json');
+            let isRegistered = false;
+            if (fs.existsSync(credsPath)) {
+              try {
+                const credsData = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+                isRegistered = !!credsData.registered || !!credsData.me;
+              } catch {}
+            }
+            if (isRegistered) {
+              state = 'CONNECTING';
+              error = 'Reconnecting to WhatsApp...';
+              const delay = Math.min(Math.max(reconnects++, 1) * 2000, 10000);
+              reconnectTimer = setTimeout(() => void connect(), delay);
+            } else {
+              state = 'QR_EXPIRED';
+              qrImage = null;
+              error = 'QR code expired. Please generate a new QR to link.';
+            }
           }
         }
       });
@@ -269,20 +340,32 @@ async function createBridge(deps = {}) {
     res.json(snapshot());
   });
   app.post('/qr/generate', async (_req, res) => {
+    if (state === 'CONNECTED') {
+      return res.json({ ...snapshot(), qr_code: null, expires_in: 0 });
+    }
     const validQR = qrImage && qrExpires > Date.now();
-    if (!validQR && state !== 'CONNECTED') {
+    if (!validQR && state !== 'AUTHENTICATING') {
       clearTimeout(reconnectTimer);
       ++generation;
       const current = socket;
       socket = null;
       qrImage = null;
       pairingReady = false;
-      state = 'DISCONNECTED';
+      state = 'GENERATING';
+      error = null;
       if (current) {
         try { current.end(undefined); } catch {}
       }
       try {
-        if (fs.existsSync(authDir)) {
+        const credsPath = path.join(authDir, 'creds.json');
+        let isRegistered = false;
+        if (fs.existsSync(credsPath)) {
+          try {
+            const credsData = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+            isRegistered = !!credsData.registered || !!credsData.me;
+          } catch {}
+        }
+        if (!isRegistered && fs.existsSync(authDir)) {
           fs.rmSync(authDir, { recursive: true, force: true });
         }
       } catch (rmErr) {
@@ -291,10 +374,36 @@ async function createBridge(deps = {}) {
       reconnects = 0;
       await connect();
     }
-    for (let i = 0; i < 40 && !qrImage && state !== 'CONNECTED'; i++) {
+    for (let i = 0; i < 40 && !qrImage && state !== 'CONNECTED' && state !== 'AUTHENTICATING'; i++) {
       await wait(250);
     }
     res.json({ ...snapshot(), expires_in: snapshot().qr_expires_in });
+  });
+
+  app.post('/reconnect', async (_req, res) => {
+    clearTimeout(reconnectTimer);
+    ++generation;
+    const current = socket;
+    socket = null;
+    user = null;
+    qrImage = null;
+    pairingReady = false;
+    state = 'GENERATING';
+    error = null;
+    if (current) {
+      try { current.end(undefined); } catch {}
+    }
+    try {
+      if (fs.existsSync(authDir)) {
+        fs.rmSync(authDir, { recursive: true, force: true });
+      }
+    } catch {}
+    reconnects = 0;
+    await connect();
+    for (let i = 0; i < 40 && !qrImage && state !== 'CONNECTED'; i++) {
+      await wait(250);
+    }
+    res.json(snapshot());
   });
   app.post('/pair-code', async (req, res) => {
     const phone = String(req.body.phone || '').replace(/\D/g, '');

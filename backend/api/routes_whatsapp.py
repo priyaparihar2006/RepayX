@@ -140,6 +140,12 @@ def disconnect(messaging: WhatsAppService = Depends(service)):
     return {"success": True, **result}
 
 
+@router.post("/reconnect")
+def reconnect(messaging: WhatsAppService = Depends(service)):
+    result = messaging.reconnect()
+    return {"success": True, **result}
+
+
 @router.get("/templates")
 def templates(messaging: WhatsAppService = Depends(operator)):
     return {"success": True, "templates": messaging.templates()}

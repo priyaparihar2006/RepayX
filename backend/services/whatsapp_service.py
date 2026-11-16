@@ -593,6 +593,17 @@ class WhatsAppService:
         except APIError:
             return {"success": True, "status": "DISCONNECTED"}
 
+    def reconnect(self) -> dict:
+        try:
+            return self._bridge("reconnect", {})
+        except APIError:
+            try:
+                self.disconnect()
+                time.sleep(0.5)
+                return self.generate_qr()
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+
     def get_loan_emi_data(
         self,
         search: str | None = None,
@@ -801,7 +812,7 @@ class WhatsAppService:
                 raise APIError(409, "not_connected", "Link your WhatsApp account before sending.")
             connected_sender = (live.get("session_info") or {}).get("phone_number")
             if not connected_sender or connected_sender == "+919999999999":
-                raise APIError(403, "wrong_sender", "Link +91 8650629360 before sending these messages.")
+                raise APIError(403, "wrong_sender", "Link an authenticated WhatsApp account before sending messages.")
             conn.execute(
                 """INSERT INTO outbox (request_id, fingerprint, recipient, customer_id, customer_name,
                    template, preview, created_at, status, transport) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sending', 'whatsapp_web')""",
