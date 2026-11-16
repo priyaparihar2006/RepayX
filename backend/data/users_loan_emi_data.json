@@ -4,8 +4,8 @@
     "customer_name": "Nancy",
     "phone": "+917060200849",
     "total_loan_amount": 100000.0,
-    "emi_paid_amount": 36497.49,
-    "emi_left_to_repay": 63502.51,
+    "emi_paid_amount": 227005.02,
+    "emi_left_to_repay": 0.0,
     "monthly_emi": 12000.0,
     "emis_paid_count": 3,
     "emis_remaining_count": 6,
@@ -13,11 +13,12 @@
     "interest_rate_pct": 11.5,
     "loan_disbursed_date": "2026-04-30",
     "next_due_date": "2026-08-30",
-    "days_past_due": 40,
+    "days_past_due": 0,
     "risk_score": 84.2,
     "risk_tier": "High Risk",
     "payment_status": "Overdue (40 days)",
-    "payment_link": "https://pay.repayx.ai/inv/385057"
+    "payment_link": "https://pay.repayx.ai/inv/385057",
+    "status": "Fully Paid"
   },
   {
     "customer_id": 385058,

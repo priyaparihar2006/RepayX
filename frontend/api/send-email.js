@@ -1,4 +1,17 @@
-const nodemailer = require('nodemailer');
+let nodemailer;
+try {
+  nodemailer = require('nodemailer');
+} catch (e1) {
+  try {
+    nodemailer = require('./frontend/node_modules/nodemailer');
+  } catch (e2) {
+    try {
+      nodemailer = require('../frontend/node_modules/nodemailer');
+    } catch (e3) {
+      throw e1;
+    }
+  }
+}
 
 const SHARED_SECRET = process.env.EMAIL_RELAY_SECRET || 'YieD8a2iKNAiRQBCZL5FKy1jO-cKhz8WmCgqaxPVIAU';
 

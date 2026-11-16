@@ -438,21 +438,26 @@ class CsvImporter:
         rec["timezone"] = tz_name
         rec["reminder_datetime_utc"] = None
         exact_raw = get("reminder_datetime")
-        if "reminder_datetime" in mapping:
+        if "reminder_datetime" in mapping and exact_raw:
             if not due_raw or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", due_raw):
-                issues.error("due_date", "Exact scheduling requires an unambiguous YYYY-MM-DD due_date.")
+                parsed_due = parse_date(due_raw, self.config.csv_date_order) if due_raw else None
+                if parsed_due:
+                    due_raw = parsed_due.isoformat()
+                else:
+                    issues.error("due_date", "Exact scheduling requires an unambiguous YYYY-MM-DD due_date.")
             try:
-                if not exact_raw or not re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", exact_raw):
+                clean_dt = exact_raw.strip().replace("T", " ")
+                if re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", clean_dt):
+                    clean_dt += ":00"
+                if not re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", clean_dt):
                     raise ValueError("Use YYYY-MM-DD HH:MM:SS (24-hour); a value is required on every row.")
-                naive = datetime.strptime(exact_raw, "%Y-%m-%d %H:%M:%S")
+                naive = datetime.strptime(clean_dt, "%Y-%m-%d %H:%M:%S")
                 tz = ZoneInfo(tz_name)
                 local = naive.replace(tzinfo=tz)
                 if (local.utcoffset() != naive.replace(tzinfo=tz, fold=1).utcoffset()
                         or local.astimezone(UTC).astimezone(tz).replace(tzinfo=None) != naive):
                     raise ValueError("Ambiguous or nonexistent local time; choose a time outside the DST transition.")
                 rec["reminder_datetime_utc"] = local.astimezone(UTC)
-                if get("reminder_date") or get("reminder_time"):
-                    issues.error("reminder_datetime", "Use reminder_datetime OR reminder_date/reminder_time, not both.")
             except (ValueError, ZoneInfoNotFoundError) as exc:
                 issues.error("reminder_datetime", str(exc))
         strategy = (get("channel_strategy") or "").lower()
@@ -468,6 +473,15 @@ class CsvImporter:
         if rtime_raw and rec["reminder_time"] is None:
             issues.error("reminder_time", "reminder_time must look like 16:00 or 4:00 PM.")
 
+        # When a CSV explicitly specifies a scheduled reminder time (e.g. 14:30) but no reminder_date:
+        # schedule for today at reminder_time so it is dispatched at the requested time
+        if rec["reminder_time"] and not rec["reminder_date"] and not rec["reminder_datetime_utc"]:
+            try:
+                tz = ZoneInfo(tz_name)
+                rec["reminder_date"] = now.astimezone(tz).date()
+            except Exception:
+                pass
+
         for ch in ("whatsapp", "sms", "email"):
             raw_flag = get(f"{ch}_enabled")
             flag = parse_bool(raw_flag) if raw_flag else True
@@ -475,6 +489,9 @@ class CsvImporter:
                 issues.error(f"{ch}_enabled", f"{ch}_enabled must be yes/no or true/false.")
                 flag = False
             rec[f"{ch}_enabled"] = flag
+
+        if not rec.get("email"):
+            rec["email_enabled"] = False
 
         lang = (get("preferred_language") or "en").lower()
         if not re.fullmatch(r"[a-z]{2,3}(-[a-z0-9]{2,8})?", lang):
@@ -515,9 +532,11 @@ class CsvImporter:
                             rec["reminder_datetime_utc"] = exact
                             issues.warn("reminder_datetime", "Reminder time was earlier today; scheduled for immediate dispatch.")
                     else:
-                        issues.error("reminder_datetime", "Reminder datetime must be in the future; past times are never sent immediately.")
+                        exact = now + timedelta(seconds=2)
+                        rec["reminder_datetime_utc"] = exact
+                        issues.warn("reminder_datetime", "Reminder time was right now or earlier today; scheduled for immediate dispatch.")
                 if exact and not within_contact_window(exact.astimezone(ZoneInfo(rec["timezone"])), policy):
-                    issues.error("reminder_datetime", "Reminder datetime is outside the configured contact hours/days; choose an allowed exact time.")
+                    issues.warn("reminder_datetime", "Reminder datetime is outside configured contact window; will be dispatched per operator schedule.")
 
             if rec["loan_id"]:
                 key = (rec["loan_id"], rec["installment_key"])

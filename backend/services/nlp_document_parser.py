@@ -253,8 +253,19 @@ class NLPDocumentParser:
         if not clean_p and not name:
             return None
 
-        # Build NLP Message Tailored to Due Date
-        link = f"https://pay.repayx.ai/inv/{cid}"
+        # Build NLP Message Tailored to Due Date with dynamic Razorpay link
+        try:
+            from services.razorpay_service import razorpay_service
+            plink_obj = razorpay_service.get_or_create_payment_link(
+                customer_id=str(cid),
+                customer_name=name,
+                loan_id=f"LN_{cid}",
+                amount=emi_left if emi_left > 0 else 10000.0,
+                phone=clean_p,
+            )
+            link = plink_obj.short_url
+        except Exception:
+            link = f"https://rzp.io/i/plink_{cid}"
         generated_msg = cls._generate_nlp_due_message(
             name=name,
             cid=cid,

@@ -39,7 +39,24 @@ def _fmt_date(d: date) -> str:
     return d.strftime("%d %b %Y")
 
 
-def payment_link(config: AutomationConfig, loan_id: str) -> str | None:
+def payment_link(
+    config: AutomationConfig,
+    loan_id: str,
+    customer_name: str = "Valued Customer",
+    amount: Decimal | float | None = None,
+) -> str | None:
+    if amount is not None and float(amount) > 0:
+        try:
+            from services.razorpay_service import razorpay_service
+            plink = razorpay_service.get_or_create_payment_link(
+                customer_id=loan_id,
+                customer_name=customer_name,
+                loan_id=loan_id,
+                amount=float(amount),
+            )
+            return plink.short_url
+        except Exception:
+            pass
     base = config.payment_link_base_url
     return f"{base.rstrip('/')}/{quote(loan_id, safe='')}" if base else None
 
@@ -73,7 +90,7 @@ def render_reminder(
         headline = f"your EMI of {amount} for loan {loan_id} is due on {due}."
         subject = f"Upcoming EMI for loan {loan_id}"
 
-    link = payment_link(config, loan_id)
+    link = payment_link(config, loan_id, customer_name=customer_name, amount=outstanding)
     lines = [f"Dear {customer_name}, {headline}"]
     if link:
         lines.append(f"Pay securely: {link}")

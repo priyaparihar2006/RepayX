@@ -22,12 +22,17 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from api.errors import APIError
+from automation.audit import audit
 from automation.auth import Principal, require
 from automation.importer import ImportRejected
 from automation.payments import reject_payment_claim, set_customer_hold, update_payment
 from automation.scheduler import JobActionError, cancel_job, reconcile_all, reschedule_job, retry_job
+from automation.messages import render_reminder
 from automation.service import AutomationService
-from automation.util import csv_safe, iso, mask_email, mask_identifier, mask_phone, parse_iso, utcnow
+from automation.util import (
+    EMAIL_RE, csv_safe, format_inr, iso, mask_email, mask_identifier, mask_phone,
+    normalize_email, normalize_phone, parse_bool, parse_date, parse_iso, parse_money, utcnow,
+)
 
 router = APIRouter(prefix="/api", tags=["automation"])
 
@@ -470,6 +475,397 @@ def send_instant_email(request: Request, body: InstantEmailBody, principal: Prin
     }
 
 
+class SendAllInstantRemindersBody(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    channel: Literal["email", "all", "whatsapp", "sms"] = "email"
+    force: bool = False
+    rows: list[dict[str, Any]] | None = None
+    emi_ids: list[int] | None = None
+    customer_ids: list[str] | None = None
+
+
+@router.post("/automation/send-all-instant-reminders")
+def send_all_instant_reminders(
+    request: Request,
+    body: SendAllInstantRemindersBody,
+    principal: Principal = require("operator"),
+):
+    service = svc(request)
+    provider = service.providers.get("email")
+    if not provider:
+        raise APIError(503, "no_email_provider", "No email provider configured.")
+    problem = provider.configuration_problem()
+    if problem:
+        raise APIError(503, "provider_not_configured", problem)
+
+    now = utcnow()
+    now_s = iso(now)
+    policy = service.policy.get()
+    cooldown_threshold = iso(now - timedelta(minutes=5))
+
+    targets: list[dict[str, Any]] = []
+
+    # Case A: rows provided from frontend table
+    if body.rows and len(body.rows) > 0:
+        for idx, row in enumerate(body.rows):
+            c_id = str(row.get("customer_id") or f"CUST-IMP-{idx+1}").strip()
+            name = str(row.get("customer_name") or row.get("name") or "Valued Customer").strip()
+            email_val = normalize_email(row.get("email") or row.get("email_address"))
+            phone_val = normalize_phone(row.get("phone") or row.get("phone_number") or row.get("mobile"))
+            loan_id = str(row.get("loan_id") or row.get("loan_number") or f"LN-{idx+1}").strip()
+            amount_val = parse_money(row.get("unpaid_amount") or row.get("emi_amount") or row.get("amount") or "0") or Decimal("0.00")
+            due_d = parse_date(row.get("due_date"), service.config.csv_date_order) or now.date()
+            raw_flag = row.get("email_enabled")
+            email_en = parse_bool(raw_flag) if raw_flag is not None and str(raw_flag).strip() != "" else True
+            raw_consent = str(row.get("consent_status") or "granted").strip().lower()
+            consent_st = "revoked" if raw_consent in ("revoked", "no", "false", "opt_out", "0") else "granted"
+            pay_status = str(row.get("payment_status") or "overdue").strip().lower()
+
+            targets.append({
+                "source": "row",
+                "customer_id": c_id,
+                "name": name,
+                "email": email_val,
+                "phone": phone_val,
+                "loan_id": loan_id,
+                "emi_id": None,
+                "amount": amount_val,
+                "due_date": due_d,
+                "email_enabled": email_en,
+                "consent_status": consent_st,
+                "payment_status": pay_status,
+                "timezone": str(row.get("timezone") or service.config.app_timezone).strip(),
+                "preferred_language": str(row.get("preferred_language") or "en").strip(),
+            })
+    else:
+        # Case B: Fetch all eligible active EMI/customer records from database
+        with service.db.read() as conn:
+            query = """
+                SELECT e.id as emi_id, e.customer_id, e.loan_id, e.emi_amount, e.amount_paid,
+                       e.due_date, e.payment_status, c.name, c.email, c.phone, c.timezone,
+                       c.preferred_language, c.consent_status, c.email_enabled, c.reminders_on_hold
+                FROM emis e
+                JOIN customers c ON c.customer_id = e.customer_id
+                WHERE e.payment_status IN ('pending', 'overdue', 'partially_paid')
+                  AND c.reminders_on_hold = 0
+            """
+            params: list[Any] = []
+            if body.emi_ids:
+                placeholders = ",".join("?" for _ in body.emi_ids)
+                query += f" AND e.id IN ({placeholders})"
+                params.extend(body.emi_ids)
+            elif body.customer_ids:
+                placeholders = ",".join("?" for _ in body.customer_ids)
+                query += f" AND e.customer_id IN ({placeholders})"
+                params.extend(body.customer_ids)
+
+            db_rows = conn.execute(query, params).fetchall()
+            for r in db_rows:
+                out_amt = max(Decimal("0.00"), Decimal(r["emi_amount"]) - Decimal(r["amount_paid"]))
+                try:
+                    due_d = date.fromisoformat(r["due_date"])
+                except Exception:
+                    due_d = now.date()
+
+                targets.append({
+                    "source": "db",
+                    "customer_id": r["customer_id"],
+                    "name": r["name"],
+                    "email": r["email"],
+                    "phone": r["phone"],
+                    "loan_id": r["loan_id"],
+                    "emi_id": r["emi_id"],
+                    "amount": out_amt,
+                    "due_date": due_d,
+                    "email_enabled": bool(r["email_enabled"]),
+                    "consent_status": r["consent_status"],
+                    "payment_status": r["payment_status"],
+                    "timezone": r["timezone"] or service.config.app_timezone,
+                    "preferred_language": r["preferred_language"] or "en",
+                })
+
+    results: list[dict[str, Any]] = []
+    sent_count = 0
+    failed_count = 0
+    skipped_count = 0
+
+    with service.db.write() as conn:
+        for t in targets:
+            c_id = t["customer_id"]
+            c_name = t["name"]
+            loan_id = t["loan_id"]
+            email_addr = t["email"]
+            amount_val = t["amount"]
+            due_date_val = t["due_date"]
+
+            # Validation 1: Email Address format & presence
+            if not email_addr or not EMAIL_RE.match(email_addr):
+                results.append({
+                    "customer_id": c_id,
+                    "customer_name": c_name,
+                    "email": email_addr or "N/A",
+                    "loan_id": loan_id,
+                    "amount": format_inr(amount_val),
+                    "status": "skipped",
+                    "reason": "Customer does not have a valid email address",
+                    "message_id": None,
+                })
+                skipped_count += 1
+                continue
+
+            # Validation 2: Email Enabled for customer
+            if not t["email_enabled"]:
+                results.append({
+                    "customer_id": c_id,
+                    "customer_name": c_name,
+                    "email": mask_email(email_addr),
+                    "loan_id": loan_id,
+                    "amount": format_inr(amount_val),
+                    "status": "skipped",
+                    "reason": "Email channel is disabled for this customer",
+                    "message_id": None,
+                })
+                skipped_count += 1
+                continue
+
+            # Validation 3: Consent status
+            if t["consent_status"] == "revoked":
+                results.append({
+                    "customer_id": c_id,
+                    "customer_name": c_name,
+                    "email": mask_email(email_addr),
+                    "loan_id": loan_id,
+                    "amount": format_inr(amount_val),
+                    "status": "skipped",
+                    "reason": "Customer has revoked communication consent",
+                    "message_id": None,
+                })
+                skipped_count += 1
+                continue
+
+            # Validation 4: Payment status & amount
+            if t["payment_status"] in ("paid", "cancelled", "waived"):
+                results.append({
+                    "customer_id": c_id,
+                    "customer_name": c_name,
+                    "email": mask_email(email_addr),
+                    "loan_id": loan_id,
+                    "amount": format_inr(amount_val),
+                    "status": "skipped",
+                    "reason": f"Loan installment status is {t['payment_status']}",
+                    "message_id": None,
+                })
+                skipped_count += 1
+                continue
+
+            if amount_val <= 0:
+                results.append({
+                    "customer_id": c_id,
+                    "customer_name": c_name,
+                    "email": mask_email(email_addr),
+                    "loan_id": loan_id,
+                    "amount": format_inr(amount_val),
+                    "status": "skipped",
+                    "reason": "No outstanding balance on this installment",
+                    "message_id": None,
+                })
+                skipped_count += 1
+                continue
+
+            # Validation 5: Suppression check
+            is_suppressed = conn.execute(
+                "SELECT 1 FROM suppressions WHERE channel = 'email' AND identifier = ?",
+                (email_addr,)
+            ).fetchone()
+            if is_suppressed:
+                results.append({
+                    "customer_id": c_id,
+                    "customer_name": c_name,
+                    "email": mask_email(email_addr),
+                    "loan_id": loan_id,
+                    "amount": format_inr(amount_val),
+                    "status": "skipped",
+                    "reason": "Email recipient is on suppression list",
+                    "message_id": None,
+                })
+                skipped_count += 1
+                continue
+
+            # Validation 6: Duplicate prevention cooldown (5 mins)
+            if not body.force:
+                recent_send = conn.execute(
+                    """SELECT 1 FROM communications
+                       WHERE channel = 'email' AND identifier = ? AND loan_id = ?
+                         AND status = 'accepted' AND created_at > ?""",
+                    (email_addr, loan_id, cooldown_threshold)
+                ).fetchone()
+                if recent_send:
+                    results.append({
+                        "customer_id": c_id,
+                        "customer_name": c_name,
+                        "email": mask_email(email_addr),
+                        "loan_id": loan_id,
+                        "amount": format_inr(amount_val),
+                        "status": "skipped",
+                        "reason": "Duplicate protection: email was already sent in the last 5 minutes",
+                        "message_id": None,
+                    })
+                    skipped_count += 1
+                    continue
+
+            # Upsert customer and EMI if from CSV rows
+            emi_id = t["emi_id"]
+            if t["source"] == "row":
+                conn.execute(
+                    """INSERT INTO customers (customer_id, name, phone, email, timezone, preferred_language, consent_status,
+                           whatsapp_enabled, sms_enabled, email_enabled, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, 1, ?, ?)
+                       ON CONFLICT(customer_id) DO UPDATE SET
+                           name=excluded.name, email=excluded.email, updated_at=excluded.updated_at""",
+                    (c_id, c_name, t["phone"], email_addr, t["timezone"], t["preferred_language"], t["consent_status"], now_s, now_s)
+                )
+                inst_key = "1"
+                existing_emi = conn.execute(
+                    "SELECT id FROM emis WHERE loan_id = ? AND installment_key = ?",
+                    (loan_id, inst_key)
+                ).fetchone()
+                if existing_emi:
+                    emi_id = existing_emi["id"]
+                    conn.execute(
+                        "UPDATE emis SET emi_amount = ?, due_date = ?, payment_status = ?, updated_at = ? WHERE id = ?",
+                        (str(amount_val), due_date_val.isoformat(), t["payment_status"], now_s, emi_id)
+                    )
+                else:
+                    cur = conn.execute(
+                        """INSERT INTO emis (customer_id, loan_id, installment_key, emi_amount, amount_paid, due_date,
+                               payment_status, payment_status_source, payment_status_updated_at, row_hash, created_at, updated_at)
+                           VALUES (?, ?, ?, ?, '0.00', ?, ?, 'manual:instant_send', ?, 'instant_send', ?, ?)""",
+                        (c_id, loan_id, inst_key, str(amount_val), due_date_val.isoformat(), t["payment_status"], now_s, now_s, now_s)
+                    )
+                    emi_id = cur.lastrowid
+
+            # Render personalized reminder
+            try:
+                tz = ZoneInfo(t["timezone"])
+            except Exception:
+                tz = ZoneInfo("Asia/Kolkata")
+            local_now = now.astimezone(tz)
+            content = render_reminder(
+                service.config,
+                c_name,
+                loan_id,
+                amount_val,
+                due_date_val,
+                local_now,
+                stage=1,
+                stage_name="friendly",
+            )
+
+            req_id = str(uuid.uuid4())
+            msg = OutboundMessage(
+                channel="email",
+                recipient=email_addr,
+                subject=content.subject,
+                text=content.text,
+                html=content.html,
+                idempotency_key=f"instant-all:{req_id}",
+                template_params=content.template_params,
+            )
+
+            # Send email
+            res = provider.send(msg)
+
+            if res.accepted:
+                sent_count += 1
+                clean_ref = (res.provider_message_id or req_id).split("@")[0].strip("<>")
+                conn.execute(
+                    """INSERT INTO communications (customer_id, loan_id, channel, direction, kind,
+                           provider_message_id, identifier, subject, content, status, created_at)
+                       VALUES (?, ?, 'email', 'outbound', 'instant_reminder', ?, ?, ?, ?, 'accepted', ?)""",
+                    (c_id, loan_id, res.provider_message_id, email_addr, content.subject, content.text, now_s)
+                )
+
+                if emi_id:
+                    open_job = conn.execute(
+                        "SELECT id FROM reminder_jobs WHERE emi_id = ? AND status IN ('pending', 'retry')",
+                        (emi_id,)
+                    ).fetchone()
+                    if open_job:
+                        job_id = open_job["id"]
+                        conn.execute(
+                            """UPDATE reminder_jobs SET status = 'completed', outcome_reason = 'accepted on email via instant dispatch',
+                                   completed_at = ?, updated_at = ? WHERE id = ?""",
+                            (now_s, now_s, job_id)
+                        )
+                        conn.execute(
+                            """INSERT INTO message_deliveries (job_id, channel, idempotency_key, recipient, provider,
+                                   status, provider_message_id, accepted_at, created_at, updated_at)
+                               VALUES (?, 'email', ?, ?, 'smtp', 'accepted', ?, ?, ?, ?)
+                               ON CONFLICT(job_id, channel) DO UPDATE SET
+                                   status = 'accepted', provider_message_id = excluded.provider_message_id,
+                                   accepted_at = excluded.accepted_at, updated_at = excluded.updated_at""",
+                            (job_id, f"{job_id}:email", mask_identifier("email", email_addr),
+                             res.provider_message_id, now_s, now_s, now_s)
+                        )
+
+                results.append({
+                    "customer_id": c_id,
+                    "customer_name": c_name,
+                    "email": mask_email(email_addr),
+                    "loan_id": loan_id,
+                    "amount": format_inr(amount_val),
+                    "status": "sent",
+                    "reason": None,
+                    "message_id": res.provider_message_id,
+                    "tracking_ref": clean_ref,
+                })
+            else:
+                failed_count += 1
+                conn.execute(
+                    """INSERT INTO communications (customer_id, loan_id, channel, direction, kind,
+                           identifier, subject, content, status, created_at)
+                       VALUES (?, ?, 'email', 'outbound', 'instant_reminder', ?, ?, ?, 'failed', ?)""",
+                    (c_id, loan_id, email_addr, content.subject, content.text, now_s)
+                )
+                results.append({
+                    "customer_id": c_id,
+                    "customer_name": c_name,
+                    "email": mask_email(email_addr),
+                    "loan_id": loan_id,
+                    "amount": format_inr(amount_val),
+                    "status": "failed",
+                    "reason": res.error_message or res.error_code or "Provider rejected email",
+                    "message_id": None,
+                })
+
+        audit(conn, principal.name, "reminders.instant_all_dispatched", "automation", str(len(targets)), {
+            "total": len(targets),
+            "sent": sent_count,
+            "failed": failed_count,
+            "skipped": skipped_count,
+        })
+
+    return {
+        "success": True,
+        "total_selected": len(targets),
+        "sent_count": sent_count,
+        "failed_count": failed_count,
+        "skipped_count": skipped_count,
+        "results": results,
+        "executed_at": now_s,
+    }
+
+
+@router.post("/automation/run-scheduler-now")
+def run_scheduler_now(request: Request, principal: Principal = require("operator")):
+    service = svc(request)
+    now = utcnow()
+    result = service.tick(now)
+    with service.db.write() as conn:
+        audit(conn, principal.name, "scheduler.manual_tick", "scheduler", "", result)
+    return {"success": True, "result": result, "server_time": iso(now)}
+
+
 # ====================================================================== EMIs and payments
 
 
@@ -679,6 +1075,16 @@ def dashboard(request: Request, _: Principal = require("viewer")):
         upcoming = conn.execute(
             "SELECT COUNT(*) FROM reminder_jobs WHERE status IN ('pending','retry') AND run_at_utc >= ? AND run_at_utc < ?",
             (iso(now), iso(now + timedelta(days=7)))).fetchone()[0]
+        next_job = conn.execute(
+            "SELECT MIN(run_at_utc) FROM reminder_jobs WHERE status IN ('pending','retry')"
+        ).fetchone()
+        next_utc = next_job[0] if next_job and next_job[0] else None
+        next_local = None
+        if next_utc:
+            try:
+                next_local = parse_iso(next_utc).astimezone(tz).strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
         deliveries = conn.execute("SELECT channel, CASE WHEN provider = 'sandbox' AND status = 'accepted' "
                                   "THEN 'simulated' ELSE status END AS status, COUNT(*) AS n, "
                                   "SUM(attempt_count) AS attempts FROM message_deliveries GROUP BY channel, "
@@ -719,6 +1125,8 @@ def dashboard(request: Request, _: Principal = require("viewer")):
         "reminders": {
             "scheduled_open": job_status.get("pending", 0) + job_status.get("retry", 0),
             "scheduled_today": due_today, "due_today_open": due_today_open, "upcoming_7_days": upcoming,
+            "next_scheduled_run_utc": next_utc,
+            "next_scheduled_run_local": next_local,
             "by_status": job_status,
         },
         "escalations": {"total": escalations_total, "open": escalations_open},

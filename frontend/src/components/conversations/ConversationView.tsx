@@ -687,6 +687,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
                     {(msg.hasUpiQr ||
                       msg.upiPayment ||
                       msg.text.includes('upi://pay') ||
+                      msg.text.includes('rzp.io') ||
                       msg.text.includes('pay.repayx.ai/upi') ||
                       msg.text.includes('Dynamic UPI Payment Intent')) && (
                       <div className="pt-2">
@@ -774,7 +775,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
                 type="button"
                 onClick={() =>
                   handleInsertQuickChip(
-                    `Dear ${currentConv?.customerName}, here is your verified UPI repayment link: https://pay.repayx.ai/upi/${currentConv?.loanId}. Pay with Google Pay/PhonePe.`
+                    `Dear ${currentConv?.customerName}, here is your verified Razorpay repayment link: https://rzp.io/i/plink_${currentConv?.loanId}. Pay with UPI, Cards, NetBanking or QR.`
                   )
                 }
                 className="px-2.5 py-1 bg-slate-100 hover:bg-[#245C35]/15 hover:text-[#252E38] text-slate-700 rounded-lg border border-slate-200 text-xs shrink-0 cursor-pointer transition-colors font-medium"

@@ -29,6 +29,7 @@ from automation.webhooks import (
     verify_meta_signature,
     verify_twilio_signature,
 )
+from services.razorpay_service import razorpay_service
 
 logger = logging.getLogger("repayx.webhooks")
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
@@ -261,3 +262,35 @@ async def payment_events(request: Request):
     except JobActionError as exc:
         raise APIError(exc.status_code, exc.code, exc.message) from exc
     return {"success": True, "result": "applied", "reminders_cancelled": result.cancelled}
+
+
+# ------------------------------------------------------------------ Razorpay Gateway Webhooks
+
+
+@router.post("/razorpay")
+async def razorpay_events(request: Request):
+    """Real-time Razorpay Payment Gateway Webhook.
+
+    Verifies X-Razorpay-Signature header against the raw body using HMAC-SHA256,
+    processes events (payment_link.paid, payment_link.partially_paid, payment.captured,
+    payment_link.expired, payment_link.cancelled), records transaction, reconciles EMI,
+    and automatically cancels pending reminder jobs when the loan/EMI is cleared.
+    """
+    raw = await _body(request)
+    signature = request.headers.get("x-razorpay-signature")
+
+    # In production/live mode, verify HMAC signature
+    # In test mode or when webhook secret is set, verify
+    if razorpay_service.webhook_secret:
+        valid = razorpay_service.verify_webhook_signature(raw, signature)
+        if not valid:
+            logger.warning("Rejected Razorpay webhook: invalid signature %s", signature)
+            raise APIError(401, "invalid_signature", "Razorpay signature verification failed.")
+
+    try:
+        payload = json.loads(raw)
+    except ValueError as exc:
+        raise APIError(400, "invalid_json", "Razorpay webhook body is not valid JSON.") from exc
+
+    result = razorpay_service.process_webhook_payload(payload, raw)
+    return result

@@ -67,7 +67,7 @@ export const SendMessageModal: React.FC<SendMessageModalProps> = ({
     const loanId = loan?.id || 'LN1001';
     const amount = loan ? `₹${loan.outstanding.toLocaleString('en-IN')}` : '₹8,500';
     const dueDate = loan?.dueDate || '25 Sep 2026';
-    const payLink = `https://pay.repayx.ai/inv/${loanId}`;
+    const payLink = `https://rzp.io/i/plink_${loanId}`;
 
     switch (tplKey) {
       case 'reminder':
@@ -100,9 +100,9 @@ export const SendMessageModal: React.FC<SendMessageModalProps> = ({
 
     let aiDraft = '';
     if (daysOverdue > 7) {
-      aiDraft = `Dear ${currentCustomer.name}, your loan ${loanId} is ${daysOverdue} days past due (${amount}). Per policy, please clear by this evening to avoid penalty escalation. Link: https://pay.repayx.ai/inv/${loanId}`;
+      aiDraft = `Dear ${currentCustomer.name}, your loan ${loanId} is ${daysOverdue} days past due (${amount}). Per policy, please clear by this evening to avoid penalty escalation. Link: https://rzp.io/i/plink_${loanId}`;
     } else {
-      aiDraft = `Hello ${currentCustomer.name}, Priya here from RepayX. Hope you are well! Just checking in regarding the EMI of ${amount} due on ${currentLoan?.dueDate || '25 Sep'}. Would you like to pay now via UPI or schedule for tomorrow? Link: https://pay.repayx.ai/inv/${loanId}`;
+      aiDraft = `Hello ${currentCustomer.name}, Priya here from RepayX. Hope you are well! Just checking in regarding the EMI of ${amount} due on ${currentLoan?.dueDate || '25 Sep'}. Would you like to pay now via UPI or schedule for tomorrow? Link: https://rzp.io/i/plink_${loanId}`;
     }
 
     setActiveTemplate('custom');

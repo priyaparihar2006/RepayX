@@ -222,10 +222,40 @@ export interface FollowUp {
   reminders_on_hold?: number;
 }
 
+export interface InstantSendResultItem {
+  customer_id: string;
+  customer_name: string;
+  email: string;
+  loan_id: string;
+  amount: string;
+  status: 'sent' | 'failed' | 'skipped';
+  reason: string | null;
+  message_id?: string | null;
+  tracking_ref?: string | null;
+}
+
+export interface InstantSendAllResponse {
+  success: boolean;
+  total_selected: number;
+  sent_count: number;
+  failed_count: number;
+  skipped_count: number;
+  results: InstantSendResultItem[];
+  executed_at: string;
+}
+
 export interface Dashboard {
   customers_total: number;
   emis: { paid: number; pending: number; overdue: number; partially_paid: number; other: number; total: number; payment_claims_pending: number };
-  reminders: { scheduled_open: number; scheduled_today: number; due_today_open: number; upcoming_7_days: number; by_status: Record<string, number> };
+  reminders: {
+    scheduled_open: number;
+    scheduled_today: number;
+    due_today_open: number;
+    upcoming_7_days: number;
+    next_scheduled_run_utc?: string | null;
+    next_scheduled_run_local?: string | null;
+    by_status: Record<string, number>;
+  };
   deliveries_by_channel: Record<Channel, Record<string, number>>;
   failed_deliveries: number; retry_attempts: number;
   recent_replies: { id: number; customer_id: string | null; customer_name: string | null; channel: Channel; from: string;
@@ -325,6 +355,14 @@ export const automationApi = {
     subject?: string;
     message?: string;
   }) => call<{ success: boolean; from_address?: string; recipient: string; status: string; tracking_ref?: string; message_id: string; sent_at: string }>('/api/automation/send-instant-email', { method: 'POST', json: body }),
+  sendAllInstantReminders: (body?: {
+    channel?: 'email' | 'all' | 'whatsapp' | 'sms';
+    force?: boolean;
+    rows?: Record<string, any>[];
+    emi_ids?: number[];
+    customer_ids?: string[];
+  }) => call<InstantSendAllResponse>('/api/automation/send-all-instant-reminders', { method: 'POST', json: body ?? {} }),
+  runSchedulerNow: () => call<{ success: boolean; result: any; server_time: string }>('/api/automation/run-scheduler-now', { method: 'POST' }),
 
   emis: (params: { payment_status?: string; claim_pending?: boolean; search?: string; page?: number }) =>
     call<{ emis: Emi[]; pagination: Pagination }>(`/api/emis${qs(params)}`),

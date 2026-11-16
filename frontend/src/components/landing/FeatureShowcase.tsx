@@ -111,8 +111,8 @@ const REAL_CONVERSATIONS: RealBorrowerConversation[] = [
       {
         sender: 'ai',
         time: '10:00 AM',
-        en: 'URGENT EMI NOTICE: Dear Nancy, your RepayX Loan Account #385057 has an overdue balance of ₹63,502.51 (40 days past due). Total Loan: ₹1,00,000 | Paid: ₹36,497.49 (3 EMIs cleared). Please complete your EMI payment today: https://pay.repayx.ai/inv/385057',
-        hi: 'अति आवश्यक EMI सूचना: प्रिय Nancy, आपके RepayX लोन खाता #385057 में ₹63,502.51 बकाया है (40 दिन overdue)। कुल लोन: ₹1,00,000 | चुकाया गया: ₹36,497.49 (3 किस्तें जमा)। आज ही भुगतान करें: https://pay.repayx.ai/inv/385057',
+        en: 'Hello Nancy, here is your verified RepayX Loan summary for Account #LN_385057:\n\n• Total Loan Sanctioned: ₹100,000.00\n• Total EMI Paid to Date: ₹36,497.49\n• Remaining Overdue Balance: ₹63,502.51\n• Status: 40 days past due\n\nPay securely using UPI, QR, Debit Card, Credit Card or NetBanking:\nhttps://rzp.io/i/plink_385057',
+        hi: 'नमस्ते Nancy, आपके ऋण खाता #LN_385057 का सत्यापित विवरण:\n\n• स्वीकृत ऋण: ₹100,000.00\n• कुल जमा राशि: ₹36,497.49\n• शेष बकाया राशि: ₹63,502.51\n• स्थिति: 40 दिन overdue\n\nसुरक्षित भुगतान करें UPI, QR, कार्ड या नेटबैंकिंग द्वारा:\nhttps://rzp.io/i/plink_385057',
       },
       {
         sender: 'borrower',

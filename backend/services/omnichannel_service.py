@@ -805,7 +805,7 @@ class OmnichannelService:
                     "chunkId": "CHUNK-OMNI-001",
                     "relevanceScore": 95,
                 },
-                "aiSuggestedResponse": f"Hello {conv['customer_name']}, your pending balance is ₹50,000. Pay securely here: https://pay.repayx.ai/inv/{conv['customer_id']}",
+                "aiSuggestedResponse": f"Hello {conv['customer_name']}, your pending balance is ₹50,000. Pay securely using UPI, Card or NetBanking: https://rzp.io/i/plink_{conv['customer_id']}",
                 "requiresManagerApproval": bool(conv.get("human_handoff", 0)),
                 "attemptCount": 1,
             },

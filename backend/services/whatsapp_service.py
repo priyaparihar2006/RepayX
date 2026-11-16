@@ -24,6 +24,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
 from urllib.request import Request, urlopen
@@ -32,6 +33,7 @@ from urllib.error import HTTPError, URLError
 from api.errors import APIError
 from services.customer_service import CustomerService
 from services.csv_scheduler_service import CSVSchedulerService
+from services.razorpay_service import razorpay_service
 
 ROOT = Path(__file__).resolve().parents[2]
 logger = logging.getLogger('whatsapp_service')
@@ -745,13 +747,32 @@ class WhatsAppService:
             tmpl = next((t for t in DEFAULT_TEMPLATES if t["id"] == template_id), DEFAULT_TEMPLATES[0])
             body = tmpl["body"]
 
+        cid_val = str(customer.get("customer_id") or "385057")
+        cname_val = str(customer.get("customer_name") or customer.get("name", "Customer"))
+        unpaid_val = float(customer.get("unpaid_amount") or customer.get("emi_left_to_repay", 0) or 63502.51)
+        phone_val = str(customer.get("phone") or "")
+
+        pay_link = customer.get("payment_link")
+        if not pay_link or "pay.repayx.ai" in str(pay_link):
+            try:
+                plink_obj = razorpay_service.get_or_create_payment_link(
+                    customer_id=cid_val,
+                    customer_name=cname_val,
+                    loan_id=f"LN_{cid_val}",
+                    amount=unpaid_val,
+                    phone=phone_val,
+                )
+                pay_link = plink_obj.short_url
+            except Exception:
+                pay_link = f"https://rzp.io/i/plink_{cid_val}"
+
         rendered = (
-            body.replace("{{customer_name}}", str(customer.get("customer_name") or customer.get("name", "Customer")))
-            .replace("{{customer_id}}", str(customer.get("customer_id", "")))
-            .replace("{{unpaid_amount}}", f"{float(customer.get('unpaid_amount') or customer.get('emi_left_to_repay', 0)):,.2f}")
+            body.replace("{{customer_name}}", cname_val)
+            .replace("{{customer_id}}", cid_val)
+            .replace("{{unpaid_amount}}", f"{unpaid_val:,.2f}")
             .replace("{{late_days}}", str(int(float(customer.get("late_days") or customer.get("days_past_due", 0)))))
             .replace("{{risk_score}}", str(customer.get("risk_score", "High")))
-            .replace("{{payment_link}}", f"https://pay.repayx.ai/inv/{customer.get('customer_id', '')}")
+            .replace("{{payment_link}}", pay_link)
         )
         return rendered
 
@@ -905,17 +926,29 @@ class WhatsAppService:
             left_emi = float(user.get("emi_left_to_repay", 0))
             late_days = int(user.get("days_past_due", 0))
             paid_cnt = int(user.get("emis_paid_count", 0))
-            link = user.get("payment_link", f"https://pay.repayx.ai/inv/{cid}")
+            link = user.get("payment_link")
+            if not link or "pay.repayx.ai" in str(link):
+                try:
+                    plink_obj = razorpay_service.get_or_create_payment_link(
+                        customer_id=str(cid),
+                        customer_name=name,
+                        loan_id=f"LN_{cid}",
+                        amount=left_emi,
+                        phone=phone,
+                    )
+                    link = plink_obj.short_url
+                except Exception:
+                    link = f"https://rzp.io/i/plink_{cid}"
 
-            # AI personalized message with exact loan data
-            ai_message = (
-                f"URGENT EMI NOTICE: Dear {name}, your RepayX Loan Account #{cid} has an overdue balance of "
-                f"₹{left_emi:,.2f} ({late_days} days past due).\n\n"
-                f"• Total Loan Taken: ₹{total_loan:,.2f}\n"
-                f"• Total EMI Paid So Far: ₹{paid_emi:,.2f} ({paid_cnt} installments cleared)\n"
-                f"• Remaining Balance Left to Repay: ₹{left_emi:,.2f}\n\n"
-                f"To prevent credit score impact or secondary collection measures, please complete your EMI payment today: {link}\n"
-                f"For inquiries, simply reply to this WhatsApp chat."
+            # AI personalized message with exact loan data and dynamic Razorpay payment link
+            ai_message = razorpay_service.format_recovery_message(
+                customer_name=name,
+                loan_id=f"LN_{cid}",
+                total_sanctioned=total_loan,
+                total_paid=paid_emi,
+                remaining_balance=left_emi,
+                days_past_due=late_days,
+                payment_link_url=link,
             )
 
             res = self.send(
@@ -980,7 +1013,6 @@ class WhatsAppService:
                 "emi_left_to_repay": 63502.51,
                 "days_past_due": 40,
                 "emis_paid_count": 3,
-                "payment_link": "https://pay.repayx.ai/inv/385057",
             }
 
         name = user_record.get("customer_name", "Borrower")
@@ -989,7 +1021,20 @@ class WhatsAppService:
         paid_emi = float(user_record.get("emi_paid_amount", 0))
         left_emi = float(user_record.get("emi_left_to_repay", 0))
         late_days = int(user_record.get("days_past_due", 0))
-        link = user_record.get("payment_link", f"https://pay.repayx.ai/inv/{cid}")
+
+        link = user_record.get("payment_link")
+        if not link or "pay.repayx.ai" in str(link):
+            try:
+                plink_obj = razorpay_service.get_or_create_payment_link(
+                    customer_id=str(cid),
+                    customer_name=name,
+                    loan_id=f"LN_{cid}",
+                    amount=left_emi,
+                    phone=phone,
+                )
+                link = plink_obj.short_url
+            except Exception:
+                link = f"https://rzp.io/i/plink_{cid}"
 
         query = message_text.lower()
         if any(w in query for w in ["balance", "left", "how much", "amount", "due", "pending"]):
@@ -1105,15 +1150,19 @@ class WhatsAppService:
             except Exception:
                 raise APIError(503, "contacts_invalid", "The WhatsApp contacts file is invalid.")
 
-        base_url = os.getenv("LOAN_HISTORY_BASE_URL", "https://repayx-loan-history-demo.aglow-map-2577.chatgpt.site").rstrip("/")
         res = []
         for contact in DEMO_CONTACTS:
             cid = contact["customer_id"]
             loan_raw = DEMO_LOAN_HISTORY.get(cid, {})
             paid_paise = sum(amt for _, amt in loan_raw.get("payments", []))
-            remaining_paise = loan_raw.get("total_paise", 0) - paid_paise
+            total_paise = loan_raw.get("total_paise", 10000000)
+            remaining_paise = total_paise - paid_paise
+            total_sanctioned = Decimal(total_paise) / Decimal(100)
+            total_paid = Decimal(paid_paise) / Decimal(100)
+            remaining_balance = Decimal(remaining_paise) / Decimal(100)
+
             loan_hist = {
-                "total_paise": loan_raw.get("total_paise", 0),
+                "total_paise": total_paise,
                 "paid_paise": paid_paise,
                 "remaining_paise": remaining_paise,
                 "payments": loan_raw.get("payments", []),
@@ -1121,16 +1170,34 @@ class WhatsAppService:
                 "due": loan_raw.get("due", ""),
                 "late_days": contact["late_days"],
             }
-            loan_history_url = f"{base_url}/?loan={cid}"
-            message = (
-                f"URGENT NOTICE: Dear {contact['name']}, your loan account #{cid} "
-                f"has an overdue balance of ₹{contact['amount']} ({contact['late_days']} days past due). "
-                f"To review your statement: {loan_history_url}"
+
+            try:
+                plink_obj = razorpay_service.get_or_create_payment_link(
+                    customer_id=str(cid),
+                    customer_name=contact["name"],
+                    loan_id=f"LN_{cid}",
+                    amount=remaining_balance,
+                    phone=contact["phone"],
+                )
+                pay_link = plink_obj.short_url
+            except Exception as exc:
+                logger.warning("Could not generate Razorpay link for %s: %s", cid, exc)
+                pay_link = f"https://rzp.io/i/plink_{cid}"
+
+            message = razorpay_service.format_recovery_message(
+                customer_name=contact["name"],
+                loan_id=f"LN_{cid}",
+                total_sanctioned=total_sanctioned,
+                total_paid=total_paid,
+                remaining_balance=remaining_balance,
+                days_past_due=contact["late_days"],
+                payment_link_url=pay_link,
             )
             res.append({
                 **contact,
                 "loan_history": loan_hist,
-                "loan_history_url": loan_history_url,
+                "loan_history_url": pay_link,
+                "payment_link": pay_link,
                 "message": message,
                 "sample_data": True,
                 "opted_in": True,

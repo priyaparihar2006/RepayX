@@ -94,23 +94,19 @@ class SmtpEmailProvider(Provider):
             return SendResult.fail("provider_not_configured", problem, transient=False)
         c = self.config
 
-        # 1. When an HTTPS email relay is configured (e.g. on Render Free where outbound port 587 is blocked),
-        # dispatch via the HTTPS relay first to avoid slow 20-second TCP connection drop timeouts.
-        if getattr(c, "email_relay_url", None):
-            relay_res = self._send_via_https_relay(message)
-            if relay_res.accepted:
-                return relay_res
-
-        # 2. Direct SMTP connection (port 465 SSL or port 587 TLS)
+        # 1. Try direct SMTP connection first (port 465 SSL or port 587 TLS)
         msg = self.build(message)
         server = None
+        smtp_err = None
+
         # Try port 465 direct SSL first for high reliability across cloud hosts
         try:
             server = smtplib.SMTP_SSL(c.smtp_host, 465, context=ssl.create_default_context(), timeout=self.timeout)
             if c.smtp_username:
                 server.login(c.smtp_username, c.smtp_password)
-        except Exception:
+        except Exception as exc:
             server = None
+            smtp_err = exc
 
         if server is None:
             try:
@@ -123,12 +119,16 @@ class SmtpEmailProvider(Provider):
                     server.login(c.smtp_username, c.smtp_password)
             except smtplib.SMTPAuthenticationError:
                 return SendResult.fail("smtp_auth", "SMTP authentication failed.", transient=False)
-            except (OSError, smtplib.SMTPException):
-                return self._send_via_https_relay(message)
+            except Exception as exc:
+                server = None
+                smtp_err = exc
 
-        try:
+        if server is not None:
             try:
                 refused = server.send_message(msg)
+                if refused:
+                    return SendResult.fail("smtp_refused", "Recipient refused by the mail server.", transient=False)
+                return SendResult.ok(msg["Message-ID"].strip("<>"))
             except smtplib.SMTPRecipientsRefused as exc:
                 code = next(iter(exc.recipients.values()))[0] if exc.recipients else 550
                 return SendResult.fail(f"smtp_{code}", "Recipient refused by the mail server.",
@@ -136,18 +136,22 @@ class SmtpEmailProvider(Provider):
             except smtplib.SMTPResponseException as exc:
                 return SendResult.fail(f"smtp_{exc.smtp_code}", "Mail server rejected the message.",
                                        transient=400 <= exc.smtp_code < 500)
-            except (socket.timeout, TimeoutError):
-                return self._send_via_https_relay(message)
-            except (OSError, smtplib.SMTPException):
-                return self._send_via_https_relay(message)
-            if refused:
-                return SendResult.fail("smtp_refused", "Recipient refused by the mail server.", transient=False)
-            return SendResult.ok(msg["Message-ID"].strip("<>"))
-        finally:
-            try:
-                server.quit()
-            except Exception:
-                pass
+            except Exception as exc:
+                smtp_err = exc
+            finally:
+                try:
+                    server.quit()
+                except Exception:
+                    pass
+
+        # 2. Fallback to HTTPS email relay if direct SMTP failed (e.g. Render outbound SMTP block)
+        if getattr(c, "email_relay_url", None):
+            relay_res = self._send_via_https_relay(message)
+            if relay_res.accepted:
+                return relay_res
+            return SendResult.fail("smtp_relay_failed", f"SMTP and relay failed (SMTP: {smtp_err}; Relay: {relay_res.error_message})", transient=True)
+
+        return SendResult.fail("smtp_connect", f"Direct SMTP failed ({smtp_err}) and no relay configured.", transient=True)
 
 
 class MailgunEmailProvider(Provider):

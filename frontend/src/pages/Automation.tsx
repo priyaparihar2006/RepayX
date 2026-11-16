@@ -8,6 +8,7 @@ import {
   AuthError, automationApi, getAutomationKey, setAutomationKey,
   type Channel, type Communication, type Dashboard, type Emi, type FollowUp, type ImportPreview,
   type ImportSummary, type Pagination, type Policy, type Reminder, type EscalationCase, type VoiceMessage,
+  type InstantSendAllResponse,
 } from '../services/automation';
 import { EmptyState, ErrorState, LoadingState } from '../components/common/RequestState';
 import { EmailTestPanel } from '../components/automation/EmailTestPanel';
@@ -145,12 +146,29 @@ const KeyGate: React.FC<{ onSignedIn: (name: string, role: Role) => void; initia
 const Overview: React.FC<{ role: Role; onOpenTab: (t: Tab) => void }> = ({ role, onOpenTab }) => {
   const { data, error, reload } = useLoader(automationApi.dashboard, [], 30_000);
   const [busy, setBusy] = useState(false);
+  const [runningScheduler, setRunningScheduler] = useState(false);
+  const [schedulerNotice, setSchedulerNotice] = useState<string | null>(null);
+
   if (error && !data) return <div className={card}><ErrorState error={error} onRetry={reload} /></div>;
   if (!data) return <div className={card}><LoadingState label="Loading automation status…" /></div>;
   const h = data.health;
   const toggle = async () => {
     setBusy(true);
     try { await (h.automation_paused ? automationApi.resume() : automationApi.pause()); reload(); } finally { setBusy(false); }
+  };
+  const handleRunScheduler = async () => {
+    setRunningScheduler(true);
+    setSchedulerNotice(null);
+    try {
+      const res = await automationApi.runSchedulerNow();
+      const claimed = res.result?.claimed ?? 0;
+      setSchedulerNotice(`Scheduler executed at ${fmtTime(res.server_time, data.app_timezone)}: ${claimed} due job(s) claimed & processed.`);
+      reload();
+    } catch (err) {
+      setSchedulerNotice(`Scheduler trigger failed: ${errText(err)}`);
+    } finally {
+      setRunningScheduler(false);
+    }
   };
   const statuses = ['simulated', 'accepted', 'delivered', 'read', 'failed', 'retry_scheduled', 'skipped', 'unknown'];
   return (
@@ -163,26 +181,45 @@ const Overview: React.FC<{ role: Role; onOpenTab: (t: Tab) => void }> = ({ role,
           <div className="flex items-center gap-3">
             <Activity className={`w-5 h-5 ${h.worker.alive ? 'text-emerald-600' : 'text-rose-600'}`} />
             <div>
-              <p className="text-sm font-bold text-slate-900">
-                Scheduler {h.automation_paused ? 'paused' : h.worker.alive ? 'running' : 'not running'}
-              </p>
-              <p className="text-[11px] text-slate-500">
-                Last run {fmtTime(h.worker.last_tick_at, data.app_timezone)}
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-slate-900">
+                  Background Worker
+                </p>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  h.automation_paused ? 'bg-amber-100 text-amber-800' : h.worker.alive ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                }`}>
+                  {h.automation_paused ? 'Scheduler paused' : h.worker.alive ? 'Scheduler running' : 'Scheduler stopped'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Next scheduled reminder: <strong className="text-slate-800">{data.reminders.next_scheduled_run_local || 'None pending'}</strong> · Last poll: {fmtTime(h.worker.last_tick_at, data.app_timezone)}
                 {h.worker.hostname ? ` on ${h.worker.hostname}` : ''} · {h.worker.jobs_processed} jobs processed ·
                 backlog {h.queue.due_backlog}{h.queue.due_backlog ? ` (oldest ${Math.round(h.queue.oldest_due_lag_seconds / 60)} min)` : ''}
               </p>
               {!h.worker.alive && (
-                <p className="text-[11px] text-rose-700 mt-1">No worker heartbeat. Start it with <code className="font-mono">python worker.py</code> in backend/.</p>
+                <p className="text-[11px] text-rose-700 mt-1">No worker heartbeat recorded recently. Start it with <code className="font-mono">python worker.py</code> in backend/.</p>
               )}
             </div>
           </div>
-          {RANK[role] >= RANK.admin && (
-            <button className={h.automation_paused ? btnPrimary : btnGhost} onClick={toggle} disabled={busy}>
-              {h.automation_paused ? <PlayCircle className="w-4 h-4" /> : <PauseCircle className="w-4 h-4" />}
-              {h.automation_paused ? 'Resume automation' : 'Pause automation'}
+          <div className="flex items-center gap-2">
+            <button className={btnGhost} onClick={handleRunScheduler} disabled={runningScheduler || busy} title="Run scheduler immediately to process due reminders">
+              {runningScheduler ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 text-amber-600 fill-current" />}
+              <span>{runningScheduler ? 'Running Scheduler...' : 'Run Scheduler Now'}</span>
             </button>
-          )}
+            {RANK[role] >= RANK.admin && (
+              <button className={h.automation_paused ? btnPrimary : btnGhost} onClick={toggle} disabled={busy}>
+                {h.automation_paused ? <PlayCircle className="w-4 h-4" /> : <PauseCircle className="w-4 h-4" />}
+                {h.automation_paused ? 'Resume automation' : 'Pause automation'}
+              </button>
+            )}
+          </div>
         </div>
+        {schedulerNotice && (
+          <p className="mt-3 text-xs text-indigo-800 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg flex items-center justify-between">
+            <span>{schedulerNotice}</span>
+            <button type="button" onClick={() => setSchedulerNotice(null)} className="text-[10px] text-indigo-500 hover:text-indigo-800 font-bold ml-2">Dismiss</button>
+          </p>
+        )}
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
           {CHANNELS.map((c) => {
             const p = h.providers[c];
@@ -602,6 +639,10 @@ const ImportTabContent: React.FC = () => {
   const [isEditMode, setIsEditMode] = useState<boolean>(true);
   const [hasEdits, setHasEdits] = useState<boolean>(false);
 
+  // Instant send all results state
+  const [instantResult, setInstantResult] = useState<InstantSendAllResponse | null>(null);
+  const [sendingInstantly, setSendingInstantly] = useState(false);
+
   const checkAutomationStatus = useCallback(async () => {
     try {
       const h = await automationApi.health();
@@ -733,21 +774,10 @@ const ImportTabContent: React.FC = () => {
   };
 
   const handleSendAllInstantly = async () => {
-    const now = new Date(Date.now() + 2_000);
-    const datePart = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-    const timePart = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now);
-    const instantDt = `${datePart} ${timePart}`;
-
-    const instantRows = (editableRows.length > 0 ? editableRows : (preview?.sample_rows as Record<string, string>[] || [])).map((r) => ({
-      ...r,
-      reminder_datetime: instantDt,
-    }));
-    setEditableRows(instantRows);
-    setHasEdits(true);
-
-    if (!file || !preview) return;
-    submitting.current = true;
-    setBusy(true); setError(''); setResult(null);
+    setSendingInstantly(true);
+    setBusy(true);
+    setError('');
+    setInstantResult(null);
 
     if (automationPaused) {
       try {
@@ -757,15 +787,21 @@ const ImportTabContent: React.FC = () => {
     }
 
     try {
-      const cols = editableHeaders.length > 0 ? editableHeaders : Object.keys(instantRows[0] || {});
-      const csvStr = serializeCsv(cols, instantRows);
-      const fileToSend = new File([csvStr], file.name, { type: 'text/csv' });
-      const res = await automationApi.importCsv(fileToSend, importType, mapping, false);
-      setResult(res);
+      const rowsToSend = editableRows.length > 0
+        ? editableRows
+        : (preview?.sample_rows as Record<string, string>[] || undefined);
+      const res = await automationApi.sendAllInstantReminders({
+        channel: 'email',
+        force: true,
+        rows: rowsToSend,
+      });
+      setInstantResult(res);
+      history.reload();
     } catch (e) {
       setError(errText(e));
     } finally {
-      submitting.current = false; setBusy(false);
+      setSendingInstantly(false);
+      setBusy(false);
     }
   };
 
@@ -1165,18 +1201,18 @@ const ImportTabContent: React.FC = () => {
               <button
                 type="button"
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md disabled:opacity-50 cursor-pointer transition"
-                disabled={busy}
+                disabled={busy || sendingInstantly}
                 onClick={handleSendAllInstantly}
-                title="Set all reminder dates to right now and dispatch immediately"
+                title="Dispatch payment reminder emails immediately to eligible customers"
               >
-                <Zap className="w-4 h-4 text-slate-950 fill-current" />
-                <span>⚡ Send All Instantly Now</span>
+                {sendingInstantly ? <RefreshCw className="w-4 h-4 text-slate-950 animate-spin" /> : <Zap className="w-4 h-4 text-slate-950 fill-current" />}
+                <span>{sendingInstantly ? '⚡ Sending Emails Now...' : '⚡ Send All Instantly Now'}</span>
               </button>
               <button
                 type="button"
                 aria-label="Validate only"
                 className={`${btnGhost} text-slate-500 hover:text-slate-700`}
-                disabled={busy}
+                disabled={busy || sendingInstantly}
                 onClick={() => run(true)}
               >
                 <span>Validate only</span>
@@ -1186,6 +1222,110 @@ const ImportTabContent: React.FC = () => {
           </div>
         )}
       </section>
+
+      {instantResult && (
+        <section className={`${card} p-5 space-y-4 border-2 border-indigo-200 bg-linear-to-b from-white to-indigo-50/20`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-100 pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 bg-indigo-100 text-indigo-700 rounded-lg">
+                  <Zap className="w-4 h-4 fill-current" />
+                </span>
+                <h2 className="text-sm font-bold text-slate-900">
+                  Instant Email Delivery Report
+                </h2>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Dispatched at {fmtTime(instantResult.executed_at)} · Live results verified from email provider.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
+                ✅ {instantResult.sent_count} Sent
+              </span>
+              {instantResult.failed_count > 0 && (
+                <span className="text-xs font-bold px-3 py-1 bg-rose-100 text-rose-800 rounded-full border border-rose-200">
+                  ❌ {instantResult.failed_count} Failed
+                </span>
+              )}
+              {instantResult.skipped_count > 0 && (
+                <span className="text-xs font-bold px-3 py-1 bg-amber-100 text-amber-800 rounded-full border border-amber-200">
+                  ⚠️ {instantResult.skipped_count} Skipped
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setInstantResult(null)}
+                className="text-xs text-slate-500 hover:text-slate-800 font-semibold px-2 py-1 ml-2"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+              <p className="text-[11px] text-slate-500 font-medium">Total Customers</p>
+              <p className="text-lg font-bold text-slate-900">{instantResult.total_selected}</p>
+            </div>
+            <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-200">
+              <p className="text-[11px] text-emerald-700 font-medium">Delivered Successfully</p>
+              <p className="text-lg font-bold text-emerald-800">{instantResult.sent_count}</p>
+            </div>
+            <div className="bg-rose-50 rounded-xl p-3 border border-rose-200">
+              <p className="text-[11px] text-rose-700 font-medium">Failed Deliveries</p>
+              <p className="text-lg font-bold text-rose-800">{instantResult.failed_count}</p>
+            </div>
+            <div className="bg-amber-50 rounded-xl p-3 border border-amber-200">
+              <p className="text-[11px] text-amber-700 font-medium">Skipped Customers</p>
+              <p className="text-lg font-bold text-amber-800">{instantResult.skipped_count}</p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                <tr>
+                  <th className="px-3 py-2">Customer</th>
+                  <th className="px-3 py-2">Email Address</th>
+                  <th className="px-3 py-2">Loan ID</th>
+                  <th className="px-3 py-2">Amount</th>
+                  <th className="px-3 py-2">Delivery Status</th>
+                  <th className="px-3 py-2">Details / Reason</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {instantResult.results.map((r, i) => (
+                  <tr key={i} className="hover:bg-slate-50/50">
+                    <td className="px-3 py-2.5 font-medium text-slate-900">{r.customer_name}</td>
+                    <td className="px-3 py-2.5 font-mono text-[11px] text-slate-600">{r.email}</td>
+                    <td className="px-3 py-2.5 font-mono text-[11px] text-slate-600">{r.loan_id}</td>
+                    <td className="px-3 py-2.5 font-bold text-slate-800">{r.amount}</td>
+                    <td className="px-3 py-2.5">
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        r.status === 'sent'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : r.status === 'failed'
+                          ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                          : 'bg-amber-100 text-amber-800 border border-amber-200'
+                      }`}>
+                        {r.status === 'sent' ? 'DELIVERED' : r.status.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-[11px] text-slate-600">
+                      {r.status === 'sent' && r.tracking_ref ? (
+                        <span className="text-emerald-700 font-mono">Receipt #{r.tracking_ref.slice(-12)}</span>
+                      ) : (
+                        r.reason || '—'
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {result && (
         <section className={`${card} p-5 space-y-4`}>

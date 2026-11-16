@@ -258,16 +258,23 @@ class Dispatcher:
         for decision in eligible:
             current = deliveries.get(decision.channel)
             if current is not None:
-                if current["status"] == "failed":
-                    continue  # permanently failed: fall back to the next channel
+                if current["status"] in SUCCESS:
+                    return
                 if current["status"] in IN_FLIGHT:
                     return  # may already have reached the customer: never fall through
-                if current["status"] == "retry_scheduled" and parse_iso(current["next_retry_at"]) > now:
-                    return
+                if current["status"] == "failed":
+                    continue  # permanently failed: fall back to the next channel
+                # If this channel already failed transiently and is scheduled for retry,
+                # fall through to attempt the next eligible channel so the reminder is delivered
+                if current["status"] == "retry_scheduled":
+                    continue
             result = self._attempt(job, decision, content, customer,
                                    now + timedelta(seconds=time.monotonic() - started))
-            if result is None or result.accepted or result.transient or result.error_code == "ambiguous_timeout":
+            if result is not None and result.accepted:
                 return
+            if result is not None and result.error_code == "ambiguous_timeout":
+                return
+            # If this channel was not accepted, fall through to the next eligible channel (e.g. Email)
 
     def _run_all(self, job, eligible, deliveries, content, customer, now) -> None:
         started = time.monotonic()

@@ -224,18 +224,37 @@ class CustomerIdentityService:
 
     def _dto_from_record(self, r: dict[str, Any], email: str | None = None) -> CustomerProfileDTO:
         cid = str(r.get("customer_id") or "385057")
+        cname = r.get("customer_name") or "Valued Borrower"
+        phone_val = clean_phone(str(r.get("phone", "")))
+        unpaid = float(r.get("emi_left_to_repay", 63502.51))
+
+        pay_link = r.get("payment_link")
+        if not pay_link or "pay.repayx.ai" in str(pay_link):
+            try:
+                from services.razorpay_service import razorpay_service
+                plink_obj = razorpay_service.get_or_create_payment_link(
+                    customer_id=cid,
+                    customer_name=cname,
+                    loan_id=f"LN_{cid}",
+                    amount=unpaid,
+                    phone=phone_val,
+                )
+                pay_link = plink_obj.short_url
+            except Exception:
+                pay_link = f"https://rzp.io/i/plink_{cid}"
+
         return CustomerProfileDTO(
             customer_id=cid,
-            name=r.get("customer_name") or "Valued Borrower",
-            phone=clean_phone(str(r.get("phone", ""))),
+            name=cname,
+            phone=phone_val,
             email=email or f"customer_{cid}@repayx.sample",
             loan_id=f"LN_{cid}",
             total_loan_amount=float(r.get("total_loan_amount", 100000.0)),
             emi_paid_amount=float(r.get("emi_paid_amount", 36497.49)),
-            emi_left_to_repay=float(r.get("emi_left_to_repay", 63502.51)),
+            emi_left_to_repay=unpaid,
             monthly_emi=float(r.get("monthly_emi", 12000.0)),
             days_past_due=int(r.get("days_past_due", 40)),
             risk_tier=r.get("risk_tier") or "High Risk",
             risk_score=float(r.get("risk_score", 80.0)),
-            payment_link=r.get("payment_link") or f"https://pay.repayx.ai/inv/{cid}",
+            payment_link=pay_link,
         )

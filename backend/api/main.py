@@ -34,6 +34,7 @@ from api import (
     routes_webhooks,
     routes_whatsapp,
     routes_sms,
+    routes_payments,
 )
 from services.sms_service import SMSService, SMSSettings
 from api.errors import register_error_handlers
@@ -131,6 +132,7 @@ def create_app(settings: Settings | None = None, automation: AutomationService |
         routes_email_test.router,
         routes_sms.router,
         routes_webhooks.router,
+        routes_payments.router,
     ):
         app.include_router(router)
 
