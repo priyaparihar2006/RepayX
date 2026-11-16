@@ -725,7 +725,7 @@ export function WhatsAppPage() {
           setError('');
         }
       }
-      setNotice('Open WhatsApp on +91 8650629360 → Linked devices → Link a device, then scan the QR.');
+      setNotice('Open WhatsApp on your mobile phone → Linked devices → Link a device, then scan the QR.');
     } catch (err) {
       setError(messageOf(err));
     } finally {

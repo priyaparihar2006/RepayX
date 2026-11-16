@@ -108,11 +108,13 @@ async function createBridge(deps = {}) {
     clearTimeout(reconnectTimer);
     initializing = true;
     const currentGeneration = ++generation;
-    state = 'CONNECTING';
+    if (state !== 'AUTHENTICATING') {
+      state = 'CONNECTING';
+    }
     error = null;
     try {
       // 1. Resolve dynamic live WhatsApp Web client version to prevent mobile "Couldn't link device" reject
-      let waVersion = [2, 3000, 1054741204];
+      let waVersion = [2, 3000, 1054746309];
       try {
         if (baileys.fetchLatestWaWebVersion) {
           const vData = await baileys.fetchLatestWaWebVersion({});
@@ -280,9 +282,11 @@ async function createBridge(deps = {}) {
           console.log('[WhatsApp] ✅ Account linked successfully: +' + phone);
         }
         if (update.connection === 'close') {
-          const closeCode = update.lastDisconnect?.error?.output?.statusCode;
-          const isLoggedOut = closeCode === baileys.DisconnectReason.loggedOut || closeCode === 401;
-          const isRestart = closeCode === baileys.DisconnectReason.restartRequired || closeCode === 515;
+          const closeCode = update.lastDisconnect?.error?.output?.statusCode
+            || update.lastDisconnect?.error?.statusCode
+            || update.lastDisconnect?.error?.status;
+          const isLoggedOut = closeCode === baileys.DisconnectReason?.loggedOut || closeCode === 401;
+          const isRestart = closeCode === baileys.DisconnectReason?.restartRequired || closeCode === 515;
           socket = null;
           pairingReady = false;
 
@@ -296,25 +300,27 @@ async function createBridge(deps = {}) {
               try { fs.rmSync(authDir, { recursive: true, force: true }); }
               catch { fs.renameSync(authDir, authDir + '.logged-out-' + Date.now()); }
             }
-          } else if (isRestart) {
-            // CRITICAL: Code 515 restart required during pairing handshake must NEVER wipe credentials!
-            console.log('[WhatsApp] Stream restart required (code 515). Re-establishing socket in 300ms...');
+          } else if (isRestart || state === 'AUTHENTICATING') {
+            // CRITICAL: Code 515 restart or mid-handshake close during QR pairing handshake must NEVER wipe credentials!
+            console.log(`[WhatsApp] Pairing handshake stream reconnect required (code ${closeCode || 515}). Re-establishing socket in 300ms...`);
             state = 'AUTHENTICATING';
             reconnectTimer = setTimeout(() => void connect(), 300);
           } else {
-            // Check if credentials exist and are registered
+            // Check if credentials exist and are registered or contain in-progress pairing tokens
             const credsPath = path.join(authDir, 'creds.json');
             let isRegistered = false;
+            let hasPairingData = false;
             if (fs.existsSync(credsPath)) {
               try {
                 const credsData = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
                 isRegistered = !!credsData.registered || !!credsData.me;
+                hasPairingData = !!credsData.account || !!credsData.signalIdentities || !!credsData.processedHistoryMessages;
               } catch {}
             }
-            if (isRegistered) {
-              state = 'CONNECTING';
+            if (isRegistered || hasPairingData) {
+              state = hasPairingData && !isRegistered ? 'AUTHENTICATING' : 'CONNECTING';
               error = 'Reconnecting to WhatsApp...';
-              const delay = Math.min(Math.max(reconnects++, 1) * 2000, 10000);
+              const delay = state === 'AUTHENTICATING' ? 300 : Math.min(Math.max(reconnects++, 1) * 2000, 10000);
               reconnectTimer = setTimeout(() => void connect(), delay);
             } else {
               state = 'QR_EXPIRED';
@@ -340,11 +346,11 @@ async function createBridge(deps = {}) {
     res.json(snapshot());
   });
   app.post('/qr/generate', async (_req, res) => {
-    if (state === 'CONNECTED') {
+    if (state === 'CONNECTED' || state === 'AUTHENTICATING') {
       return res.json({ ...snapshot(), qr_code: null, expires_in: 0 });
     }
     const validQR = qrImage && qrExpires > Date.now();
-    if (!validQR && state !== 'AUTHENTICATING') {
+    if (!validQR) {
       clearTimeout(reconnectTimer);
       ++generation;
       const current = socket;
@@ -359,13 +365,15 @@ async function createBridge(deps = {}) {
       try {
         const credsPath = path.join(authDir, 'creds.json');
         let isRegistered = false;
+        let hasPairingData = false;
         if (fs.existsSync(credsPath)) {
           try {
             const credsData = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
             isRegistered = !!credsData.registered || !!credsData.me;
+            hasPairingData = !!credsData.account || !!credsData.signalIdentities;
           } catch {}
         }
-        if (!isRegistered && fs.existsSync(authDir)) {
+        if (!isRegistered && !hasPairingData && fs.existsSync(authDir)) {
           fs.rmSync(authDir, { recursive: true, force: true });
         }
       } catch (rmErr) {
