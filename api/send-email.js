@@ -9,7 +9,7 @@ try {
       nodemailer = require('../frontend/node_modules/nodemailer');
     } catch (e3) {
       throw e1;
-    }
+    } 
   }
 }
 

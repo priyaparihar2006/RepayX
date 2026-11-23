@@ -96,4 +96,4 @@ function doPost(e) {
 }
 
 // Run manually once in the editor to grant MailApp permissions; does NOT send.
-function authorizeRepayX() { MailApp.getRemainingDailyQuota(); }
+function authorizeRepayX() { MailApp.getRemainingDailyQuota(); } 

@@ -19,6 +19,7 @@ import { DemoDataNotice } from './components/common/DemoDataNotice';
 import { AiAssistantDrawer } from './components/ai-drawer/AiAssistantDrawer';
 import { EmptyState, LoadingState } from './components/common/RequestState';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { SplashScreen } from './components/common/SplashScreen';
 
 // Helper for lazy loading that gracefully reloads once if a build deployment replaced asset chunks
 function lazyWithRetry<T extends React.ComponentType<any>>(
@@ -455,6 +456,7 @@ const NotFound: React.FC = () => (
 export default function App() {
   return (
     <ErrorBoundary fallbackTitle="RepayX application encountered an unexpected error">
+      <SplashScreen />
       <BrowserRouter>
         <ToastProvider>
           <AppContent />
