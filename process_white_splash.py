@@ -22,25 +22,7 @@ total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 print(f"Source Video: {w}x{h} @ {fps}fps, {total_frames} frames", flush=True)
 
 os.makedirs('frontend/public', exist_ok=True)
-out_webm = 'frontend/public/splash_transparent.webm'
 out_mp4 = 'frontend/public/splash_screen.mp4'
-
-# FFMPEG WebM VP9 with Alpha (yuva420p)
-webm_cmd = [
-    ffmpeg_exe, "-y",
-    "-f", "rawvideo",
-    "-vcodec", "rawvideo",
-    "-s", f"{w}x{h}",
-    "-pix_fmt", "rgba",
-    "-r", str(fps),
-    "-i", "-",
-    "-c:v", "libvpx-vp9",
-    "-pix_fmt", "yuva420p",
-    "-auto-alt-ref", "0",
-    "-b:v", "2000k",
-    "-crf", "26",
-    out_webm
-]
 
 # FFMPEG MP4 H.264 (clean background, pure white #FFFFFF, no watermark)
 mp4_cmd = [
@@ -60,7 +42,6 @@ mp4_cmd = [
 ]
 
 # Use DEVNULL to prevent OS pipe buffer deadlocks
-proc_webm = subprocess.Popen(webm_cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 proc_mp4 = subprocess.Popen(mp4_cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 # Coordinate grids and background fitting matrices
@@ -94,7 +75,7 @@ logo_region[215:550, 225:1030] = True
 gem_mask = np.zeros((h, w), dtype=np.uint8)
 gem_mask[535:, 1085:] = 255
 
-print("Processing frames to pure white background...", flush=True)
+print("Processing frames to pure white splash_screen.mp4...", flush=True)
 frame_idx = 0
 
 while True:
@@ -119,7 +100,7 @@ while True:
     alpha_smooth = cv2.GaussianBlur(alpha, (3, 3), 0)
     alpha_smooth[~logo_region] = 0.0
 
-    # 1. Unmixed pure white composite for MP4: C = I + (1 - alpha) * (W - B)
+    # Unmixed pure white composite for MP4: C = I + (1 - alpha) * (W - B)
     alpha_3d = np.repeat(alpha_smooth[:, :, np.newaxis], 3, axis=2)
     W = 255.0
     white_composite = frame.astype(np.float64) + (1.0 - alpha_3d) * (W - bg_fitted)
@@ -129,35 +110,22 @@ while True:
 
     proc_mp4.stdin.write(white_composite.tobytes())
 
-    # 2. Transparent RGBA for WebM
-    rgba = cv2.cvtColor(white_composite, cv2.COLOR_BGR2RGBA)
-    rgba[:, :, 3] = (alpha_smooth * 255).astype(np.uint8)
-    proc_webm.stdin.write(rgba.tobytes())
-
     frame_idx += 1
     if frame_idx % 40 == 0 or frame_idx == total_frames:
         print(f"Processed {frame_idx}/{total_frames} frames...", flush=True)
 
 cap.release()
 
-proc_webm.stdin.close()
-proc_webm.wait()
-
 proc_mp4.stdin.close()
 proc_mp4.wait()
 
-print(f"WebM return code: {proc_webm.returncode}", flush=True)
-if proc_webm.returncode == 0:
-    print(f"WebM generated! Size: {os.path.getsize(out_webm) / 1024 / 1024:.2f} MB", flush=True)
-
 print(f"MP4 return code: {proc_mp4.returncode}", flush=True)
 if proc_mp4.returncode == 0:
-    print(f"MP4 generated! Size: {os.path.getsize(out_mp4) / 1024 / 1024:.2f} MB", flush=True)
+    print(f"splash_screen.mp4 generated! Size: {os.path.getsize(out_mp4) / 1024 / 1024:.2f} MB", flush=True)
 
 # Copy to dist and assets
 for dest_dir in ['frontend/dist', 'frontend/src/assets/images']:
     if os.path.exists(dest_dir):
-        shutil.copy2(out_webm, os.path.join(dest_dir, 'splash_transparent.webm'))
         shutil.copy2(out_mp4, os.path.join(dest_dir, 'splash_screen.mp4'))
         print(f"Copied updated video assets to {dest_dir}", flush=True)
 

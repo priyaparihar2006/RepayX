@@ -38,3 +38,4 @@ models/holdout_customer_ids.npy
 backend/data/*.env
 extracted_loanflow/
 *.zip
+frontend/dist/*
