@@ -62,11 +62,11 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         isFading ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
       style={{
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#EBEBEB',
       }}
     >
-      {/* Responsive Video Container */}
-      <div className="relative w-full h-full flex items-center justify-center p-2 sm:p-4 md:p-8">
+      {/* Full-Screen Edge-to-Edge Video Container */}
+      <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
         <video
           ref={videoRef}
           autoPlay
@@ -75,12 +75,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
           playsInline
           controls={false}
           preload="auto"
-          className="w-full h-full max-w-[1280px] max-h-[720px] object-contain"
+          className="w-full h-full object-cover"
           onEnded={startFadeOut}
         >
-          {/* Primary: Transparent WebM with alpha channel and Gemini branding removed */}
-          <source src="/splash_transparent.webm" type="video/webm; codecs=vp9" />
-          {/* Universal Fallback: Cleaned H.264 MP4 with seamless RepayX green branding */}
           <source src="/splash_screen.mp4" type="video/mp4" />
         </video>
       </div>

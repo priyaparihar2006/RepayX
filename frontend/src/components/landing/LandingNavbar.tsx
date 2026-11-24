@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, ArrowRight, ShieldCheck, Sparkles, MessageSquare, LayoutDashboard } from 'lucide-react';
+import { Menu, X, ArrowRight, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
 interface LandingNavbarProps {
@@ -62,11 +62,11 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4 flex-nowrap">
           {/* Logo & Brand */}
           <button
             onClick={() => scrollToSection('hero')}
-            className="flex items-center gap-3 group text-left cursor-pointer"
+            className="flex items-center gap-3 group text-left cursor-pointer shrink-0"
           >
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#168653] to-[#5DE5A1] p-0.5 shadow-md shadow-[#168653]/30 group-hover:scale-105 transition-transform">
               <div className="w-full h-full bg-[#101D25] rounded-[10px] flex items-center justify-center text-white font-extrabold text-base tracking-tighter">
@@ -91,12 +91,12 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
           </button>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-1 lg:gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md" aria-label="Main menu">
+          <nav className="hidden md:flex items-center gap-1 lg:gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md flex-nowrap shrink-0" aria-label="Main menu">
             {navLinks.map((link) => (
               <button
                 key={link.id}
                 onClick={() => scrollToSection(link.id)}
-                className="px-3.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 rounded-full transition-all cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 rounded-full transition-all cursor-pointer whitespace-nowrap"
               >
                 {link.label}
               </button>
@@ -104,32 +104,16 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
           </nav>
 
           {/* CTA Buttons */}
-          <div className="hidden sm:flex items-center gap-2 lg:gap-3">
-            <button
-              onClick={() => navigate('/whatsapp')}
-              className="px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer border border-white/10"
-              title="Launch Live WhatsApp Outreach Automation"
-            >
-              <MessageSquare className="w-3.5 h-3.5 text-[#5DE5A1]" />
-              <span>WhatsApp</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-[#5DE5A1] animate-pulse" />
-            </button>
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <LayoutDashboard className="w-3.5 h-3.5 text-slate-400" />
-              <span>Dashboard</span>
-            </button>
+          <div className="hidden sm:flex items-center gap-2 lg:gap-3 shrink-0">
             <button
               onClick={onOpenLoginModal}
-              className="px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
+              className="px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
             >
               Login
             </button>
             <button
               onClick={() => navigate('/dashboard')}
-              className="relative group overflow-hidden px-4 py-2 rounded-xl bg-gradient-to-r from-[#168653] to-[#5DE5A1] text-[#101D25] font-bold text-xs shadow-md shadow-[#168653]/30 hover:shadow-lg hover:shadow-[#5DE5A1]/30 hover:brightness-105 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
+              className="relative group overflow-hidden px-4 py-2 rounded-xl bg-gradient-to-r from-[#168653] to-[#5DE5A1] text-[#101D25] font-bold text-xs shadow-md shadow-[#168653]/30 hover:shadow-lg hover:shadow-[#5DE5A1]/30 hover:brightness-105 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
             >
               <span>Get Started</span>
               <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
@@ -139,17 +123,10 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-2">
             <button
-              onClick={() => navigate('/whatsapp')}
-              className="px-2.5 py-1.5 rounded-lg bg-[#142630] border border-[#5DE5A1]/30 text-[#5DE5A1] font-bold text-xs flex items-center gap-1"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>WhatsApp</span>
-            </button>
-            <button
               onClick={() => navigate('/dashboard')}
-              className="px-2.5 py-1.5 rounded-lg bg-[#168653] text-white font-bold text-xs"
+              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#168653] to-[#5DE5A1] text-[#101D25] font-bold text-xs"
             >
-              Dashboard
+              Get Started
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
